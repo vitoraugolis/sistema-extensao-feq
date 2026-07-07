@@ -37,7 +37,8 @@ from atena.core.orquestrador import Orquestrador
 from atena.core import guardrails as G
 from atena.core import auth
 from atena.agentes.ontologista import Ontologista
-from atena.agentes.ingestao import Ingestao, normalizar_meta
+from atena.agentes.ingestao import Ingestao, normalizar_meta, fetch_meta_lead
+from atena.agentes import nutricao
 from atena.agentes.curador import Curador
 from atena.agentes.cerebro import cerebro_factory, modelo_atual, testar_modelo, PROVEDORES, chave_do
 from atena.transporte.whatsapp import WhatsApp
@@ -49,11 +50,13 @@ if _modelo_salvo:
     os.environ["ATENA_MODELO"] = _modelo_salvo   # escolha da Central sobrevive a restart
 ONTO = Ontologista(EST)              # detém o grafo (.ont) — fonte da verdade
 ORQ = Orquestrador(estado=EST, ont=ONTO.ont, brain=cerebro_factory(ONTO.ont))
-ING = Ingestao(EST, ONTO.ont)
+ING = Ingestao(EST, ONTO.ont, faro=ORQ.faro)
 WA = WhatsApp(EST, ORQ)
 CUR = Curador(EST, ONTO.ont)
 WEB = pathlib.Path(__file__).resolve().parents[1] / "web"
 app = Flask(__name__)
+from werkzeug.middleware.proxy_fix import ProxyFix
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1)   # IP real atrás do Caddy
 auth.init_app(app, EST)             # login/RBAC/auditoria — /api/* exige sessão
 
 
@@ -173,7 +176,7 @@ def conversa_iniciar():
     return jsonify({"card_id": card_id, "envio": r})
 
 
-CFG = {"auto_aprovar": False}   # toggle da Central; auditado; reseta no restart (deliberado)
+CFG = {"auto_aprovar": EST.get_config("auto_aprovar") == "1"}   # persistido: deploys reiniciam o serviço
 
 
 def _aprovar_e_enviar(card_id, texto=None, ator="humano"):
@@ -208,6 +211,7 @@ def config_ep():
         b = request.get_json(silent=True) or {}
         if "auto_aprovar" in b:
             CFG["auto_aprovar"] = bool(b.get("auto_aprovar"))
+            EST.set_config("auto_aprovar", "1" if CFG["auto_aprovar"] else "0")
             EST.log_acao("operador", f"auto_aprovar={CFG['auto_aprovar']}")
         if b.get("modelo"):
             prov = b["modelo"].partition(":")[0]
@@ -258,6 +262,9 @@ def aprovacoes():
     for p in EST.listar_propostas("proposta"):
         out.append({"tipo": "injetor", "icone": "ti-database-import",
                     "texto": f"{p['tipo']} · {p['alvo']}", "pid": p["id"]})
+    for a in EST.listar_alertas(5):
+        out.append({"tipo": "alerta", "icone": "ti-alert-circle",
+                    "texto": f"[{a['tipo']}] {a['texto']} · {(a['criado'] or '')[5:16]}"})
     return jsonify(out)
 
 
@@ -301,7 +308,17 @@ def webhook_meta():
             if ch.get("field") != "leadgen":
                 continue
             v = ch.get("value", {})
-            res.append(ING.ingest(normalizar_meta(v.get("field_data"), v.get("campaign_name", ""), v.get("leadgen_id", ""))))
+            if v.get("field_data"):     # payload de teste/simulação com dados inline
+                lead = normalizar_meta(v.get("field_data"), v.get("campaign_name", ""),
+                                       v.get("leadgen_id", ""))
+            else:                       # webhook real: só leadgen_id -> busca na Graph API
+                lead = fetch_meta_lead(v.get("leadgen_id"))
+                if not lead:
+                    EST.add_alerta("ingestao",
+                                   f"leadgen {v.get('leadgen_id')} sem fetch (token/permissão?)")
+                    res.append({"ok": False, "leadgen_id": v.get("leadgen_id")})
+                    continue
+            res.append(ING.ingest(lead))
     return jsonify({"processados": res})
 
 
@@ -313,13 +330,22 @@ def webhook_whatsapp():
     if not G.verificar_assinatura(os.environ.get("META_APP_SECRET"), request.get_data(),
                                   request.headers.get("X-Hub-Signature-256")):
         return jsonify({"erro": "assinatura inválida"}), 403
-    res = WA.receber(request.get_json(silent=True) or {})
-    if CFG["auto_aprovar"]:
-        for r in res:
-            if r.get("card_id") and r.get("revisor", {}).get("aprovado"):
-                corpo, _ = _aprovar_e_enviar(r["card_id"], ator="auto")
-                r["auto_envio"] = corpo.get("envio") or corpo.get("erro")
-    return jsonify(res)
+    payload = request.get_json(silent=True) or {}
+    # ACK imediato (a Meta reentrega se demorar); turno de LLM roda fora do request
+    threading.Thread(target=_processar_whatsapp, args=(payload,), daemon=True).start()
+    return jsonify({"ok": True})
+
+
+def _processar_whatsapp(payload):
+    try:
+        res = WA.receber(payload)
+        if CFG["auto_aprovar"]:
+            for r in res:
+                if r.get("card_id") and r.get("revisor", {}).get("aprovado"):
+                    _aprovar_e_enviar(r["card_id"], ator="auto")
+    except Exception as e:
+        print(f"[webhook] processamento falhou: {e}", flush=True)
+        EST.add_alerta("webhook", f"falha ao processar mensagem: {e}")
 
 
 @app.route("/api/duvidas")
@@ -381,23 +407,72 @@ def fazer_backup():
     return {"ok": True, "backup": ts, "arquivos": len(list(bdir.iterdir()))}
 
 
-def _backup_diario():
-    # ponytail: agendador interno (03:30) — evita TCC do launchd; futuro: curador diário aqui
-    import time as _t
-    while True:
-        agora = datetime.datetime.now()
-        alvo = agora.replace(hour=3, minute=30, second=0, microsecond=0)
-        if alvo <= agora:
-            alvo += datetime.timedelta(days=1)
-        _t.sleep((alvo - agora).total_seconds())
+def _canario():
+    """Autoteste diário do pipeline: LLM (contrato JSON), Revisor e ontologia."""
+    problemas = []
+    r = testar_modelo(":".join(modelo_atual()))
+    if not r.get("ok"):
+        problemas.append(f"LLM {':'.join(modelo_atual())}: {r.get('erro')}")
+    rev = revisar("FEQ-0480", "São 19x de R$ 866,09.", ONTO.ont)
+    if not rev["aprovado"]:
+        problemas.append("Revisor bloqueou um fato verdadeiro")
+    if not ONTO.ont.captavel("FEQ-0480").get("existe"):
+        problemas.append("ontologia não carregou o catálogo")
+    if problemas:
+        EST.add_alerta("canario", "Canário falhou: " + "; ".join(problemas))
+    else:
+        EST.log_acao("sistema", "canario_ok")
+
+
+def _despachar_alertas():
+    """Alerta novo -> tenta avisar o gestor por WhatsApp (best effort; a Central sempre mostra)."""
+    dest = EST.get_config("alerta_whatsapp") or "5519936185086"
+    for a in EST.alertas_nao_notificados():
         try:
-            fazer_backup()
+            WA.enviar(dest, f"⚠️ Atena [{a['tipo']}]: {a['texto']}")
+        except Exception:
+            pass
+        EST.marcar_alerta_notificado(a["id"])
+
+
+def _rodou_hoje(chave):
+    hoje = datetime.date.today().isoformat()
+    if EST.get_config(chave) == hoje:
+        return True
+    EST.set_config(chave, hoje)
+    return False
+
+
+def _operacoes():
+    """Agendador único (tick 60s): alertas, degradação, backup, canário, nutrição, LGPD."""
+    import time as _t
+    from atena.agentes import cerebro as _cer
+    while True:
+        _t.sleep(60)
+        try:
+            _despachar_alertas()
+            # degradação: 3+ fallbacks determinísticos em 15 min -> alerta (máx. 1 a cada 30 min)
+            recentes = [t for t in _cer.FALLBACKS if _t.time() - t < 900]
+            ultimo = float(EST.get_config("op_fb_alerta") or 0)
+            if len(recentes) >= 3 and _t.time() - ultimo > 1800:
+                EST.set_config("op_fb_alerta", str(_t.time()))
+                EST.add_alerta("degradacao",
+                               f"{len(recentes)} respostas caíram no fallback determinístico em 15 min — verificar journalctl")
+            h = datetime.datetime.utcnow().hour
+            if h == 6 and not _rodou_hoje("op_backup"):       # 03:30h BRT ~ 06h UTC
+                fazer_backup()
+            if h == 7 and not _rodou_hoje("op_lgpd"):
+                EST.anonimizar_antigos(dias=180)
+            if h == 11 and not _rodou_hoje("op_canario"):     # 08h BRT
+                _canario()
+            if h == 14 and not _rodou_hoje("op_nutricao"):    # 11h BRT
+                nutricao.reengajar(EST, ONTO.ont, WA)
         except Exception as e:
-            print("backup diário falhou:", e)
+            print(f"[operacoes] tick falhou: {e}", flush=True)
 
 
 import threading
-threading.Thread(target=_backup_diario, daemon=True).start()
+threading.Thread(target=_operacoes, daemon=True).start()
 
 
 @app.route("/api/backup", methods=["POST"])

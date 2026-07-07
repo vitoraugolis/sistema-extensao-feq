@@ -20,8 +20,9 @@ card no FARO em **Lead**. (Histórico: chegou-se a definir Make→FARO; revertid
 ## Must-fixes do webhook público (novos — endpoint exposto na internet)
 - **S1 Verificar `X-Hub-Signature-256`** (HMAC-SHA256 com `META_APP_SECRET`) em todo POST. Sem isso,
   qualquer um injeta leads falsos. **Bloqueante.**
-- **S2 ACK rápido + processamento assíncrono.** Responder `200` imediatamente e processar fora do
-  request (fila SQLite). A Meta reentrega se demorar → sem isso há timeout e duplicata.
+- **S2 ACK rápido + processamento assíncrono.** ✅ Implementado: `200` imediato, turno processado
+  em thread; reentregas deduplicadas por `message_id` (`msgs_vistas`). Leadgen real busca os dados
+  via Graph API (`fetch_meta_lead`; exige token com `leads_retrieval` — `META_PAGE_TOKEN`).
 - **S3 Infra de borda:** HTTPS público (ngrok em dev; domínio/TLS em prod), `META_VERIFY_TOKEN`,
   token permanente com `leads_retrieval`.
 - **S4 Mapear campos do formulário real** em `fetch_meta_lead` (`full_name`/`phone_number`/`curso`…).

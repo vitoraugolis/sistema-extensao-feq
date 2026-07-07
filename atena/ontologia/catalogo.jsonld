@@ -106,7 +106,7 @@
       "requisito": { "@type": "feq:RequisitoAcademico", "nivelMinimo": "feq:superiorCompleto" },
       "cargaHoraria": { "@type": "feq:Duracao", "horas": 40, "label": "40h (8h presenciais + 32h EAD)" },
       "vagasMin": 25, "vagasMax": 60,
-      "janelaInscricao":   { "@type": "feq:JanelaTemporal", "inicio": "2025-12-03", "fim": "2026-05-11" },
+      "janelaInscricao":   { "@type": "feq:JanelaTemporal", "inicio": "2025-12-03", "fim": "2026-07-19" },
       "janelaOferecimento":{ "@type": "feq:JanelaTemporal", "inicio": "2026-06-13", "fim": "2026-09-30" },
       "planoPagamento": { "@type": "feq:PlanoPagamento", "taxaInscricao": "22.00", "numParcelas": 3, "valorParcela": "1000.12", "aVista": "3000.37" },
       "urlExtecamp": "https://ins.extecamp.unicamp.br/curso/dados/FEQ-0333/001",

@@ -31,10 +31,32 @@ def normalizar_meta(field_data, campaign_name="", leadgen_id=""):
     }
 
 
+def fetch_meta_lead(leadgen_id):
+    """Webhook leadgen real só traz o ID — busca os dados na Graph API.
+    Token: META_PAGE_TOKEN (preferido) ou WHATSAPP_TOKEN (se tiver leads_retrieval)."""
+    import os
+    import requests
+    token = os.environ.get("META_PAGE_TOKEN") or os.environ.get("WHATSAPP_TOKEN")
+    if not token or not leadgen_id:
+        return None
+    try:
+        r = requests.get(f"https://graph.facebook.com/v19.0/{leadgen_id}",
+                         params={"access_token": token}, timeout=20)
+        if r.status_code != 200:
+            print(f"[ingestao] Graph {r.status_code}: {r.text[:150]}", flush=True)
+            return None
+        data = r.json()
+        return normalizar_meta(data.get("field_data"), data.get("campaign_name", ""), leadgen_id)
+    except Exception as e:
+        print(f"[ingestao] fetch_meta_lead falhou: {e}", flush=True)
+        return None
+
+
 class Ingestao:
-    def __init__(self, estado, ont):
+    def __init__(self, estado, ont, faro=None):
         self.est = estado
         self.ont = ont
+        self.faro = faro
 
     def ingest(self, lead):
         tel = lead.get("telefone", "")
@@ -50,5 +72,12 @@ class Ingestao:
         card_id = f"meta-{_digits(tel)}"
         self.est.upsert_lead(card_id, nome=lead.get("nome", ""), telefone=tel,
                              curso=lead.get("curso", ""), fase="Lead", estado_conversa=ec)
+        if self.faro and self.faro.ativo:   # espelha no system of record
+            try:
+                fid = self.faro.criar_lead(lead.get("nome"), tel, lead.get("curso"))
+                if fid:
+                    self.est.set_lead(card_id, faro_id=fid)
+            except Exception as e:
+                print(f"[faro] criar_lead falhou: {e}", flush=True)
         return {"ok": True, "acao": "criado", "card_id": card_id,
                 "captavel": cap.get("captavel"), "estado_conversa": ec}

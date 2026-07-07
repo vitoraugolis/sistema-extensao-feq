@@ -90,6 +90,45 @@ def test_responder_duvida_fecha_ciclo():
     assert est.decisao_pendente("c1")["agente"] == "coordenacao"       # proposta pronta p/ envio
 
 
+def test_afirmacao_pos_gate_qualifica():
+    # "Sim, tenho" logo após a pergunta do gate = superior confirmado (fallback com memória)
+    est, orq = _novo()
+    est.add_conversa("c1", "agente", "você já concluiu o ensino superior? É o pré-requisito.")
+    orq.processar_mensagem("c1", "Sim, tenho")
+    assert est.get_lead("c1")["fase"] == "Prospect"
+
+
+def test_gate_nao_repete_a_mesma_frase():
+    from atena.core.orquestrador import MSG_GATE, MSG_GATE_2, brain_deterministico
+    est, _ = _novo()
+    lead = est.get_lead("c1")
+    d1 = brain_deterministico(ONT, lead, "quero saber mais", historico=[])
+    assert d1.mensagem_ao_lead == MSG_GATE
+    d2 = brain_deterministico(ONT, lead, "legal",
+                              historico=[{"papel": "agente", "texto": MSG_GATE}])
+    assert d2.mensagem_ao_lead == MSG_GATE_2          # variou, não papagaiou
+
+
+def test_pedido_de_link_envia_link():
+    est, orq = _novo(escolaridade="Superior Completo")
+    est.add_conversa("c1", "agente", "Posso te enviar o link de inscrição?")
+    orq.processar_mensagem("c1", "Pode sim!")
+    d = est.listar_decisoes("c1")[0]
+    assert "ins.extecamp.unicamp.br" in (d["mensagem"] or "")     # mandou o link de verdade
+    assert "16/08/2026" in d["mensagem"]                          # com o prazo certo
+
+
+def test_anti_loop_escala_para_humano():
+    from atena.core import contratos as C
+    est, _ = _novo()
+    est.add_conversa("c1", "agente", "MESMA RESPOSTA")
+    brain_teimoso = lambda lead, msg, hist=None: C.DecisaoAgente(
+        C.CONTINUAR, "x", mensagem_ao_lead="MESMA RESPOSTA")
+    Orquestrador(est, ONT, brain_teimoso).processar_mensagem("c1", "e aí?")
+    assert est.get_lead("c1")["estado_conversa"] == "escalado_humano"
+    assert est.decisao_pendente("c1")["mensagem"] != "MESMA RESPOSTA"  # saída elegante, não papagaio
+
+
 def test_funil_conta_fases():
     est = Estado(":memory:")
     est.seed_demo()

@@ -22,7 +22,11 @@ from atena.core import guardrails as G
 from atena.agentes.bibliotecario import Bibliotecario
 from atena.core.orquestrador import brain_deterministico
 
+import time as _time
+import collections
+
 _URL = "https://api.anthropic.com/v1/messages"
+FALLBACKS = collections.deque(maxlen=100)   # timestamps p/ o monitor de degradação
 
 # provedor -> variável de ambiente da chave (o modelo ativo vem de ATENA_MODELO="prov:id")
 PROVEDORES = {"claude": "ANTHROPIC_API_KEY", "openai": "OPENAI_API_KEY", "gemini": "GEMINI_API_KEY"}
@@ -70,7 +74,8 @@ def _gemini(key, mid, system, messages):
         f"https://generativelanguage.googleapis.com/v1beta/models/{mid}:generateContent",
         timeout=40, params={"key": key},
         json={"systemInstruction": {"parts": [{"text": system}]}, "contents": contents,
-              "generationConfig": {"maxOutputTokens": 1000}})
+              "generationConfig": {"maxOutputTokens": 3000,
+                                   "responseMimeType": "application/json"}})
     if r.status_code != 200:
         raise RuntimeError(f"Gemini {r.status_code}: {r.text[:120]}")
     return r.json()["candidates"][0]["content"]["parts"][0]["text"]
@@ -87,10 +92,13 @@ def chamar_llm(system, messages, modelo=None):
 
 
 def testar_modelo(modelo):
-    """Ping mínimo ao provedor/modelo — valida chave e ID ao vivo."""
+    """Valida chave, ID E o contrato JSON (o mesmo que o cérebro exige em produção)."""
     try:
-        out = chamar_llm("Responda somente: ok", [{"role": "user", "content": "ping"}], modelo=modelo)
-        return {"ok": True, "resposta": (out or "")[:60]}
+        out = chamar_llm('Responda SOMENTE com este JSON, sem mais nada: {"ok": true}',
+                         [{"role": "user", "content": "ping"}], modelo=modelo)
+        if not _json(out):
+            return {"ok": False, "erro": f"respondeu, mas fora do contrato JSON: {(out or '')[:80]!r}"}
+        return {"ok": True, "resposta": (out or "").strip()[:60]}
     except Exception as e:
         return {"ok": False, "erro": str(e)[:200]}
 
@@ -117,15 +125,20 @@ def _json(texto):
     return json.loads(m.group(0)) if m else None
 
 
-def _system_prompt(ctx):
+def _system_prompt(ctx, lead_nome=None):
     c = ctx["curso"]
+    nome = (lead_nome or "").strip()
     citados = "\n".join(
         f"CURSO CITADO PELO LEAD ({x['curso']['codigo']}, inscrição {x['captavel']['status']}):\n"
         f"{json.dumps(x['curso'], ensure_ascii=False)}"
         for x in ctx.get("cursos_citados", []))
     return (
         "Você é o Vinícius, atendente da Extensão FEQ Unicamp, qualificando um lead por WhatsApp. "
-        "Apresente-se como Vinícius (nunca como IA/Atena).\n"
+        "Apresente-se como Vinícius (nunca como IA/Atena). "
+        + (f"O LEAD se chama {nome} — trate-o por esse nome; " if nome else "")
+        + "NUNCA chame o lead de Vinícius (esse é VOCÊ).\n"
+        "TOM: caloroso, gentil e humano; celebre o interesse do lead; UMA pergunta por vez; "
+        "frases curtas de WhatsApp, sem parecer formulário.\n"
         f"CURSO DE INTERESSE DO LEAD (registro completo):\n{json.dumps(c, ensure_ascii=False)}\n"
         f"Elegibilidade já avaliada: {ctx.get('elegivel')}. Captável agora: {ctx['captavel'].get('captavel')}.\n"
         f"PORTFÓLIO COMPLETO DA FEQ (você conhece todos; use p/ orientar e redirecionar):\n"
@@ -157,25 +170,36 @@ def _system_prompt(ctx):
 def cerebro_llm(ont, lead, mensagem_lead, historico=None):
     # Decisões determinísticas (não confiar no LLM):
     if G.detectar_optout(mensagem_lead):
-        return brain_deterministico(ont, lead, mensagem_lead)
+        return brain_deterministico(ont, lead, mensagem_lead, historico)
     ctx = Bibliotecario(ont).contexto(lead["curso"], lead.get("escolaridade"), mensagem=mensagem_lead)
     if not ctx.get("existe") or not ctx["captavel"].get("captavel"):
-        return brain_deterministico(ont, lead, mensagem_lead)
-    try:
-        data = _json(chamar_llm(_system_prompt(ctx), _turns(historico, mensagem_lead)))
-        if not data or data.get("proxima_acao") not in C.ACOES:
-            raise ValueError("saída do LLM inválida")
-        # guarda anti-placeholder: ação conversacional exige mensagem de verdade
-        msg = (data.get("mensagem_ao_lead") or "").strip()
-        if data["proxima_acao"] in (C.CONTINUAR, C.QUALIFICAR, C.DESCARTAR) and len(msg) < 10:
-            raise ValueError(f"mensagem degenerada: {msg!r}")
-        return C.DecisaoAgente(
-            proxima_acao=data["proxima_acao"], motivo=data.get("motivo", ""),
-            mensagem_ao_lead=data.get("mensagem_ao_lead"),
-            escalonamento_motivo=data.get("escalonamento_motivo"),
-            dados=data.get("dados") or {})
-    except Exception:
-        return brain_deterministico(ont, lead, mensagem_lead)
+        return brain_deterministico(ont, lead, mensagem_lead, historico)
+    sysp = _system_prompt(ctx, lead.get("nome"))
+    turns = _turns(historico, mensagem_lead)
+    # tenta o modelo escolhido; se falhar e não for Claude, tenta Claude; só então o determinístico
+    tentativas = [None]
+    if modelo_atual()[0] != "claude" and chave_do("claude"):
+        tentativas.append(f"claude:{os.environ.get('ANTHROPIC_MODEL', 'claude-sonnet-4-6')}")
+    for m in tentativas:
+        try:
+            data = _json(chamar_llm(sysp, turns, modelo=m))
+            if not data or data.get("proxima_acao") not in C.ACOES:
+                raise ValueError("saída do LLM inválida")
+            # guarda anti-placeholder: ação conversacional exige mensagem de verdade
+            msg = (data.get("mensagem_ao_lead") or "").strip()
+            if data["proxima_acao"] in (C.CONTINUAR, C.QUALIFICAR, C.DESCARTAR) and len(msg) < 10:
+                raise ValueError(f"mensagem degenerada: {msg!r}")
+            return C.DecisaoAgente(
+                proxima_acao=data["proxima_acao"], motivo=data.get("motivo", ""),
+                mensagem_ao_lead=data.get("mensagem_ao_lead"),
+                escalonamento_motivo=data.get("escalonamento_motivo"),
+                dados=data.get("dados") or {})
+        except Exception as e:
+            # visível no journalctl — diagnóstico de por que o LLM não respondeu
+            print(f"[cerebro] falha em {m or ':'.join(modelo_atual())}: {type(e).__name__}: {e}",
+                  flush=True)
+    FALLBACKS.append(_time.time())
+    return brain_deterministico(ont, lead, mensagem_lead, historico)
 
 
 def cerebro_factory(ont):

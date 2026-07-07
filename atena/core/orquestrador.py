@@ -15,6 +15,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2]))
 from atena.ontologia.servico import Ontologia
 from atena.revisor.ontologico import revisar
 from atena.core.estado import Estado
+from atena.core.faro import Faro
 from atena.core import contratos as C
 from atena.core import guardrails as G
 
@@ -40,7 +41,17 @@ def _inferir_escolaridade(texto):
     return m.group(0) if m else None
 
 
-def brain_deterministico(ont, lead, mensagem_lead):
+AFIRMA_RE = re.compile(
+    r"^\s*(sim|s[,.!\s]|claro|tenho|possuo|com certeza|isso|j[áa]\b|conclu[íi]"
+    r"|pode\b|manda|envia|beleza|ok\b|quero|por favor)", re.I)
+MSG_GATE = ("Que ótimo seu interesse! 😊 Para eu te orientar da melhor forma, só preciso "
+            "confirmar uma coisa: você já concluiu o ensino superior? "
+            "É o pré-requisito dos nossos cursos.")
+MSG_GATE_2 = ("Desculpe insistir! 🙏 É que essa informação define os próximos passos: "
+              "você já concluiu o ensino superior?")
+
+
+def brain_deterministico(ont, lead, mensagem_lead, historico=None):
     """Cérebro mínimo, offline. Substituível por um cérebro LLM (mesmo contrato)."""
     cod = lead["curso"]
     if G.detectar_optout(mensagem_lead):
@@ -54,6 +65,10 @@ def brain_deterministico(ont, lead, mensagem_lead):
         return C.DecisaoAgente(C.ESCALAR, f"curso {cod} não captável ({cap.get('status')})",
                                escalonamento_motivo=f"captabilidade: {cap.get('status')}")
     esc = _inferir_escolaridade(mensagem_lead) or lead.get("escolaridade")
+    # memória mínima: "sim/tenho" logo após a pergunta do gate = superior confirmado
+    ultima_agente = next((h["texto"] for h in reversed(historico or []) if h.get("papel") == "agente"), "")
+    if not esc and "ensino superior" in ultima_agente.lower() and AFIRMA_RE.search(mensagem_lead or ""):
+        esc = "Superior Completo"
     if esc:
         eleg = ont.elegivel(esc, cod)
         if eleg is False:
@@ -62,20 +77,33 @@ def brain_deterministico(ont, lead, mensagem_lead):
                                    dados={"escolaridade": esc})
         if eleg is True:
             c = ont.curso(cod)
+            # lead pediu o link (ou confirmou a oferta de link) -> ENVIA o link
+            quer_link = (re.search(r"\blink\b|inscri", mensagem_lead or "", re.I) or
+                         ("link de inscrição" in ultima_agente.lower()
+                          and AFIRMA_RE.search(mensagem_lead or "")))
+            if quer_link and c.get("url_extecamp"):
+                prazo = "/".join(reversed((c.get("inscricoes_fim") or "").split("-")))
+                msg = (f"Perfeito! 🎉 Aqui está o link de inscrição do {cod}: "
+                       f"{c['url_extecamp']} — as inscrições vão até {prazo}. "
+                       f"Qualquer dúvida no preenchimento, me chama por aqui!")
+                return C.DecisaoAgente(C.QUALIFICAR, "elegível — link de inscrição enviado",
+                                       mensagem_ao_lead=msg, dados={"escolaridade": esc})
             p = c["plano"]
             msg = (f"Que ótimo! O {cod} são {p['n']}x de R$ {_fmt_ptbr(p['valor_parcela'])}, "
                    f"ou R$ {_fmt_ptbr(p['a_vista'])} à vista. Posso te enviar o link de inscrição?")
             return C.DecisaoAgente(C.QUALIFICAR, "elegível + interesse",
                                    mensagem_ao_lead=msg, dados={"escolaridade": esc})
-    return C.DecisaoAgente(C.CONTINUAR, "coletando escolaridade",
-                           mensagem_ao_lead="Perfeito! Para confirmar: você já concluiu o ensino superior? É o requisito deste curso.")
+    # anti-repetição: se a última mensagem do agente já foi o gate, varia a frase
+    msg_gate = MSG_GATE_2 if "ensino superior" in ultima_agente.lower() else MSG_GATE
+    return C.DecisaoAgente(C.CONTINUAR, "coletando escolaridade", mensagem_ao_lead=msg_gate)
 
 
 class Orquestrador:
-    def __init__(self, estado=None, ont=None, brain=None):
+    def __init__(self, estado=None, ont=None, brain=None, faro=None):
         self.est = estado or Estado()
         self.ont = ont or Ontologia()
-        self.brain = brain or (lambda lead, msg, hist=None: brain_deterministico(self.ont, lead, msg))
+        self.faro = faro or Faro()
+        self.brain = brain or (lambda lead, msg, hist=None: brain_deterministico(self.ont, lead, msg, hist))
 
     def processar_mensagem(self, card_id, mensagem_lead):
         lead = self.est.get_lead(card_id)
@@ -87,6 +115,12 @@ class Orquestrador:
         self.est.add_conversa(card_id, "lead", mensagem_lead)
 
         dec = self.brain(lead, mensagem_lead, historico)
+        # anti-loop: repetir a MESMA mensagem é sinal de agente perdido -> humano assume
+        ultima_ag = next((h["texto"] for h in reversed(historico) if h.get("papel") == "agente"), None)
+        if dec.mensagem_ao_lead and dec.mensagem_ao_lead == ultima_ag:
+            dec = C.DecisaoAgente(C.ESCALAR, "loop detectado (mensagem idêntica à anterior)",
+                                  mensagem_ao_lead="Boa pergunta! Vou pedir para alguém da equipe te responder pessoalmente — só um instante! 😊",
+                                  escalonamento_motivo="agente repetiria a mesma resposta")
         if dec.proxima_acao == C.CONSULTAR:
             # regra de ouro: template fixo ao lead + dúvida na fila da coordenação
             dec.mensagem_ao_lead = MSG_COORDENACAO
@@ -118,11 +152,21 @@ class Orquestrador:
             campos["optout"] = 1
         elif acao == C.ESCALAR:
             campos["motivo"] = dec.escalonamento_motivo or dec.motivo
+            self.est.add_alerta("escalonamento",
+                                f"Lead {card_id} escalado: {campos['motivo']}")
         elif acao in C.FASE_POR_ACAO:
             campos["fase"] = C.FASE_POR_ACAO[acao]
             if acao == C.DESCARTAR:
                 campos["motivo"] = dec.motivo
         self.est.set_lead(card_id, **campos)
+        # espelha no FARO (system of record) — best effort, nunca bloqueia a conversa
+        if self.faro.ativo and campos.get("fase"):
+            l = self.est.get_lead(card_id)
+            if l and l.get("faro_id"):
+                try:
+                    self.faro.mover(l["faro_id"], campos["fase"])
+                except Exception as e:
+                    print(f"[faro] espelhamento falhou: {e}", flush=True)
 
         if dec.mensagem_ao_lead and rev["aprovado"]:
             status = "proposta"   # aguardando aprovação humana (envio = tier externa)

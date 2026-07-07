@@ -37,6 +37,8 @@ class WhatsApp:
             for ch in entry.get("changes", []):
                 v = ch.get("value", {})
                 for m in v.get("messages", []):
+                    if self.est.msg_ja_vista(m.get("id")):
+                        continue   # reentrega da Meta — já processada, não duplicar resposta
                     tel = m.get("from", "")
                     texto = (m.get("text") or {}).get("body", "")
                     card_id = self.est.lead_por_telefone(tel)

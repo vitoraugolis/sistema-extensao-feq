@@ -38,6 +38,10 @@ CREATE TABLE IF NOT EXISTS duvidas(
   id INTEGER PRIMARY KEY AUTOINCREMENT, card_id TEXT, pergunta TEXT, contexto TEXT,
   resposta TEXT, status TEXT DEFAULT 'aberta', criado TEXT, respondido_em TEXT);
 CREATE TABLE IF NOT EXISTS config(chave TEXT PRIMARY KEY, valor TEXT);
+CREATE TABLE IF NOT EXISTS msgs_vistas(msg_id TEXT PRIMARY KEY, ts TEXT);
+CREATE TABLE IF NOT EXISTS alertas(
+  id INTEGER PRIMARY KEY AUTOINCREMENT, tipo TEXT, texto TEXT,
+  criado TEXT, notificado INTEGER DEFAULT 0);
 CREATE TABLE IF NOT EXISTS usuarios(
   usuario TEXT PRIMARY KEY, senha_hash TEXT, papel TEXT, ativo INTEGER DEFAULT 1, criado TEXT);
 """
@@ -60,6 +64,12 @@ class Estado:
             self.conn.execute("PRAGMA journal_mode=WAL")
         self._lock = threading.Lock()
         self.conn.executescript(SCHEMA)
+        for mig in ("ALTER TABLE leads ADD COLUMN reengajos INTEGER DEFAULT 0",
+                    "ALTER TABLE leads ADD COLUMN faro_id TEXT"):
+            try:
+                self.conn.execute(mig)
+            except sqlite3.OperationalError:
+                pass  # coluna já existe
         self.conn.commit()
 
     # ---------------------------------------------------------------- leads
@@ -162,6 +172,55 @@ class Estado:
                 "UPDATE duvidas SET resposta=?, status=?, respondido_em=? WHERE id=?",
                 (resposta, status, _agora(), did))
             self.conn.commit()
+
+    # ------------------------------------------------- dedupe de webhook
+    def msg_ja_vista(self, msg_id):
+        """Marca e informa: True se este message_id já foi processado (reentrega)."""
+        if not msg_id:
+            return False
+        with self._lock:
+            cur = self.conn.execute(
+                "INSERT OR IGNORE INTO msgs_vistas(msg_id, ts) VALUES(?,?)", (msg_id, _agora()))
+            self.conn.commit()
+            return cur.rowcount == 0
+
+    # ----------------------------------------------------------------- alertas
+    def add_alerta(self, tipo, texto):
+        with self._lock:
+            self.conn.execute("INSERT INTO alertas(tipo,texto,criado) VALUES(?,?,?)",
+                              (tipo, texto, _agora()))
+            self.conn.commit()
+
+    def alertas_nao_notificados(self):
+        return [dict(r) for r in self.conn.execute(
+            "SELECT * FROM alertas WHERE notificado=0 ORDER BY id")]
+
+    def marcar_alerta_notificado(self, aid):
+        with self._lock:
+            self.conn.execute("UPDATE alertas SET notificado=1 WHERE id=?", (aid,))
+            self.conn.commit()
+
+    def listar_alertas(self, limite=10):
+        return [dict(r) for r in self.conn.execute(
+            "SELECT * FROM alertas ORDER BY id DESC LIMIT ?", (limite,))]
+
+    # -------------------------------------------------------------- LGPD
+    def anonimizar_antigos(self, dias=180):
+        """Leads perdidos há mais de N dias: apaga PII e o conteúdo das conversas."""
+        limite = (datetime.datetime.now() - datetime.timedelta(days=dias)).isoformat()
+        n = 0
+        for l in self.listar_leads():
+            if l["fase"] == "Perdido" and (l["atualizado"] or "9999") < limite and l["telefone"]:
+                with self._lock:
+                    self.conn.execute(
+                        "UPDATE leads SET nome='(anonimizado)', telefone='' WHERE card_id=?",
+                        (l["card_id"],))
+                    self.conn.execute("DELETE FROM conversas WHERE card_id=?", (l["card_id"],))
+                    self.conn.commit()
+                n += 1
+        if n:
+            self.log_acao("sistema", f"lgpd: {n} lead(s) anonimizado(s)")
+        return n
 
     # ------------------------------------------------------------- auditoria
     def log_acao(self, ator, acao, alvo=""):

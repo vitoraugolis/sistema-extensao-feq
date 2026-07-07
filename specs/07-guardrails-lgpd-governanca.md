@@ -22,7 +22,8 @@
   `Data Consentimento` no card.
 - **Opt-out** em toda cadência; honrado imediatamente.
 - **Minimização**: coletar só o necessário por estágio. CPF/endereço/documentos apenas na inscrição.
-- **Retenção**: leads descartados/inativos têm prazo definido antes de arquivamento/anonimização.
+- **Retenção**: ✅ implementado — job diário anonimiza leads em "Perdido" há mais de 180 dias
+  (nome/telefone apagados, conversas excluídas; `estado.anonimizar_antigos`).
 - **PII**: nunca em logs em texto; nunca em prompt além do necessário; mascarar antes de
   enviar a APIs externas quando aplicável.
 

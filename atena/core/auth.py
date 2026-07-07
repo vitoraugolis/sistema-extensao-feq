@@ -58,6 +58,8 @@ def _garantir_secret(app):
             pass  # sem .env gravável: sessão vale só até o restart
         os.environ["ATENA_SECRET"] = sec
     app.secret_key = sec
+    app.config.update(SESSION_COOKIE_HTTPONLY=True, SESSION_COOKIE_SAMESITE="Lax",
+                      SESSION_COOKIE_SECURE=os.environ.get("ATENA_COOKIE_SECURE", "0") == "1")
 
 
 def init_app(app, estado):
