@@ -1,0 +1,391 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Central de Operação · Extensão FEQ</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.7.0/dist/tabler-icons.min.css">
+<style>
+:root{--ink:#1e293b;--ink2:#475569;--ink3:#64748b;--accent:#2563eb;--ok:#0f6e56;--warn:#854f0b;--bad:#991b1b;}
+*{box-sizing:border-box;}
+body{margin:0;min-height:100vh;color:var(--ink);font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+ background:radial-gradient(circle at 16% 10%,#c7d2fe,transparent 42%),radial-gradient(circle at 86% 4%,#a7f3d0,transparent 40%),radial-gradient(circle at 72% 94%,#ddd6fe,transparent 46%),linear-gradient(135deg,#eef2ff,#faf5ff);background-attachment:fixed;}
+.wrap{max-width:1080px;margin:0 auto;padding:22px;}
+.g{background:rgba(255,255,255,.52);-webkit-backdrop-filter:blur(22px) saturate(170%);backdrop-filter:blur(22px) saturate(170%);
+ border:.5px solid rgba(255,255,255,.7);border-radius:18px;box-shadow:0 10px 34px rgba(31,41,55,.10);}
+.top{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;}
+.brand{display:flex;align-items:center;gap:11px;}
+.logo{width:34px;height:34px;border-radius:10px;background:rgba(37,99,235,.16);color:#1d4ed8;display:flex;align-items:center;justify-content:center;font-size:19px;}
+.pill{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;padding:4px 9px;border-radius:999px;}
+.layout{display:grid;grid-template-columns:170px 1fr;gap:16px;}
+.nav{padding:10px 9px;align-self:start;position:sticky;top:22px;}
+.navi{display:flex;align-items:center;gap:10px;padding:9px 11px;border-radius:12px;font-size:13.5px;color:#334155;cursor:pointer;border:none;background:none;width:100%;text-align:left;font-family:inherit;}
+.navi:hover{background:rgba(255,255,255,.5);}
+.navi.on{background:rgba(37,99,235,.14);color:#1d4ed8;}
+.navi i{font-size:18px;}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:16px;}
+.card{padding:13px 15px;}
+.lab{font-size:12px;color:var(--ink3);margin:0;}
+.num{font-size:27px;font-weight:500;margin:3px 0 0;letter-spacing:-.01em;}
+.sec{padding:16px 18px;margin-bottom:16px;}
+.sec h2{font-size:15px;font-weight:500;margin:0 0 12px;}
+.hidden{display:none;}
+.row{display:flex;align-items:center;gap:10px;padding:9px 11px;border-radius:12px;background:rgba(255,255,255,.5);margin-bottom:8px;font-size:13px;}
+.tag{font-size:11px;padding:3px 8px;border-radius:999px;margin-left:auto;white-space:nowrap;}
+.t-ok{background:rgba(16,158,117,.16);color:#04342C;}
+.t-bad{background:rgba(226,75,74,.16);color:#791F1F;}
+.t-acc{background:rgba(37,99,235,.14);color:#1d4ed8;}
+.t-warn{background:rgba(239,159,39,.18);color:#633806;}
+.bubble{max-width:80%;padding:9px 12px;font-size:13.5px;border-radius:14px;}
+.b-lead{align-self:flex-start;background:rgba(255,255,255,.72);border-radius:14px 14px 14px 4px;}
+.b-ag{align-self:flex-end;background:rgba(37,99,235,.12);border:1.5px solid rgba(37,99,235,.45);border-radius:14px 14px 4px 14px;}
+select,textarea{width:100%;border-radius:11px;border:.5px solid rgba(148,163,184,.55);background:rgba(255,255,255,.62);padding:9px 11px;font:inherit;font-size:13.5px;color:var(--ink);}
+.btn{border:none;border-radius:11px;padding:9px 14px;font-size:13px;font-weight:500;cursor:pointer;font-family:inherit;}
+.btn-p{background:var(--accent);color:#fff;}
+.btn-v{background:#534ab7;color:#fff;}
+.btn-g{background:rgba(255,255,255,.6);color:#334155;border:.5px solid rgba(148,163,184,.55);}
+.chip{display:inline-flex;align-items:center;gap:4px;font-size:11px;padding:3px 8px;border-radius:999px;margin:3px 4px 0 0;}
+.muted{color:var(--ink3);font-size:12px;}
+</style>
+</head>
+<body>
+<div id="login" style="display:none;position:fixed;inset:0;background:rgba(30,41,59,.35);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);align-items:center;justify-content:center;z-index:50;">
+  <div class="g" style="padding:22px;width:300px;">
+    <div style="font-weight:500;margin-bottom:12px;"><i class="ti ti-lock"></i> Central FEQ — acesso</div>
+    <input id="lu" placeholder="usuário" style="margin-bottom:8px;">
+    <input id="lp" type="password" placeholder="senha" style="margin-bottom:12px;">
+    <button class="btn btn-p" style="width:100%;" onclick="login()">Entrar</button>
+    <div id="lerr" class="muted" style="color:#991b1b;margin-top:8px;"></div>
+  </div>
+</div>
+<div class="wrap">
+  <div class="top">
+    <div class="brand">
+      <div class="logo"><i class="ti ti-shield-bolt"></i></div>
+      <div>
+        <div style="font-weight:500;">Central de Operação · Extensão FEQ</div>
+        <div class="muted">Atena · captação de alunos Unicamp</div>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;">
+      <button id="autoTgl" class="pill" style="border:none;cursor:pointer;font-family:inherit;background:rgba(148,163,184,.25);color:#334155;" onclick="toggleAuto()"><i class="ti ti-bolt"></i> aprovação automática: OFF</button>
+      <span class="pill" style="background:rgba(16,158,117,.16);color:#04342C;"><i class="ti ti-circle-filled" style="font-size:9px;"></i> sistema ativo</span>
+    </div>
+  </div>
+
+  <div class="layout">
+    <nav class="g nav">
+      <button class="navi on" data-sec="painel"><i class="ti ti-layout-dashboard"></i> Painel</button>
+      <button class="navi" data-sec="conversas"><i class="ti ti-messages"></i> Conversas</button>
+      <button class="navi" data-sec="aprovacoes"><i class="ti ti-inbox"></i> Aprovações</button>
+      <button class="navi" data-sec="duvidas"><i class="ti ti-help-circle"></i> Dúvidas <span class="tag t-warn" id="dvCount" style="display:none;margin-left:auto;"></span></button>
+      <button class="navi" data-sec="injetor"><i class="ti ti-database-import"></i> Injetor</button>
+      <button class="navi" data-sec="revisor"><i class="ti ti-eye-search"></i> Revisor ao vivo</button>
+      <button class="navi" data-sec="config"><i class="ti ti-settings"></i> Configurações</button>
+    </nav>
+
+    <main>
+      <section id="painel">
+        <div class="cards" id="cards"></div>
+        <div class="g sec">
+          <h2>Captabilidade hoje <span class="muted" id="hoje"></span></h2>
+          <div id="capt"></div>
+          <p class="muted" style="margin:10px 2px 0;">Status calculado pela ontologia (janela de inscrição vs. hoje). Curso encerrado não é engajado pelo SDR.</p>
+        </div>
+      </section>
+
+      <section id="conversas" class="hidden"><div class="g sec"><h2>Conversas ao vivo</h2><div id="conv"></div></div></section>
+
+      <section id="aprovacoes" class="hidden"><div class="g sec"><h2>Fila de aprovação humana</h2><div id="aprov"></div></div></section>
+
+      <section id="duvidas" class="hidden">
+        <div class="g sec">
+          <h2><i class="ti ti-help-circle"></i> Dúvidas para a coordenação</h2>
+          <p class="muted" style="margin:0 0 10px;">Quando o Vinícius não tem a informação, ele avisa o lead ("vou consultar a coordenação"), a dúvida cai aqui, e a sua resposta vira a fonte autorizada da mensagem que ele elabora de volta.</p>
+          <div id="dvs"></div>
+        </div>
+      </section>
+
+      <section id="injetor" class="hidden">
+        <div class="g sec">
+          <h2><i class="ti ti-database-import"></i> Injetor de conhecimento</h2>
+          <p class="muted" style="margin:0 0 10px;">Cole uma atualização (curso reabriu, novo preço, adequação). A Atena propõe o diff na ontologia + relatório de impacto, valida com SHACL e envia para sua aprovação.</p>
+          <textarea id="inj" rows="3" placeholder="Ex.: a inscrição do FEQ-0499 reabriu até 30/08/2026 e a carga é 48h."></textarea>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;">
+            <span class="muted">diff + impacto · validação SHACL · aprovação humana</span>
+            <button class="btn btn-v" onclick="analisarInjetor()">Analisar impacto</button>
+          </div>
+          <div id="injout" style="margin-top:12px;"></div>
+        </div>
+      </section>
+
+      <section id="revisor" class="hidden">
+        <div class="g sec">
+          <h2><i class="ti ti-eye-search"></i> Revisor ao vivo (grounding real)</h2>
+          <p class="muted" style="margin:0 0 10px;">Escolha um curso e escreva uma afirmação. O Revisor ontológico resolve cada fato contra o grafo (fail-closed).</p>
+          <div style="display:grid;grid-template-columns:160px 1fr;gap:10px;align-items:start;">
+            <select id="rcurso"></select>
+            <textarea id="rtexto" rows="2" placeholder="Ex.: o curso custa R$ 999,00 em 30x.">O curso custa R$ 999,00 em 30x.</textarea>
+          </div>
+          <div style="margin-top:10px;"><button class="btn btn-p" onclick="testarRevisor()">Revisar</button></div>
+          <div id="rout" style="margin-top:12px;"></div>
+        </div>
+      </section>
+      <section id="config" class="hidden">
+        <div class="g sec">
+          <h2><i class="ti ti-settings"></i> Modelo do cérebro (Vinícius)</h2>
+          <p class="muted" style="margin:0 0 12px;">Define qual LLM processa as respostas ao lead. Provedores sem chave no .env aparecem desabilitados. O Revisor estrutural é determinístico e independe desta escolha.</p>
+          <div style="display:grid;grid-template-columns:150px 1fr auto auto;gap:10px;align-items:center;">
+            <select id="cfgProv" onchange="cfgPresets()"></select>
+            <input id="cfgModelo" list="cfgLista" placeholder="id do modelo">
+            <datalist id="cfgLista"></datalist>
+            <button class="btn btn-g" onclick="cfgTestar()">Testar</button>
+            <button class="btn btn-p" onclick="cfgSalvar()">Salvar</button>
+          </div>
+          <div id="cfgOut" style="margin-top:12px;"></div>
+          <div id="cfgAtual" class="muted" style="margin-top:8px;"></div>
+        </div>
+        <div class="g sec" id="secUsuarios" style="display:none;">
+          <h2><i class="ti ti-users"></i> Usuários da Central</h2>
+          <p class="muted" style="margin:0 0 10px;">Contas com login e senha (armazenadas com hash). Ao criar o primeiro usuário real, o acesso de desenvolvimento (operador/operador) é desativado automaticamente.</p>
+          <div id="usrLista" style="margin-bottom:12px;"></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 140px auto;gap:8px;">
+            <input id="usrNome" placeholder="usuário">
+            <input id="usrSenha" type="password" placeholder="senha (mín. 6)">
+            <select id="usrPapel"><option value="operador">operador</option><option value="supervisor">supervisor</option></select>
+            <button class="btn btn-p" onclick="usrCriar()">Criar</button>
+          </div>
+          <div id="usrOut" style="margin-top:10px;"></div>
+        </div>
+      </section>
+    </main>
+  </div>
+</div>
+
+<script>
+const $ = (s)=>document.querySelector(s);
+const api = (p,o)=>fetch(p,o).then(r=>r.json());
+
+document.querySelectorAll('.navi').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('.navi').forEach(x=>x.classList.remove('on'));
+  b.classList.add('on');
+  document.querySelectorAll('main section').forEach(s=>s.classList.add('hidden'));
+  $('#'+b.dataset.sec).classList.remove('hidden');
+});
+
+async function carregar(){
+  const st = await api('/api/stats');
+  $('#cards').innerHTML = st.funil.map(f=>`
+    <div class="g card"><p class="lab">${f.fase}</p><p class="num">${f.n}</p>
+    <span class="chip t-acc">${f.nota}</span></div>`).join('');
+
+  const cap = await api('/api/captabilidade');
+  $('#hoje').textContent = '· ' + cap.hoje.split('-').reverse().join('/');
+  $('#capt').innerHTML = cap.cursos.map(c=>{
+    const cls = c.status==='aberta'?'t-ok':(c.status==='encerrada'?'t-bad':'t-warn');
+    const al = c.alerta?` <i class="ti ti-alert-triangle" title="${c.alerta}" style="color:#854f0b;"></i>`:'';
+    return `<div class="row"><strong>${c.curso}</strong>${al}<span style="color:var(--ink2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${c.nome}</span><span class="tag ${cls}">${c.status}</span></div>`;
+  }).join('');
+
+  if(!$('#rcurso').options.length) $('#rcurso').innerHTML = cap.cursos.map(c=>`<option value="${c.curso}">${c.curso}</option>`).join('');
+
+  const cv = await api('/api/conversas');
+  $('#conv').innerHTML = cv.map(c=>{
+    const fios = (c.thread||[]).map(t=>{
+      const eu = t.papel==='agente';
+      return `<div class="bubble ${eu?'b-ag':'b-lead'}" style="${eu?'align-self:flex-end;':''}">${eu?'<div style="font-size:10.5px;color:#1d4ed8;margin-bottom:2px;"><i class="ti ti-robot"></i> Vinícius · '+(t.ts||'').slice(11,16)+'</div>':''}${(t.texto||'<i>(mídia/sem texto)</i>')}</div>`;
+    }).join('');
+    const prop = c.proposta?`
+        <div class="bubble b-ag" style="align-self:flex-end;border-style:dashed;"><div style="font-size:11px;color:#1d4ed8;margin-bottom:4px;"><i class="ti ti-robot"></i> proposta · aguardando você</div>${c.proposta}
+          <div style="margin-top:6px;"><span class="chip t-ok"><i class="ti ti-check"></i> revisor ok</span></div>
+          <div style="margin-top:8px;display:flex;gap:7px;"><button class="btn btn-p" style="padding:6px 11px;" onclick="aprovarMsg('${c.id}')"><i class="ti ti-send"></i> Aprovar</button><button class="btn btn-g" style="padding:6px 11px;" onclick="editarMsg('${c.id}',this)">Editar</button><button class="btn btn-g" style="padding:6px 11px;color:#991b1b;" onclick="api('/api/conversas/${c.id}/recusar',{method:'POST'}).then(carregar)">Recusar</button></div>
+        </div>`:'';
+    return `<div class="g" style="padding:13px 15px;margin-bottom:12px;">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <div style="width:34px;height:34px;border-radius:50%;background:rgba(83,74,183,.18);color:#3C3489;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:500;">${c.iniciais}</div>
+        <div><div style="font-weight:500;font-size:13.5px;">${c.lead||c.id}</div><div class="muted">${c.curso} · ${c.estado} · há ${c.ha}</div></div>
+      </div><div style="display:flex;flex-direction:column;gap:8px;margin-top:8px;">${fios}${prop}</div></div>`;
+  }).join('');
+
+  const dv = await api('/api/duvidas');
+  const dc = document.getElementById('dvCount');
+  if(Array.isArray(dv)){
+    dc.style.display = dv.length ? 'inline-flex' : 'none'; dc.textContent = dv.length;
+    $('#dvs').innerHTML = dv.length ? dv.map(d=>`
+      <div class="g" style="padding:12px 14px;margin-bottom:10px;">
+        <div style="display:flex;align-items:center;gap:8px;font-size:13px;">
+          <i class="ti ti-help-circle" style="color:#854f0b;"></i>
+          <strong>${d.pergunta}</strong>
+          <span class="muted" style="margin-left:auto;">${d.lead} · ${d.curso} · ${(d.criado||'').slice(11,16)}</span>
+        </div>
+        ${d.contexto?`<div class="muted" style="margin:5px 0 0 24px;">lead perguntou: "${d.contexto}"</div>`:''}
+        <textarea id="dvr-${d.id}" rows="2" placeholder="Escreva a informação da coordenação…" style="margin-top:9px;"></textarea>
+        <div style="display:flex;gap:8px;margin-top:8px;align-items:center;">
+          <button class="btn btn-p" onclick="responderDuvida(${d.id})"><i class="ti ti-send"></i> Responder e enviar ao lead</button>
+          <button class="btn btn-g" onclick="paraInjetor(${d.id})" title="Dado de catálogo (preço/data/carga)? Atualize a ontologia.">É dado de catálogo → Injetor</button>
+        </div>
+      </div>`).join('') : '<div class="muted">Nenhuma dúvida aberta. 🎉</div>';
+  }
+
+  const ap = await api('/api/aprovacoes');
+  const cor = {escalonamento:'t-warn',captabilidade:'t-bad',injetor:'t-acc'};
+  $('#aprov').innerHTML = ap.map(a=>`<div class="row"><i class="ti ${a.icone}"></i><span>${a.texto}</span><span class="tag ${cor[a.tipo]||'t-acc'}">${a.tipo}</span></div>`).join('');
+}
+
+async function testarRevisor(){
+  const r = await api('/api/reviewer',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({curso:$('#rcurso').value, texto:$('#rtexto').value})});
+  const head = r.aprovado
+    ? `<span class="tag t-ok"><i class="ti ti-check"></i> aprovado</span>`
+    : `<span class="tag t-bad"><i class="ti ti-ban"></i> bloqueado</span>`;
+  const bl = (r.bloqueios||[]).map(b=>`<div class="row" style="background:rgba(226,75,74,.10);"><i class="ti ti-alert-triangle" style="color:#991b1b;"></i><span>${b}</span></div>`).join('');
+  const an = (r.ancoras||[]).map(a=>`<span class="chip t-ok"><i class="ti ti-check"></i> ${a}</span>`).join('');
+  $('#rout').innerHTML = `<div style="margin-bottom:8px;">${head}</div>${bl}${an?('<div style="margin-top:6px;">'+an+'</div>'):''}`;
+}
+
+async function analisarInjetor(){
+  const v = $('#inj').value.trim() || 'A inscrição do FEQ-0499 reabriu até 30/08/2026.';
+  $('#injout').innerHTML = `<div class="row t-acc"><i class="ti ti-loader"></i><span>Interpretando, gerando diff e validando com SHACL…</span></div>`;
+  const p = await api('/api/injetor',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({texto:v})});
+  renderProposta(p);
+}
+
+function renderProposta(p){
+  const val = p.validacao || {};
+  const head = p.status==='proposta'
+    ? `<span class="tag t-ok"><i class="ti ti-check"></i> validada (SHACL)</span>`
+    : (p.status==='esclarecer'
+        ? `<span class="tag t-warn"><i class="ti ti-help"></i> precisa de esclarecimento</span>`
+        : `<span class="tag t-bad"><i class="ti ti-ban"></i> ${p.status}</span>`);
+  const diff = (p.diff||[]).map(d=>`<div class="row"><i class="ti ti-arrow-right"></i><span><strong>${d.campo}</strong>: <span style="color:#991b1b;">${d.de??'—'}</span> → <span style="color:#04342C;">${d.para}</span></span></div>`).join('');
+  const imp = (p.impacto||[]).map(i=>`<div class="row t-acc" style="background:rgba(37,99,235,.08);"><i class="ti ti-bolt"></i><span>${i}</span></div>`).join('');
+  const aprovar = p.status==='proposta'
+    ? `<div style="margin-top:10px;display:flex;gap:8px;"><button class="btn btn-p" onclick="aprovarProposta('${p.id}')"><i class="ti ti-check"></i> Aprovar e aplicar</button><button class="btn btn-g" onclick="api('/api/injetor/${p.id}/rejeitar',{method:'POST'}).then(()=>{$('#injout').innerHTML='';carregar();})">Rejeitar</button></div>`
+    : '';
+  $('#injout').innerHTML = `<div style="margin:4px 0 8px;">${head} <span class="muted">${p.alvo||''} · ${p.tipo||''}</span></div>
+    ${diff?('<p class="muted" style="margin:8px 2px 4px;">Diff proposto</p>'+diff):''}
+    <p class="muted" style="margin:10px 2px 4px;">Relatório de impacto</p>${imp}${aprovar}`;
+}
+
+async function aprovarProposta(pid){
+  const r = await api('/api/injetor/'+pid+'/aprovar',{method:'POST'});
+  if(r.ok){ $('#injout').innerHTML = `<div class="row t-ok" style="background:rgba(16,158,117,.10);"><i class="ti ti-circle-check"></i><span>Aplicado e versionado (${r.versao.versao}). Ontologia recarregada.</span></div>`; carregar(); }
+  else { $('#injout').innerHTML = `<div class="row t-bad" style="background:rgba(226,75,74,.10);"><i class="ti ti-ban"></i><span>${r.erro}</span></div>`; }
+}
+
+async function aprovarMsg(id, texto){
+  const body = texto ? {texto} : {};
+  const r = await api('/api/conversas/'+id+'/aprovar',{method:'POST',
+    headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
+  alert(r.envio ? ('envio: '+(r.envio.status||(r.envio.ok?'ok':'falhou'))+(r.envio.motivo?' — '+r.envio.motivo:'')) : (r.erro||'erro'));
+  carregar();
+}
+function editarMsg(id, btn){
+  const card = btn.closest('.g'); const atual = card.querySelector('.b-ag')?.childNodes[1]?.textContent || '';
+  const novo = prompt('Editar mensagem (passa pelo Revisor):', atual.trim());
+  if(novo) aprovarMsg(id, novo);
+}
+let AUTO=false;
+function pintaAuto(){
+  const b=document.getElementById('autoTgl');
+  b.innerHTML='<i class="ti ti-bolt"></i> aprovação automática: '+(AUTO?'ON':'OFF');
+  b.style.background=AUTO?'rgba(239,159,39,.25)':'rgba(148,163,184,.25)';
+  b.style.color=AUTO?'#633806':'#334155';
+}
+async function toggleAuto(){
+  const r=await api('/api/config',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({auto_aprovar:!AUTO})});
+  AUTO=!!r.auto_aprovar; pintaAuto();
+}
+const PRESETS = {
+  claude: ["claude-sonnet-4-6","claude-haiku-4-5","claude-sonnet-5"],
+  openai: ["gpt-4o-mini","gpt-4o"],
+  gemini: ["gemini-2.5-flash","gemini-2.5-pro","gemini-flash-latest"]
+};
+let CFGSRV = {};
+function cfgPresets(){
+  const p = $('#cfgProv').value;
+  $('#cfgLista').innerHTML = (PRESETS[p]||[]).map(m=>`<option value="${m}">`).join('');
+  const atual = (CFGSRV.modelo||'').split(':');
+  $('#cfgModelo').value = (atual[0]===p) ? atual[1] : (PRESETS[p]||[''])[0];
+}
+function cfgRender(){
+  const provs = CFGSRV.provedores||{};
+  $('#cfgProv').innerHTML = Object.keys(PRESETS).map(p=>
+    `<option value="${p}" ${provs[p]?'':'disabled'}>${p}${provs[p]?'':' (sem chave)'}</option>`).join('');
+  const atualProv = (CFGSRV.modelo||'claude:').split(':')[0];
+  if(provs[atualProv]) $('#cfgProv').value = atualProv;
+  cfgPresets();
+  $('#cfgAtual').textContent = 'Em uso agora: ' + (CFGSRV.modelo||'—');
+}
+async function cfgTestar(){
+  const m = $('#cfgProv').value + ':' + $('#cfgModelo').value.trim();
+  $('#cfgOut').innerHTML = '<span class="chip t-acc"><i class="ti ti-loader"></i> testando '+m+'…</span>';
+  const r = await api('/api/config/testar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({modelo:m})});
+  $('#cfgOut').innerHTML = r.ok
+    ? '<span class="chip t-ok"><i class="ti ti-check"></i> '+m+' respondeu: "'+(r.resposta||'ok')+'"</span>'
+    : '<span class="chip t-bad"><i class="ti ti-ban"></i> falhou: '+(r.erro||'erro')+'</span>';
+}
+async function cfgSalvar(){
+  const m = $('#cfgProv').value + ':' + $('#cfgModelo').value.trim();
+  const r = await api('/api/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({modelo:m})});
+  if(r.erro){ $('#cfgOut').innerHTML='<span class="chip t-bad">'+r.erro+'</span>'; return; }
+  CFGSRV = r; cfgRender();
+  $('#cfgOut').innerHTML = '<span class="chip t-ok"><i class="ti ti-check"></i> salvo — próximas respostas usam '+m+'</span>';
+}
+let PAPEL='';
+async function usrListar(){
+  if(PAPEL!=='supervisor') return;
+  document.getElementById('secUsuarios').style.display='block';
+  const us = await api('/api/usuarios');
+  if(!Array.isArray(us)) return;
+  $('#usrLista').innerHTML = us.length ? us.map(u=>`
+    <div class="row"><i class="ti ti-user"></i><strong>${u.usuario}</strong>
+      <span class="chip ${u.papel==='supervisor'?'t-warn':'t-acc'}">${u.papel}</span>
+      ${u.ativo? '' : '<span class="chip t-bad">desativado</span>'}
+      <span class="muted" style="margin-left:auto;">${(u.criado||'').slice(0,10)}</span>
+      ${u.ativo? `<button class="btn btn-g" style="padding:4px 9px;color:#991b1b;" onclick="api('/api/usuarios/${u.usuario}/desativar',{method:'POST'}).then(usrListar)">Desativar</button>`:''}
+    </div>`).join('') : '<div class="muted">Nenhum usuário criado — o acesso operador/operador (bootstrap) está ativo. Crie o seu primeiro usuário.</div>';
+}
+async function usrCriar(){
+  const r = await api('/api/usuarios',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({usuario:$('#usrNome').value,senha:$('#usrSenha').value,papel:$('#usrPapel').value})});
+  $('#usrOut').innerHTML = r.ok
+    ? '<span class="chip t-ok"><i class="ti ti-check"></i> usuário '+r.usuario+' criado</span>'
+    : '<span class="chip t-bad">'+(r.erro||'erro')+'</span>';
+  if(r.ok){ $('#usrNome').value=''; $('#usrSenha').value=''; usrListar(); }
+}
+let LOGADO=false;
+async function responderDuvida(id){
+  const v = document.getElementById('dvr-'+id).value.trim();
+  if(!v){ alert('Escreva a resposta da coordenação.'); return; }
+  const r = await api('/api/duvidas/'+id+'/responder',{method:'POST',
+    headers:{'Content-Type':'application/json'}, body:JSON.stringify({resposta:v})});
+  if(r.erro){ alert(r.erro); return; }
+  alert(r.envio ? 'Resposta elaborada e enviada ao lead ✓' : 'Resposta elaborada — proposta aguardando aprovação na aba Conversas.');
+  carregar();
+}
+function paraInjetor(id){
+  const v = document.getElementById('dvr-'+id).value.trim();
+  document.querySelector('.navi[data-sec="injetor"]').click();
+  if(v) $('#inj').value = v;
+}
+async function boot(){
+  const me = await api('/api/me');
+  if(!me.usuario){ document.getElementById('login').style.display='flex'; return; }
+  document.getElementById('login').style.display='none';
+  PAPEL = me.papel||'';
+  const cfg=await api('/api/config'); AUTO=!!cfg.auto_aprovar; pintaAuto();
+  CFGSRV = cfg; cfgRender(); usrListar();
+  LOGADO=true; carregar();
+}
+setInterval(()=>{ if(LOGADO) carregar(); }, 5000);
+async function login(){
+  const r = await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({usuario:$('#lu').value,senha:$('#lp').value})});
+  if(r.ok){ boot(); } else { $('#lerr').textContent='credenciais inválidas'; }
+}
+boot();
+</script>
+</body>
+</html>

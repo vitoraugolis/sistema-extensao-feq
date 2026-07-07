@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "central",
+      "runtimeExecutable": "env",
+      "runtimeArgs": ["ATENA_JANELA_LIVRE=1", "python3", "atena/api/app.py"],
+      "port": 8095
+    }
+  ]
+}

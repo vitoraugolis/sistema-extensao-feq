@@ -1,0 +1,52 @@
+#  Atena · Ontologia FEQ — Vocabulário (camadas superior + domínio)
+#  ---------------------------------------------------------------------------
+#  Define classes, propriedades e os indivíduos ORDINAIS de escolaridade.
+#  Carregado como "ont_graph" na validação SHACL e como grafo-base pelo
+#  serviço de ontologia (atena/ontologia/servico.py).
+#
+#  Princípio de alto nível: tudo é uma feq:Entidade com prov:wasDerivedFrom
+#  (proveniência). Afirmações (feq:Assercao) resolvem a Âncoras; Ações têm
+#  feq:NivelDeRisco. É isso que torna grounding e governança estruturais.
+
+@prefix feq:  <https://feq.unicamp.br/ontologia#> .
+@prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix owl:  <http://www.w3.org/2002/07/owl#> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+@prefix prov: <http://www.w3.org/ns/prov#> .
+
+# ---------------------------------------------------------------- Camada superior
+feq:Entidade        a rdfs:Class ; rdfs:comment "Raiz: todo nó do sistema tem proveniência." .
+feq:Assercao        a rdfs:Class ; rdfs:comment "Afirmação factual extraída de uma mensagem candidata." .
+feq:Ancora          a rdfs:Class ; rdfs:comment "Tripla/literal do grafo que sustenta uma Assercao." .
+feq:Acao            a rdfs:Class ; rdfs:comment "Operação proposta por um agente (mover card, enviar, etc.)." .
+feq:NivelDeRisco    a rdfs:Class ; rdfs:comment "leitura | escrita_reversivel | externa_irreversivel." .
+feq:Guardrail       a rdfs:Class .
+feq:Agente          a rdfs:Class .
+
+feq:leitura              a feq:NivelDeRisco ; feq:ordemRisco 1 .
+feq:escrita_reversivel   a feq:NivelDeRisco ; feq:ordemRisco 2 .
+feq:externa_irreversivel a feq:NivelDeRisco ; feq:ordemRisco 3 .
+
+# ---------------------------------------------------------------- Camada de domínio
+feq:Curso              a rdfs:Class .
+feq:Especializacao     a rdfs:Class ; rdfs:subClassOf feq:Curso .
+feq:Extensao           a rdfs:Class ; rdfs:subClassOf feq:Curso .
+feq:RequisitoAcademico a rdfs:Class .
+feq:JanelaTemporal     a rdfs:Class ; rdfs:comment "Intervalo [inicio, fim]; status derivado vs. hoje." .
+feq:PlanoPagamento     a rdfs:Class .
+feq:Duracao            a rdfs:Class ; rdfs:comment "Carga horária do curso — NUNCA confundir com hora-de-relógio (feq:horarioAula)." .
+feq:NivelEscolaridade  a rdfs:Class ; rdfs:comment "Ordinal: comparável por feq:ordem." .
+feq:Lead               a rdfs:Class ; rdfs:subClassOf feq:Entidade .
+
+# ---------------------------------------------------------------- Escolaridade ORDINAL
+#  Elegibilidade = comparação >= sobre feq:ordem (não igualdade de string).
+feq:medio              a feq:NivelEscolaridade ; feq:ordem 1 ; rdfs:label "Ensino médio completo" .
+feq:superiorIncompleto a feq:NivelEscolaridade ; feq:ordem 2 ; rdfs:label "Superior incompleto" .
+feq:superiorCompleto   a feq:NivelEscolaridade ; feq:ordem 3 ; rdfs:label "Superior completo" .
+feq:pos                a feq:NivelEscolaridade ; feq:ordem 4 ; rdfs:label "Pós-graduação" .
+
+# ---------------------------------------------------------------- Proveniência compartilhada
+feq:fonteNotion a prov:Entity ;
+    rdfs:label "Notion — [FEQ] Mapeamento Completo do Sistema" ;
+    feq:extraidoEm "2026-06-04"^^xsd:date .

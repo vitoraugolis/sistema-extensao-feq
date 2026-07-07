@@ -1,0 +1,13 @@
+# segredos — NUNCA versionar
+.env
+
+# runtime (PII de leads, backups, logs)
+atena/data/
+atena/backups/
+atena/ops/logs/
+
+# artefatos
+__pycache__/
+*.pyc
+.DS_Store
+/tmp/

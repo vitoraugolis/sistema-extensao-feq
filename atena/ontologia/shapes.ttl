@@ -1,0 +1,70 @@
+#  Atena · Ontologia FEQ — Shapes SHACL (integridade do catálogo)
+#  ---------------------------------------------------------------------------
+#  ESCOPO destas shapes: INTEGRIDADE estrutural do catálogo + COERÊNCIA de
+#  pagamento. NÃO modelam "janela aberta hoje" nem "lead elegível": isso é
+#  inferência de RUNTIME (depende de `hoje` e do lead), feita por consultas
+#  SPARQL em atena/ontologia/servico.py — um curso encerrado é dado VÁLIDO,
+#  só não é captável. Misturar as duas coisas seria erro de modelagem.
+
+@prefix sh:   <http://www.w3.org/ns/shacl#> .
+@prefix feq:  <https://feq.unicamp.br/ontologia#> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+
+feq:prefixos
+    sh:declare [ sh:prefix "feq" ; sh:namespace "https://feq.unicamp.br/ontologia#"^^xsd:anyURI ] .
+
+# ------------------------------------------------------------------ Curso
+feq:CursoShape a sh:NodeShape ;
+    sh:targetClass feq:Curso ;
+    sh:property [ sh:path feq:codigo ; sh:datatype xsd:string ; sh:minCount 1 ; sh:maxCount 1 ] ;
+    sh:property [ sh:path feq:nome ; sh:minCount 1 ] ;
+    sh:property [ sh:path feq:requisito ; sh:class feq:RequisitoAcademico ; sh:minCount 1 ; sh:maxCount 1 ] ;
+    sh:property [ sh:path feq:janelaInscricao ; sh:class feq:JanelaTemporal ; sh:minCount 1 ; sh:maxCount 1 ] ;
+    sh:property [ sh:path feq:planoPagamento ; sh:class feq:PlanoPagamento ; sh:minCount 1 ; sh:maxCount 1 ] ;
+    # cargaHoraria é OPCIONAL: ausência = "não sei" (ex.: FEQ-0499). O Revisor
+    # bloqueia (fail-closed) qualquer claim de carga quando o campo está ausente.
+    sh:property [ sh:path feq:cargaHoraria ; sh:class feq:Duracao ; sh:maxCount 1 ] .
+
+# ------------------------------------------------------------------ Requisito acadêmico
+feq:RequisitoShape a sh:NodeShape ;
+    sh:targetClass feq:RequisitoAcademico ;
+    sh:property [
+        sh:path feq:nivelMinimo ; sh:minCount 1 ; sh:maxCount 1 ;
+        sh:in ( feq:medio feq:superiorIncompleto feq:superiorCompleto feq:pos ) ;
+        sh:message "nivelMinimo deve ser um NivelEscolaridade conhecido (ordinal)." ] .
+
+# ------------------------------------------------------------------ Janela temporal
+feq:JanelaTemporalShape a sh:NodeShape ;
+    sh:targetClass feq:JanelaTemporal ;
+    sh:property [ sh:path feq:fim ; sh:datatype xsd:date ; sh:minCount 1 ; sh:maxCount 1 ] ;
+    sh:property [ sh:path feq:inicio ; sh:datatype xsd:date ; sh:maxCount 1 ] ;  # opcional (ex.: 0499)
+    sh:sparql [
+        a sh:SPARQLConstraint ;
+        sh:message "Janela inválida: inicio posterior ao fim." ;
+        sh:prefixes feq:prefixos ;
+        sh:select """
+            SELECT $this WHERE {
+                $this feq:inicio ?i ; feq:fim ?f .
+                FILTER( ?i > ?f )
+            }""" ] .
+
+# ------------------------------------------------------------------ Plano de pagamento (coerência)
+#  Trava que mata a alucinação de parcelas: numParcelas × valorParcela ~= aVista,
+#  com tolerância de arredondamento (1 centavo por parcela + 5 centavos).
+#  Ex.: "30x R$ 866,09" => 25982,70 != 16455,75 => VIOLA.
+feq:PlanoPagamentoShape a sh:NodeShape ;
+    sh:targetClass feq:PlanoPagamento ;
+    sh:property [ sh:path feq:numParcelas ; sh:datatype xsd:integer ; sh:minInclusive 1 ; sh:minCount 1 ] ;
+    sh:property [ sh:path feq:valorParcela ; sh:datatype xsd:decimal ; sh:minCount 1 ] ;
+    sh:property [ sh:path feq:aVista ; sh:datatype xsd:decimal ; sh:minCount 1 ] ;
+    sh:sparql [
+        a sh:SPARQLConstraint ;
+        sh:message "Plano incoerente: numParcelas × valorParcela difere de aVista além da tolerância." ;
+        sh:prefixes feq:prefixos ;
+        sh:select """
+            SELECT $this WHERE {
+                $this feq:numParcelas ?n ; feq:valorParcela ?v ; feq:aVista ?av .
+                BIND( ABS( (?n * ?v) - ?av ) AS ?erro )
+                BIND( (?n * 0.01) + 0.05 AS ?tol )
+                FILTER( ?erro > ?tol )
+            }""" ] .
