@@ -1,8 +1,8 @@
 #!/bin/zsh
 # Deploy do Sistema Atena FEQ em um VPS (Lightsail) — roda NO MAC.
 # Uso: zsh atena/ops/deploy_vps.sh <IP_DO_VPS> [usuario_ssh]
-# Copia código + .env + banco, instala dependências, cria serviços systemd
-# (app + caddy com HTTPS automático via <IP>.sslip.io).
+# Copia o código (PRESERVA .env e banco do VPS), instala dependências, cria
+# serviços systemd (app + caddy com HTTPS automático via <IP>.sslip.io).
 set -e
 IP="$1"
 SSHUSER="${2:-auto}"
@@ -22,15 +22,18 @@ fi
 echo "==> usuário SSH: $SSHUSER"
 SSH=(ssh -i "$KEY" -o StrictHostKeyChecking=accept-new "$SSHUSER@$IP")
 
-# 2) Copia o projeto (código + specs + .env + banco; sem lixo)
+# 2) Copia o projeto (código + specs; sem lixo, sem .env, sem banco)
 echo "==> copiando arquivos"
 "${SSH[@]}" "mkdir -p ~/atena-feq"
 rsync -az -e "ssh -i $KEY" \
   --exclude '__pycache__' --exclude '.DS_Store' --exclude 'atena/backups' \
   --exclude 'atena/ops/logs' --exclude '.git' \
-  --exclude 'atena/data' \
+  --exclude 'atena/data' --exclude '.env' \
   "$DIR/" "$SSHUSER@$IP:~/atena-feq/"
-# atena/data EXCLUÍDO: o banco vivo mora no VPS — nunca sobrescrever com o do Mac
+# atena/data e .env EXCLUÍDOS: banco vivo e segredos moram no VPS — o .env do Mac
+# pode estar parcial/desatualizado; sobrescrever apagaria tokens de produção.
+# .env só é semeado no BOOTSTRAP (se ainda não existir no VPS):
+rsync -az --ignore-existing -e "ssh -i $KEY" "$DIR/.env" "$SSHUSER@$IP:~/atena-feq/.env" 2>/dev/null || true
 
 # 3) Prepara o VPS: python, deps, swap (instâncias pequenas), serviços
 echo "==> configurando o VPS"
