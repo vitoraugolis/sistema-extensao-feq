@@ -13,6 +13,7 @@ from atena.core.orquestrador import Orquestrador
 from atena.core.faro import Faro
 from atena.transporte.whatsapp import WhatsApp
 from atena.agentes.nutricao import leads_para_reengajar, reengajar
+from atena.agentes.ingestao import Ingestao, normalizar_meta, curso_de_texto
 
 ONT = Ontologia()
 
@@ -75,6 +76,38 @@ def test_lgpd_anonimiza_perdidos_antigos():
     l = est.get_lead("p1")
     assert l["nome"] == "(anonimizado)" and l["telefone"] == ""
     assert est.historico("p1") == []
+
+
+def test_curso_do_nome_do_formulario():
+    # padrão acordado: nome do formulário = curso + versão
+    assert curso_de_texto("FEQ-0333 v1") == "FEQ-0333"
+    assert curso_de_texto("FEQ0480 v2") == "FEQ-0480"
+    assert curso_de_texto("Campanha genérica sem código") == ""
+    # form vazio -> cai no fallback de campanha
+    assert curso_de_texto("", "Leads FEQ-0499 verão") == "FEQ-0499"
+
+
+def test_normalizar_meta_so_nome_tel_email():
+    # formulário coleta só Nome/Telefone/E-mail; curso vem do nome do form
+    fd = [{"name": "full_name", "values": ["Maria Silva"]},
+          {"name": "phone_number", "values": ["+55 19 99888-7766"]},
+          {"name": "email", "values": ["maria@x.com"]}]
+    lead = normalizar_meta(fd, campaign_name="qualquer", leadgen_id="777", curso="FEQ-0333")
+    assert lead["nome"] == "Maria Silva" and lead["curso"] == "FEQ-0333"
+    assert lead["telefone"] and lead["email"] == "maria@x.com"
+
+
+def test_ingest_gate_dispara_1o_contato_so_se_captavel():
+    est = Estado(":memory:")
+    ing = Ingestao(est, ONT)
+    cap = ing.ingest(normalizar_meta(
+        [{"name": "full_name", "values": ["A"]}, {"name": "phone_number", "values": ["+55 19 90000-0001"]}],
+        curso="FEQ-0480"))                                   # captável hoje
+    assert cap["captavel"] and cap["estado_conversa"] == "aguardando_1o_contato"
+    nao = ing.ingest(normalizar_meta(
+        [{"name": "full_name", "values": ["B"]}, {"name": "phone_number", "values": ["+55 19 90000-0002"]}],
+        curso="FEQ-0655"))                                   # encerrado
+    assert nao["captavel"] is False and nao["estado_conversa"] == "aguardando_revisao"
 
 
 def test_faro_noop_sem_chave():

@@ -1,21 +1,34 @@
 # 04 — Fase 1: Ingestão de Leads (Meta → Atena → FARO · Variante B)
 
 **Módulo-alvo:** `atena/agentes/ingestao.py` (porta a lógica de `feq_ingestao_meta_faro.py`).
-**Status:** implementado em `atena/agentes/ingestao.py` (dedupe por sufixo de telefone, gate de captabilidade); webhook + assinatura HMAC no `api/app.py`.
+**Status:** implementado em `atena/agentes/ingestao.py` (dedupe por telefone, gate de captabilidade,
+curso pelo nome do formulário); webhook assíncrono + assinatura HMAC + dedupe de leadgen + 1º contato
+automático (captável) no `api/app.py`.
 
 ## Decisão (revertida em 26/06/2026)
 A **Atena recebe os leads diretamente da Meta** (Variante B). Não há mais Make como ingestor. O
 formulário instantâneo dispara o webhook; a Atena busca os dados via Graph API, deduplica e cria o
 card no FARO em **Lead**. (Histórico: chegou-se a definir Make→FARO; revertido.)
 
+## Convenção do formulário instantâneo (fixada 07/07/2026)
+- **Nome do formulário = código do curso + versão**, ex.: `FEQ-0333 v1`. É daqui que a Atena
+  resolve o curso (o formulário coleta **só Nome, Telefone e E-mail** — não há campo de curso).
+- Resolução: `curso_de_texto(nome_do_form, campanha)` via regex `FEQ[-_ ]?(\d{3,4})` →
+  `FEQ-XXXX`. Fallback: nome da campanha, se o form não casar.
+
 ## Requisitos funcionais
 - **F1** Webhook `/webhook/meta`: handshake `GET` (verify token) + `POST` leadgen.
-- **F2** `fetch_meta_lead(leadgen_id)` via Graph API com **token permanente de System User**.
+- **F2** `fetch_meta_lead(leadgen_id, form_id)` via Graph API com **token permanente de System
+  User** (`leads_retrieval`): busca `field_data`+`campaign_name`+`form_id` do lead e o `name`
+  do formulário; resolve o curso pelo nome do form.
 - **F3** Deduplicar por telefone antes de criar (não duplicar → atualizar/enriquecer).
 - **F4** Criar card em "Lead": Nome, Telefone, E-mail, Curso, Origem=Meta Ads, Campanha, Lead ID
   Externo, **Consentimento LGPD (do formulário)**, Data Consentimento, Opt-out=false.
 - **F5** `/simulate` para testar o caminho FARO sem a Meta (mantém AC offline).
 - **F6** `/health`.
+- **F7** **1º contato automático**: lead captável recém-criado dispara `feq_abertura_curso`
+  (template aprovado) e vai para `aguardando_resposta` — a conversa no WhatsApp continua o
+  processo. Não-captável não recebe mensagem (F-gate → revisão).
 
 ## Must-fixes do webhook público (novos — endpoint exposto na internet)
 - **S1 Verificar `X-Hub-Signature-256`** (HMAC-SHA256 com `META_APP_SECRET`) em todo POST. Sem isso,
@@ -25,7 +38,10 @@ card no FARO em **Lead**. (Histórico: chegou-se a definir Make→FARO; revertid
   via Graph API (`fetch_meta_lead`; exige token com `leads_retrieval` — `META_PAGE_TOKEN`).
 - **S3 Infra de borda:** HTTPS público (ngrok em dev; domínio/TLS em prod), `META_VERIFY_TOKEN`,
   token permanente com `leads_retrieval`.
-- **S4 Mapear campos do formulário real** em `fetch_meta_lead` (`full_name`/`phone_number`/`curso`…).
+- **S4 Mapear campos do formulário real** em `fetch_meta_lead` (`full_name`/`phone_number`/`email`);
+  ✅ **curso resolvido pelo NOME DO FORMULÁRIO** (`FEQ-0333 v1`), não por campo do form.
+- **S5 Dedupe de leadgen** por `leadgen:{id}` (`msgs_vistas`): a Meta reentrega o mesmo evento;
+  ✅ processado uma vez só.
 
 ## Dedupe (3 camadas — responsabilidade da Atena novamente)
 1. **Cache local** (telefone/lead_id, TTL 15 min) — latência de indexação + reentrega de webhook.
@@ -51,5 +67,8 @@ no núcleo. Decisão de escopo Google: em aberto.
 - AC2 POST sem assinatura válida → **rejeitado** (401/403), nada criado.
 - AC3 Card em "Lead" com todos os campos; `fields_skipped` vazio.
 - AC4 Consentimento gravado a partir do formulário (não fixo `true`).
-- AC5 Curso não-captável → card criado mas **SDR não disparado**; vai para revisão.
-- AC6 Nenhuma mensagem ao lead nesta fase.
+- AC5 Curso não-captável → card criado mas **1º contato NÃO disparado**; vai para revisão + alerta.
+- AC6 Curso captável → **`feq_abertura_curso` disparado automaticamente** (template aprovado);
+  respostas do lead seguem a governança normal (auto-aprovar OFF → fila de aprovação).
+- AC7 Curso resolvido do nome do formulário (`FEQ-0333 v1` → `FEQ-0333`), mesmo sem campo de curso.
+- AC8 Mesmo `leadgen_id` reentregue → processado uma única vez (sem 2ª mensagem).

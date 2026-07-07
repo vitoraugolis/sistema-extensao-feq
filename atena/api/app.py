@@ -154,6 +154,23 @@ def decisoes(card_id):
     return jsonify(EST.listar_decisoes(card_id))
 
 
+def _primeiro_contato(card_id):
+    """Caminho único do 1º contato: dispara feq_abertura_curso e põe o lead em
+    aguardando_resposta. Usado pelo operador e pela ingestão Meta automática."""
+    lead = EST.get_lead(card_id)
+    if not lead:
+        return {"ok": False, "erro": "lead inexistente"}
+    curso = lead.get("curso", "")
+    info = ONTO.ont.curso(curso) or {}
+    primeiro_nome = (lead.get("nome") or "").split()[0] if lead.get("nome") else "olá"
+    r = WA.enviar_template(lead["telefone"], "feq_abertura_curso",
+                           params=[primeiro_nome, f"{info.get('nome', curso)} ({curso})"])
+    if r.get("ok"):
+        EST.add_conversa(card_id, "agente", f"[template feq_abertura_curso] {curso}")
+        EST.set_lead(card_id, estado_conversa="aguardando_resposta")
+    return r
+
+
 @app.route("/api/conversas/iniciar", methods=["POST"])
 def conversa_iniciar():
     """1º contato (operador): cria/acha o lead e dispara o template de abertura."""
@@ -168,12 +185,7 @@ def conversa_iniciar():
     card_id = EST.lead_por_telefone(tel) or f"op-{''.join(c for c in tel if c.isdigit())}"
     EST.upsert_lead(card_id, nome=nome, telefone=tel, curso=curso,
                     fase="Lead", estado_conversa="aguardando_resposta")
-    info = ONTO.ont.curso(curso)
-    r = WA.enviar_template(tel, "feq_abertura_curso",
-                           params=[nome or "olá", f"{info['nome']} ({curso})"])
-    if r.get("ok"):
-        EST.add_conversa(card_id, "agente", f"[template feq_abertura_curso] {nome} / {curso}")
-    return jsonify({"card_id": card_id, "envio": r})
+    return jsonify({"card_id": card_id, "envio": _primeiro_contato(card_id)})
 
 
 CFG = {"auto_aprovar": EST.get_config("auto_aprovar") == "1"}   # persistido: deploys reiniciam o serviço
@@ -302,24 +314,44 @@ def webhook_meta():
                                   request.headers.get("X-Hub-Signature-256")):
         return jsonify({"erro": "assinatura inválida"}), 403
     payload = request.get_json(silent=True) or {}
-    res = []
+    # ACK imediato (a Meta reentrega se demorar); fetch na Graph + envio rodam fora do request
+    threading.Thread(target=_processar_meta, args=(payload,), daemon=True).start()
+    return jsonify({"ok": True})
+
+
+def _processar_meta(payload):
     for entry in payload.get("entry", []):
         for ch in entry.get("changes", []):
             if ch.get("field") != "leadgen":
                 continue
             v = ch.get("value", {})
-            if v.get("field_data"):     # payload de teste/simulação com dados inline
-                lead = normalizar_meta(v.get("field_data"), v.get("campaign_name", ""),
-                                       v.get("leadgen_id", ""))
-            else:                       # webhook real: só leadgen_id -> busca na Graph API
-                lead = fetch_meta_lead(v.get("leadgen_id"))
+            lid = str(v.get("leadgen_id", ""))
+            if lid and EST.msg_ja_vista(f"leadgen:{lid}"):
+                continue                    # reentrega da Meta -> já processado
+            try:
+                if v.get("field_data"):     # payload de teste/simulação com dados inline
+                    lead = normalizar_meta(v.get("field_data"), v.get("campaign_name", ""), lid)
+                else:                       # webhook real: só o ID -> Graph resolve dados + curso (nome do form)
+                    lead = fetch_meta_lead(lid, v.get("form_id"))
                 if not lead:
                     EST.add_alerta("ingestao",
-                                   f"leadgen {v.get('leadgen_id')} sem fetch (token/permissão?)")
-                    res.append({"ok": False, "leadgen_id": v.get("leadgen_id")})
+                                   f"leadgen {lid} sem fetch (token com leads_retrieval?)")
                     continue
-            res.append(ING.ingest(lead))
-    return jsonify({"processados": res})
+                r = ING.ingest(lead)
+                if not r.get("ok") or r.get("acao") != "criado":
+                    continue                # dedupe por telefone ou lead sem telefone
+                EST.log_acao("meta",
+                             f"lead {r['card_id']} · curso {lead.get('curso') or '?'} · consentimento no formulário",
+                             r["card_id"])
+                if r.get("captavel"):
+                    _primeiro_contato(r["card_id"])   # a conversa no WhatsApp continua o processo
+                else:
+                    EST.add_alerta("ingestao",
+                                   f"lead {r['card_id']} — curso '{lead.get('curso') or '?'}' não captável "
+                                   f"(form: '{lead.get('form', '')}'), revisar")
+            except Exception as e:
+                print(f"[webhook-meta] falha ao processar leadgen {lid}: {e}", flush=True)
+                EST.add_alerta("ingestao", f"falha ao processar leadgen {lid}: {e}")
 
 
 @app.route("/webhook/whatsapp", methods=["GET", "POST"])
