@@ -184,6 +184,14 @@ class Estado:
             self.conn.commit()
             return cur.rowcount == 0
 
+    def viu_msg(self, msg_id):
+        """Só CONSULTA (não marca): True se msg_id já foi processado. Use para
+        deduplicar sem 'queimar' o id quando o processamento ainda pode falhar."""
+        if not msg_id:
+            return False
+        return self.conn.execute(
+            "SELECT 1 FROM msgs_vistas WHERE msg_id=?", (msg_id,)).fetchone() is not None
+
     # ----------------------------------------------------------------- alertas
     def add_alerta(self, tipo, texto):
         with self._lock:

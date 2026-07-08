@@ -429,17 +429,21 @@ def _processar_meta(payload):
                 continue
             v = ch.get("value", {})
             lid = str(v.get("leadgen_id", ""))
-            if lid and EST.msg_ja_vista(f"leadgen:{lid}"):
-                continue                    # reentrega da Meta -> já processado
+            if lid and EST.viu_msg(f"leadgen:{lid}"):   # read-only: reentrega já processada
+                continue
             try:
                 if v.get("field_data"):     # payload de teste/simulação com dados inline
                     lead = normalizar_meta(v.get("field_data"), v.get("campaign_name", ""), lid)
                 else:                       # webhook real: só o ID -> Graph resolve dados + curso (nome do form)
                     lead = fetch_meta_lead(lid, v.get("form_id"))
                 if not lead:
+                    # NÃO marca o leadgen: falha transitória (token/permissão) tem de poder
+                    # ser reprocessada quando a Meta reentregar. Dedupe real de envio = telefone (ingest).
                     EST.add_alerta("ingestao",
-                                   f"leadgen {lid} sem fetch (token com leads_retrieval?)")
+                                   f"leadgen {lid} sem fetch (token com leads_retrieval / Página ligada ao app?)")
                     continue
+                if lid:
+                    EST.msg_ja_vista(f"leadgen:{lid}")   # fetch OK -> marca (evita re-buscar)
                 r = ING.ingest(lead)
                 if not r.get("ok") or r.get("acao") != "criado":
                     continue                # dedupe por telefone ou lead sem telefone

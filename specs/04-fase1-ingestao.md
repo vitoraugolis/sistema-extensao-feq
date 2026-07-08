@@ -48,8 +48,17 @@ card no FARO em **Lead**. (Histórico: chegou-se a definir Make→FARO; revertid
   token permanente com `leads_retrieval`.
 - **S4 Mapear campos do formulário real** em `fetch_meta_lead` (`full_name`/`phone_number`/`email`);
   ✅ **curso resolvido pelo NOME DO FORMULÁRIO** (`FEQ-0333 v1`), não por campo do form.
-- **S5 Dedupe de leadgen** por `leadgen:{id}` (`msgs_vistas`): a Meta reentrega o mesmo evento;
-  ✅ processado uma vez só.
+- **S5 Dedupe de leadgen** por `leadgen:{id}` (`msgs_vistas`): a Meta reentrega o mesmo evento.
+  ✅ **retry-safe**: o guard de topo usa `estado.viu_msg` (só CONSULTA); o id só é marcado
+  (`msg_ja_vista`) DEPOIS do fetch dar certo. Assim uma falha transitória (token/permissão) não
+  "queima" o leadgen — a reentrega da Meta consegue reprocessar. Dedupe real de envio = telefone (ingest).
+- **S6 CONEXÃO PÁGINA↔APP (pré-requisito operacional — causou incidente 08/07/2026):** os leads
+  reais só chegam/são buscáveis se a **Página** que hospeda os formulários instantâneos estiver:
+  (a) inscrita no app com o campo **`leadgen`** (`POST /{page_id}/subscribed_apps` fields=leadgen);
+  (b) com o webhook do objeto **`page`** apontando para **`/webhook/meta`** (NÃO `/webhook/whatsapp`)
+  e assinando `leadgen`; (c) atribuída ao **System User** do token (senão `fetch_meta_lead` dá 400
+  "does not exist / missing permissions" e `GET /me/accounts` devolve 0 páginas). Diagnóstico:
+  `GET /{app_id}/subscriptions` e `GET /me/accounts?fields=...,subscribed_apps{subscribed_fields}`.
 
 ## Dedupe (3 camadas — responsabilidade da Atena novamente)
 1. **Cache local** (telefone/lead_id, TTL 15 min) — latência de indexação + reentrega de webhook.

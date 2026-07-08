@@ -147,6 +147,17 @@ def test_prequalificado_pula_gate_academico():
     assert "/inscricao/FEQ-0333/" in (dec2.mensagem_ao_lead or "")
 
 
+def test_viu_msg_nao_marca_mas_msg_ja_vista_marca():
+    est = Estado(":memory:")
+    # viu_msg só consulta -> não queima o id (permite reprocessar após falha transitória)
+    assert est.viu_msg("leadgen:X") is False
+    assert est.viu_msg("leadgen:X") is False
+    # msg_ja_vista marca -> 2ª vez acusa reentrega
+    assert est.msg_ja_vista("leadgen:X") is False
+    assert est.msg_ja_vista("leadgen:X") is True
+    assert est.viu_msg("leadgen:X") is True            # agora sim, já visto
+
+
 def test_purgar_demo_deixa_so_reais():
     est = Estado(":memory:")
     est.seed_demo()                                    # cria seed-*/demo-*
