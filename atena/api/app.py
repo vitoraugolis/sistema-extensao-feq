@@ -154,8 +154,13 @@ def decisoes(card_id):
     return jsonify(EST.listar_decisoes(card_id))
 
 
+# preferido primeiro; cai para o próximo se o de cima ainda não estiver aprovado na Meta.
+# feq_lead (com botões link/dúvidas) é o alvo; enquanto PENDING, usa feq_abertura_curso.
+TEMPLATES_ABERTURA = ("feq_lead", "feq_abertura_curso")
+
+
 def _primeiro_contato(card_id):
-    """Caminho único do 1º contato: dispara feq_abertura_curso e põe o lead em
+    """Caminho único do 1º contato: dispara o template de abertura e põe o lead em
     aguardando_resposta. Usado pelo operador e pela ingestão Meta automática."""
     lead = EST.get_lead(card_id)
     if not lead:
@@ -163,11 +168,14 @@ def _primeiro_contato(card_id):
     curso = lead.get("curso", "")
     info = ONTO.ont.curso(curso) or {}
     primeiro_nome = (lead.get("nome") or "").split()[0] if lead.get("nome") else "olá"
-    r = WA.enviar_template(lead["telefone"], "feq_abertura_curso",
-                           params=[primeiro_nome, f"{info.get('nome', curso)} ({curso})"])
-    if r.get("ok"):
-        EST.add_conversa(card_id, "agente", f"[template feq_abertura_curso] {curso}")
-        EST.set_lead(card_id, estado_conversa="aguardando_resposta")
+    params = [primeiro_nome, f"{info.get('nome', curso)} ({curso})"]
+    r = {"ok": False, "erro": "sem template"}
+    for tpl in TEMPLATES_ABERTURA:      # feq_lead quando aprovado; senão feq_abertura_curso
+        r = WA.enviar_template(lead["telefone"], tpl, params=params)
+        if r.get("ok"):
+            EST.add_conversa(card_id, "agente", f"[template {tpl}] {curso}")
+            EST.set_lead(card_id, estado_conversa="aguardando_resposta")
+            return r
     return r
 
 
