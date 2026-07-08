@@ -125,8 +125,8 @@
       "janelaInscricao":   { "@type": "feq:JanelaTemporal", "inicio": "2025-03-19", "fim": "2026-07-22" },
       "janelaOferecimento":{ "@type": "feq:JanelaTemporal", "inicio": "2026-08-22", "fim": "2027-11-27" },
       "planoPagamento": { "@type": "feq:PlanoPagamento", "taxaInscricao": "22.00", "numParcelas": 13, "valorParcela": "733.34", "aVista": "9533.46" },
-      "urlExtecamp": "https://ins.extecamp.unicamp.br/curso/dados/FEQ-0580/001",
-      "insightVenda": "Entrave é clareza, não preço. Pedem conteúdo programático. Potencial de seguir o modelo do 0480.",
+      "urlExtecamp": "https://ins.extecamp.unicamp.br/curso/inscricao/FEQ-0580/001",
+      "insightVenda": "Curso extremamente prático/mão na massa (Python aplicado a otimização e simulação de processos industriais). Entrave costuma ser clareza, não preço; leads pedem o conteúdo programático.",
       "wasDerivedFrom": "feq:fonteNotion"
     },
     {
