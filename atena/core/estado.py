@@ -348,3 +348,16 @@ class Estado:
                          mensagem="Que bom, Marina! O FEQ-0480 são 19x de R$ 866,09, ou R$ 16.455,75 à vista. Posso te enviar o link de inscrição?",
                          motivo="elegível + interesse", ancoras=["parcelamento 19x", "valor R$ 16.455,75"],
                          aprovado_revisor=1, status="proposta")
+
+    def purgar_demo(self):
+        """Remove os leads sintéticos (seed-*/demo-*) e tudo ligado a eles.
+        Deixa a Central só com leads reais vindos do sistema. Retorna nº de leads removidos."""
+        with self._lock:
+            n = self.conn.execute(
+                "SELECT COUNT(*) c FROM leads WHERE card_id LIKE 'seed-%' OR card_id LIKE 'demo-%'"
+            ).fetchone()["c"]
+            for tabela in ("conversas", "decisoes", "tarefas", "cards_vistos", "duvidas", "leads"):
+                self.conn.execute(
+                    f"DELETE FROM {tabela} WHERE card_id LIKE 'seed-%' OR card_id LIKE 'demo-%'")
+            self.conn.commit()
+        return n

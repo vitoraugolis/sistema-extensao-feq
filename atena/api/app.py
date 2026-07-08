@@ -44,7 +44,8 @@ from atena.agentes.cerebro import cerebro_factory, modelo_atual, testar_modelo, 
 from atena.transporte.whatsapp import WhatsApp
 
 EST = Estado()
-EST.seed_demo()
+if os.environ.get("ATENA_SEED_DEMO") == "1":   # produção fica só com leads reais do sistema
+    EST.seed_demo()
 _modelo_salvo = EST.get_config("modelo")
 if _modelo_salvo:
     os.environ["ATENA_MODELO"] = _modelo_salvo   # escolha da Central sobrevive a restart
@@ -152,10 +153,60 @@ def conversa_detalhe(card_id):
         return jsonify({"erro": "lead inexistente"}), 404
     prop = EST.decisao_pendente(card_id)
     return jsonify({"id": card_id, "lead": lead["nome"], "iniciais": _iniciais(lead["nome"]),
-                    "curso": lead["curso"], "estado": lead["estado_conversa"],
+                    "curso": lead["curso"], "estado": lead["estado_conversa"], "fase": lead["fase"],
                     "telefone": lead["telefone"], "optout": bool(lead.get("optout")),
                     "thread": EST.historico(card_id),
                     "proposta": prop["mensagem"] if prop else None})
+
+
+FASES = ("Lead", "Prospect", "Inscrito", "Matriculado", "Em espera", "Perdido")
+
+
+@app.route("/api/kanban")
+def kanban():
+    """Funil de leads por fase — cartões com sinais de 'precisa de você' para o
+    operador triar; o motor autônomo move a maioria sozinho."""
+    cols = {f: [] for f in FASES}
+    for l in EST.listar_leads():
+        hist = EST.historico(l["card_id"])
+        ult = hist[-1] if hist else None
+        fase = l["fase"] if l["fase"] in cols else "Lead"
+        cols[fase].append({
+            "id": l["card_id"], "nome": l["nome"] or l["card_id"],
+            "iniciais": _iniciais(l["nome"]), "curso": l["curso"],
+            "estado": l["estado_conversa"], "ha": _ha(l["atualizado"]),
+            "optout": bool(l.get("optout")),
+            "precisa_voce": l["estado_conversa"] == "escalado_humano",
+            "proposta": bool(EST.decisao_pendente(l["card_id"])),
+            "aguardando": bool(ult and ult["papel"] == "lead"),
+            "curso_encerrado": not ONTO.ont.captavel(l["curso"]).get("captavel"),
+        })
+    return jsonify({"colunas": [{"fase": f, "leads": cols[f]} for f in FASES]})
+
+
+@app.route("/api/leads/<card_id>/mover", methods=["POST"])
+def lead_mover(card_id):
+    """Move manual de fase (override humano). Espelha no FARO se ativo."""
+    lead = EST.get_lead(card_id)
+    if not lead:
+        return jsonify({"erro": "lead inexistente"}), 404
+    fase = (request.get_json(silent=True) or {}).get("fase", "")
+    if fase not in FASES:
+        return jsonify({"erro": "fase inválida"}), 400
+    EST.set_lead(card_id, fase=fase)
+    if lead.get("faro_id") and ORQ.faro.ativo:
+        try:
+            ORQ.faro.mover(lead["faro_id"], fase)
+        except Exception as e:
+            print(f"[faro] mover falhou: {e}", flush=True)
+    EST.log_acao(session.get("usuario", "operador"), f"mover fase -> {fase}", card_id)
+    return jsonify({"ok": True, "fase": fase})
+
+
+@app.route("/api/leads/<card_id>/reativar", methods=["POST"])
+def lead_reativar(card_id):
+    """Reativação manual: dispara feq_reengajamento (opt-out/captabilidade travam)."""
+    return jsonify({"envio": nutricao.reengajar_um(EST, ONTO.ont, WA, card_id)})
 
 
 @app.route("/api/conversas/<card_id>/responder", methods=["POST"])

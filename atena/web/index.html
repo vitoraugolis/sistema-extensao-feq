@@ -73,6 +73,16 @@ select,textarea{width:100%;border-radius:11px;border:.5px solid rgba(148,163,184
   .conv-shell.chat-open .conv-side{display:none;}
   .conv-back{display:inline-flex;}
 }
+.kb-board{display:flex;gap:12px;overflow-x:auto;padding:4px 2px 8px;}
+.kb-col{flex:0 0 210px;background:rgba(255,255,255,.4);border-radius:14px;padding:10px 9px;align-self:flex-start;}
+.kb-col-h{display:flex;justify-content:space-between;align-items:center;font-size:12.5px;font-weight:600;margin:2px 4px 9px;color:var(--ink2);}
+.kb-count{color:var(--ink3);font-weight:500;background:rgba(148,163,184,.2);border-radius:999px;padding:1px 8px;font-size:11px;}
+.kb-card{background:rgba(255,255,255,.72);border-radius:11px;padding:9px 11px;margin-bottom:8px;cursor:pointer;border:.5px solid rgba(148,163,184,.3);transition:border-color .12s;}
+.kb-card:hover{border-color:var(--accent);}
+.kb-nome{font-size:13px;font-weight:500;display:flex;align-items:center;gap:7px;}
+.kb-sub{font-size:11px;color:var(--ink3);margin-top:3px;}
+.kb-badges{display:flex;flex-wrap:wrap;gap:4px;margin-top:7px;}
+.kb-empty{color:var(--ink3);font-size:11.5px;padding:6px 4px;}
 </style>
 </head>
 <body>
@@ -103,6 +113,7 @@ select,textarea{width:100%;border-radius:11px;border:.5px solid rgba(148,163,184
   <div class="layout">
     <nav class="g nav">
       <button class="navi on" data-sec="painel"><i class="ti ti-layout-dashboard"></i> Painel</button>
+      <button class="navi" data-sec="kanban"><i class="ti ti-layout-columns"></i> Funil</button>
       <button class="navi" data-sec="conversas"><i class="ti ti-messages"></i> Conversas</button>
       <button class="navi" data-sec="aprovacoes"><i class="ti ti-inbox"></i> Aprovações</button>
       <button class="navi" data-sec="duvidas"><i class="ti ti-help-circle"></i> Dúvidas <span class="tag t-warn" id="dvCount" style="display:none;margin-left:auto;"></span></button>
@@ -118,6 +129,13 @@ select,textarea{width:100%;border-radius:11px;border:.5px solid rgba(148,163,184
           <h2>Captabilidade hoje <span class="muted" id="hoje"></span></h2>
           <div id="capt"></div>
           <p class="muted" style="margin:10px 2px 0;">Status calculado pela ontologia (janela de inscrição vs. hoje). Curso encerrado não é engajado pelo SDR.</p>
+        </div>
+      </section>
+
+      <section id="kanban" class="hidden">
+        <div class="g sec" style="padding:14px 16px;">
+          <h2 style="display:flex;align-items:center;gap:7px;"><i class="ti ti-layout-columns"></i> Funil de leads <span class="muted" style="font-weight:400;">· clique num card para abrir a conversa</span></h2>
+          <div class="kb-board" id="kbBoard"></div>
         </div>
       </section>
 
@@ -209,6 +227,7 @@ document.querySelectorAll('.navi').forEach(b=>b.onclick=()=>{
   b.classList.add('on');
   document.querySelectorAll('main section').forEach(s=>s.classList.add('hidden'));
   $('#'+b.dataset.sec).classList.remove('hidden');
+  if(b.dataset.sec==='kanban') renderKanban();
 });
 
 async function carregar(){
@@ -229,6 +248,7 @@ async function carregar(){
 
   await atualizarLista();
   if(CONV_ABERTA) refrescarAberta();
+  if(!$('#kanban').classList.contains('hidden')) renderKanban();
 
   const dv = await api('/api/duvidas');
   const dc = document.getElementById('dvCount');
@@ -301,6 +321,45 @@ async function atualizarLista(){
   renderListaConv();
 }
 
+async function renderKanban(){
+  const d = await api('/api/kanban');
+  if(!d.colunas) return;
+  $('#kbBoard').innerHTML = d.colunas.map(col=>`
+    <div class="kb-col">
+      <div class="kb-col-h"><span>${col.fase}</span><span class="kb-count">${col.leads.length}</span></div>
+      ${col.leads.map(kbCard).join('') || '<div class="kb-empty">—</div>'}
+    </div>`).join('');
+}
+function kbCard(c){
+  const b = [];
+  if(c.precisa_voce) b.push('<span class="chip t-warn" style="margin:0;"><i class="ti ti-hand-stop"></i> precisa de você</span>');
+  if(c.proposta) b.push('<span class="chip t-acc" style="margin:0;"><i class="ti ti-robot"></i> proposta pronta</span>');
+  else if(c.aguardando) b.push('<span class="chip t-acc" style="margin:0;">aguardando lead</span>');
+  if(c.optout) b.push('<span class="chip t-bad" style="margin:0;">opt-out</span>');
+  if(c.curso_encerrado) b.push('<span class="chip t-bad" style="margin:0;">curso encerrado</span>');
+  return `<div class="kb-card" onclick="abrirDoKanban('${c.id}')">
+    <div class="kb-nome"><span class="conv-ava" style="width:22px;height:22px;font-size:9.5px;">${c.iniciais}</span>${c.nome}</div>
+    <div class="kb-sub">${c.curso} · ${c.ha}</div>
+    ${b.length?`<div class="kb-badges">${b.join('')}</div>`:''}
+  </div>`;
+}
+function abrirDoKanban(id){
+  document.querySelector('.navi[data-sec="conversas"]').click();
+  abrirConversa(id);
+}
+async function moverFase(id, fase){
+  const r = await api('/api/leads/'+id+'/mover',{method:'POST',
+    headers:{'Content-Type':'application/json'}, body:JSON.stringify({fase})});
+  if(r.erro){ marcarErro(id, r); return; }
+  CONV_ERRO = null; aposAcao();
+}
+async function reativarLead(id){
+  const r = await api('/api/leads/'+id+'/reativar',{method:'POST'});
+  if(r.envio && !r.envio.ok){ marcarErro(id, {}, 'não reativado — '+(r.envio.motivo||'')); return; }
+  CONV_ERRO = {id, html:'<div class="conv-blocked" style="color:#04342C;background:rgba(16,158,117,.12);"><i class="ti ti-check"></i> Reengajamento enviado.</div>'};
+  aposAcao();
+}
+
 function renderListaConv(){
   const q = (($('#convBusca')||{}).value || '').toLowerCase().trim();
   const lst = CONV_LISTA.filter(c => !q || (c.lead||'').toLowerCase().includes(q) ||
@@ -361,6 +420,12 @@ function renderThread(d){
         <div class="conv-ava">${d.iniciais}</div>
         <div><div style="font-weight:500;font-size:13.5px;">${d.lead||d.id}</div>
         <div class="muted">${d.curso} · ${d.estado}${d.optout?' · <span style="color:#991b1b;">opt-out</span>':''}</div></div>
+        <div style="margin-left:auto;display:flex;gap:6px;align-items:center;">
+          <select title="mover fase" style="width:auto;padding:5px 8px;font-size:12px;" onchange="moverFase('${d.id}',this.value)">
+            ${['Lead','Prospect','Inscrito','Matriculado','Em espera','Perdido'].map(f=>`<option ${f===d.fase?'selected':''}>${f}</option>`).join('')}
+          </select>
+          <button class="btn btn-g" style="padding:6px 10px;" title="Enviar reengajamento" onclick="reativarLead('${d.id}')"><i class="ti ti-refresh"></i></button>
+        </div>
       </div>
     </div>
     <div class="conv-thread" id="convThread">${fios || '<div class="muted" style="margin:auto;">Sem mensagens ainda.</div>'}${prop}</div>

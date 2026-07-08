@@ -30,6 +30,28 @@ def leads_para_reengajar(est, ont, agora=None, dias=3, max_reengajos=2):
     return out
 
 
+def reengajar_um(est, ont, wa, card_id):
+    """Reativação manual de UM lead (botão do kanban). Trava dura: opt-out e
+    captabilidade. Sem o limite de 2× nem o silêncio de 3 dias — é ato deliberado
+    do operador. Retorna o resultado do envio."""
+    l = est.get_lead(card_id)
+    if not l:
+        return {"ok": False, "motivo": "lead inexistente"}
+    if l.get("optout"):
+        return {"ok": False, "motivo": "lead em opt-out"}
+    if not ont.captavel(l["curso"]).get("captavel"):
+        return {"ok": False, "motivo": "curso não captável (inscrições encerradas)"}
+    c = ont.curso(l["curso"])
+    prazo = "/".join(reversed((c.get("inscricoes_fim") or "").split("-")))
+    r = wa.enviar_template(l["telefone"], "feq_reengajamento",
+                           params=[l.get("nome") or "olá", f"{c['nome']} ({c['codigo']})", prazo])
+    if r.get("ok"):
+        est.set_lead(card_id, reengajos=(l.get("reengajos") or 0) + 1)
+        est.add_conversa(card_id, "agente", f"[template feq_reengajamento] prazo {prazo}")
+        est.log_acao("operador", f"reativação manual: {card_id}")
+    return r
+
+
 def reengajar(est, ont, wa):
     """Envia feq_reengajamento aos elegíveis. Retorna quantos foram enviados."""
     enviados = 0

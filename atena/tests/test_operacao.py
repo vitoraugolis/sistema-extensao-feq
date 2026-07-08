@@ -12,7 +12,7 @@ from atena.core.estado import Estado
 from atena.core.orquestrador import Orquestrador
 from atena.core.faro import Faro
 from atena.transporte.whatsapp import WhatsApp
-from atena.agentes.nutricao import leads_para_reengajar, reengajar
+from atena.agentes.nutricao import leads_para_reengajar, reengajar, reengajar_um
 from atena.agentes.ingestao import Ingestao, normalizar_meta, curso_de_texto
 from atena.core.orquestrador import brain_deterministico
 from atena.core import contratos as C
@@ -145,6 +145,39 @@ def test_prequalificado_pula_gate_academico():
     dec2 = brain_deterministico(ONT, saved, "Receber o link para prosseguir", [])
     assert dec2.proxima_acao == C.QUALIFICAR
     assert "/inscricao/FEQ-0333/" in (dec2.mensagem_ao_lead or "")
+
+
+def test_purgar_demo_deixa_so_reais():
+    est = Estado(":memory:")
+    est.seed_demo()                                    # cria seed-*/demo-*
+    est.upsert_lead("meta-5519999", nome="Real", telefone="+55 19 99999-9999",
+                    curso="FEQ-0333", fase="Lead", estado_conversa="aguardando_resposta")
+    est.add_conversa("demo-marina", "lead", "oi")      # ligado a um demo
+    antes = len(est.listar_leads())
+    removidos = est.purgar_demo()
+    restantes = est.listar_leads()
+    assert removidos >= 30 and antes - removidos == len(restantes)
+    assert [l["card_id"] for l in restantes] == ["meta-5519999"]   # só o real sobra
+    assert est.historico("demo-marina") == []          # conversas do demo também sumiram
+
+
+def test_reativar_um_respeita_travas():
+    est = Estado(":memory:")
+    os.environ.pop("WHATSAPP_TOKEN", None)             # dry-run
+    wa = WhatsApp(est, None)
+    # captável + sem opt-out -> reengaja (dry-run) e incrementa contador
+    est.upsert_lead("r1", nome="Ana", telefone="+55 19 90000-1111", curso="FEQ-0480",
+                    fase="Lead", estado_conversa="aguardando_resposta")
+    assert reengajar_um(est, ONT, wa, "r1")["ok"] is True
+    assert est.get_lead("r1")["reengajos"] == 1
+    # opt-out -> trava dura
+    est.upsert_lead("r2", nome="B", telefone="+55 19 90000-2222", curso="FEQ-0480",
+                    fase="Lead", estado_conversa="aguardando_resposta", optout=1)
+    assert reengajar_um(est, ONT, wa, "r2")["ok"] is False
+    # curso encerrado -> trava dura
+    est.upsert_lead("r3", nome="C", telefone="+55 19 90000-3333", curso="FEQ-0655",
+                    fase="Lead", estado_conversa="aguardando_resposta")
+    assert reengajar_um(est, ONT, wa, "r3")["ok"] is False
 
 
 def test_faro_noop_sem_chave():
