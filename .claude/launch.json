@@ -4,8 +4,8 @@
     {
       "name": "central",
       "runtimeExecutable": "env",
-      "runtimeArgs": ["ATENA_JANELA_LIVRE=1", "python3", "atena/api/app.py"],
-      "port": 8095
+      "runtimeArgs": ["ATENA_JANELA_LIVRE=1", "PORT=8096", "python3", "atena/api/app.py"],
+      "port": 8096
     }
   ]
 }

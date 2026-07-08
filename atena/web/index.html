@@ -46,6 +46,33 @@ select,textarea{width:100%;border-radius:11px;border:.5px solid rgba(148,163,184
 .btn-g{background:rgba(255,255,255,.6);color:#334155;border:.5px solid rgba(148,163,184,.55);}
 .chip{display:inline-flex;align-items:center;gap:4px;font-size:11px;padding:3px 8px;border-radius:999px;margin:3px 4px 0 0;}
 .muted{color:var(--ink3);font-size:12px;}
+.conv-shell{display:grid;grid-template-columns:270px 1fr;height:72vh;min-height:420px;overflow:hidden;padding:0;}
+.conv-side{border-right:.5px solid rgba(148,163,184,.35);display:flex;flex-direction:column;overflow:hidden;}
+.conv-search{padding:12px;border-bottom:.5px solid rgba(148,163,184,.25);flex-shrink:0;}
+.conv-search input{width:100%;border-radius:10px;border:.5px solid rgba(148,163,184,.55);background:rgba(255,255,255,.65);padding:8px 10px;font:inherit;font-size:13px;}
+.conv-list{overflow-y:auto;flex:1;}
+.conv-item{display:flex;align-items:center;gap:10px;padding:11px 13px;cursor:pointer;border-bottom:.5px solid rgba(148,163,184,.14);}
+.conv-item:hover{background:rgba(255,255,255,.55);}
+.conv-item.on{background:rgba(37,99,235,.12);}
+.conv-ava{width:38px;height:38px;flex-shrink:0;border-radius:50%;background:rgba(83,74,183,.18);color:#3C3489;display:flex;align-items:center;justify-content:center;font-size:12.5px;font-weight:500;}
+.conv-meta{min-width:0;flex:1;}
+.conv-nome{font-size:13.5px;font-weight:500;display:flex;justify-content:space-between;gap:6px;}
+.conv-prev{font-size:12px;color:var(--ink3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px;}
+.conv-dot{width:9px;height:9px;border-radius:50%;background:var(--accent);flex-shrink:0;}
+.conv-main{display:flex;flex-direction:column;overflow:hidden;}
+.conv-head{padding:12px 16px;border-bottom:.5px solid rgba(148,163,184,.25);flex-shrink:0;}
+.conv-thread{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:9px;}
+.conv-ts{font-size:10px;color:var(--ink3);margin-top:3px;}
+.conv-composer{padding:11px;border-top:.5px solid rgba(148,163,184,.25);display:flex;gap:8px;align-items:flex-end;flex-shrink:0;}
+.conv-composer textarea{resize:none;max-height:110px;}
+.conv-blocked{font-size:12px;color:#991b1b;background:rgba(226,75,74,.10);border-radius:10px;padding:7px 10px;margin:0 11px 9px;}
+.conv-back{display:none;align-items:center;justify-content:center;width:28px;height:28px;flex-shrink:0;border-radius:50%;border:none;background:rgba(148,163,184,.25);cursor:pointer;margin-right:2px;font-size:15px;color:#334155;}
+@media (max-width:900px){
+  .conv-shell{grid-template-columns:1fr;}
+  .conv-shell:not(.chat-open) .conv-main{display:none;}
+  .conv-shell.chat-open .conv-side{display:none;}
+  .conv-back{display:inline-flex;}
+}
 </style>
 </head>
 <body>
@@ -94,7 +121,17 @@ select,textarea{width:100%;border-radius:11px;border:.5px solid rgba(148,163,184
         </div>
       </section>
 
-      <section id="conversas" class="hidden"><div class="g sec"><h2>Conversas ao vivo</h2><div id="conv"></div></div></section>
+      <section id="conversas" class="hidden">
+        <div class="g conv-shell">
+          <div class="conv-side">
+            <div class="conv-search"><input id="convBusca" placeholder="Buscar por nome ou curso…" oninput="renderListaConv()"></div>
+            <div class="conv-list" id="convLista"></div>
+          </div>
+          <div class="conv-main" id="convMain">
+            <div class="muted" style="margin:auto;text-align:center;"><i class="ti ti-message-2" style="font-size:26px;display:block;margin-bottom:6px;"></i>Selecione uma conversa</div>
+          </div>
+        </div>
+      </section>
 
       <section id="aprovacoes" class="hidden"><div class="g sec"><h2>Fila de aprovação humana</h2><div id="aprov"></div></div></section>
 
@@ -165,6 +202,7 @@ select,textarea{width:100%;border-radius:11px;border:.5px solid rgba(148,163,184
 <script>
 const $ = (s)=>document.querySelector(s);
 const api = (p,o)=>fetch(p,o).then(r=>r.json());
+let CONV_LISTA = [], CONV_ABERTA = null, CONV_DATA = null, CONV_ERRO = null;
 
 document.querySelectorAll('.navi').forEach(b=>b.onclick=()=>{
   document.querySelectorAll('.navi').forEach(x=>x.classList.remove('on'));
@@ -189,23 +227,8 @@ async function carregar(){
 
   if(!$('#rcurso').options.length) $('#rcurso').innerHTML = cap.cursos.map(c=>`<option value="${c.curso}">${c.curso}</option>`).join('');
 
-  const cv = await api('/api/conversas');
-  $('#conv').innerHTML = cv.map(c=>{
-    const fios = (c.thread||[]).map(t=>{
-      const eu = t.papel==='agente';
-      return `<div class="bubble ${eu?'b-ag':'b-lead'}" style="${eu?'align-self:flex-end;':''}">${eu?'<div style="font-size:10.5px;color:#1d4ed8;margin-bottom:2px;"><i class="ti ti-robot"></i> Vinícius · '+(t.ts||'').slice(11,16)+'</div>':''}${(t.texto||'<i>(mídia/sem texto)</i>')}</div>`;
-    }).join('');
-    const prop = c.proposta?`
-        <div class="bubble b-ag" style="align-self:flex-end;border-style:dashed;"><div style="font-size:11px;color:#1d4ed8;margin-bottom:4px;"><i class="ti ti-robot"></i> proposta · aguardando você</div>${c.proposta}
-          <div style="margin-top:6px;"><span class="chip t-ok"><i class="ti ti-check"></i> revisor ok</span></div>
-          <div style="margin-top:8px;display:flex;gap:7px;"><button class="btn btn-p" style="padding:6px 11px;" onclick="aprovarMsg('${c.id}')"><i class="ti ti-send"></i> Aprovar</button><button class="btn btn-g" style="padding:6px 11px;" onclick="editarMsg('${c.id}',this)">Editar</button><button class="btn btn-g" style="padding:6px 11px;color:#991b1b;" onclick="api('/api/conversas/${c.id}/recusar',{method:'POST'}).then(carregar)">Recusar</button></div>
-        </div>`:'';
-    return `<div class="g" style="padding:13px 15px;margin-bottom:12px;">
-      <div style="display:flex;align-items:center;gap:10px;">
-        <div style="width:34px;height:34px;border-radius:50%;background:rgba(83,74,183,.18);color:#3C3489;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:500;">${c.iniciais}</div>
-        <div><div style="font-weight:500;font-size:13.5px;">${c.lead||c.id}</div><div class="muted">${c.curso} · ${c.estado} · há ${c.ha}</div></div>
-      </div><div style="display:flex;flex-direction:column;gap:8px;margin-top:8px;">${fios}${prop}</div></div>`;
-  }).join('');
+  await atualizarLista();
+  if(CONV_ABERTA) refrescarAberta();
 
   const dv = await api('/api/duvidas');
   const dc = document.getElementById('dvCount');
@@ -273,16 +296,123 @@ async function aprovarProposta(pid){
   else { $('#injout').innerHTML = `<div class="row t-bad" style="background:rgba(226,75,74,.10);"><i class="ti ti-ban"></i><span>${r.erro}</span></div>`; }
 }
 
+async function atualizarLista(){
+  CONV_LISTA = await api('/api/conversas');
+  renderListaConv();
+}
+
+function renderListaConv(){
+  const q = (($('#convBusca')||{}).value || '').toLowerCase().trim();
+  const lst = CONV_LISTA.filter(c => !q || (c.lead||'').toLowerCase().includes(q) ||
+    (c.curso||'').toLowerCase().includes(q) || c.id.toLowerCase().includes(q));
+  $('#convLista').innerHTML = lst.length ? lst.map(c=>`
+    <div class="conv-item ${c.id===CONV_ABERTA?'on':''}" onclick="abrirConversa('${c.id}')">
+      <div class="conv-ava">${c.iniciais}</div>
+      <div class="conv-meta">
+        <div class="conv-nome"><span>${c.lead||c.id}</span><span class="muted" style="font-size:10.5px;">${c.ha}</span></div>
+        <div class="conv-prev">${c.pendente?'<i class="ti ti-robot" style="color:#1d4ed8;"></i> proposta pronta para aprovação':(c.preview||'(sem mensagens)')}</div>
+      </div>
+      ${(c.aguardando||c.pendente)?'<div class="conv-dot" title="aguardando você"></div>':''}
+      ${c.optout?'<span class="chip t-bad" style="margin:0;">opt-out</span>':''}
+    </div>`).join('') : '<div class="muted" style="padding:16px;text-align:center;">Nenhuma conversa ainda.</div>';
+}
+
+async function abrirConversa(id){
+  CONV_ABERTA = id;
+  CONV_ERRO = null;
+  document.querySelector('.conv-shell').classList.add('chat-open');
+  renderListaConv();
+  await refrescarAberta();
+}
+function fecharConversa(){
+  CONV_ABERTA = null;
+  document.querySelector('.conv-shell').classList.remove('chat-open');
+  renderListaConv();
+}
+
+async function refrescarAberta(){
+  if(!CONV_ABERTA) return;
+  const d = await api('/api/conversas/'+CONV_ABERTA);
+  if(d.erro){ CONV_ABERTA = null; return; }
+  CONV_DATA = d;
+  renderThread(d);
+}
+
+function renderThread(d){
+  const draftAtual = $('#convInput'); const draft = draftAtual ? draftAtual.value : '';
+  const fios = (d.thread||[]).map(t=>{
+    const eu = t.papel==='agente';
+    return `<div class="bubble ${eu?'b-ag':'b-lead'}" style="align-self:${eu?'flex-end':'flex-start'};">
+      ${(t.texto||'<i>(mídia/sem texto)</i>')}<div class="conv-ts">${eu?'Vinícius · ':''}${(t.ts||'').slice(11,16)}</div></div>`;
+  }).join('');
+  const prop = d.proposta?`
+    <div class="bubble b-ag" style="align-self:flex-end;border-style:dashed;">
+      <div style="font-size:11px;color:#1d4ed8;margin-bottom:4px;"><i class="ti ti-robot"></i> proposta · aguardando você</div>${d.proposta}
+      <div style="margin-top:6px;"><span class="chip t-ok"><i class="ti ti-check"></i> revisor ok</span></div>
+      <div style="margin-top:8px;display:flex;gap:7px;">
+        <button class="btn btn-p" style="padding:6px 11px;" onclick="aprovarMsg('${d.id}')"><i class="ti ti-send"></i> Aprovar</button>
+        <button class="btn btn-g" style="padding:6px 11px;" onclick="editarMsg('${d.id}')">Editar</button>
+        <button class="btn btn-g" style="padding:6px 11px;color:#991b1b;" onclick="api('/api/conversas/${d.id}/recusar',{method:'POST'}).then(aposAcao)">Recusar</button>
+      </div></div>`:'';
+  $('#convMain').innerHTML = `
+    <div class="conv-head">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <button class="conv-back" onclick="fecharConversa()" title="Voltar"><i class="ti ti-arrow-left"></i></button>
+        <div class="conv-ava">${d.iniciais}</div>
+        <div><div style="font-weight:500;font-size:13.5px;">${d.lead||d.id}</div>
+        <div class="muted">${d.curso} · ${d.estado}${d.optout?' · <span style="color:#991b1b;">opt-out</span>':''}</div></div>
+      </div>
+    </div>
+    <div class="conv-thread" id="convThread">${fios || '<div class="muted" style="margin:auto;">Sem mensagens ainda.</div>'}${prop}</div>
+    <div id="convErro">${(CONV_ERRO && CONV_ERRO.id===d.id) ? CONV_ERRO.html : ''}</div>
+    ${d.optout
+      ? '<div class="conv-blocked" style="margin:0 11px 11px;"><i class="ti ti-ban"></i> Lead em opt-out — não é possível enviar mensagens.</div>'
+      : `<div class="conv-composer">
+           <textarea id="convInput" rows="1" placeholder="Digite uma mensagem…" onkeydown="convKeydown(event)">${draft}</textarea>
+           <button class="btn btn-p" onclick="convEnviar()" title="Enviar (Enter)"><i class="ti ti-send"></i></button>
+         </div>`}`;
+  const th = $('#convThread'); if(th) th.scrollTop = th.scrollHeight;
+}
+
+function convKeydown(e){
+  if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); convEnviar(); }
+}
+
+function marcarErro(id, r, motivoFallback){
+  const texto = r.bloqueios ? ('<strong>Bloqueado pelo Revisor:</strong> '+r.bloqueios.join('; '))
+              : (r.erro || motivoFallback);
+  CONV_ERRO = {id, html: `<div class="conv-blocked">${texto}</div>`};
+  if(CONV_ABERTA===id) renderThread(CONV_DATA);   // mostra já, sem esperar o próximo poll
+}
+
+async function convEnviar(){
+  const inp = $('#convInput'); const texto = inp ? inp.value.trim() : '';
+  if(!texto || !CONV_ABERTA) return;
+  const id = CONV_ABERTA;
+  inp.disabled = true;
+  const r = await api('/api/conversas/'+id+'/enviar',{method:'POST',
+    headers:{'Content-Type':'application/json'}, body:JSON.stringify({texto})});
+  if(inp) inp.disabled = false;
+  if(r.erro){ marcarErro(id, r); return; }
+  if(r.envio && !r.envio.ok){ marcarErro(id, {}, r.envio.motivo || ('não enviado — '+r.envio.status)); return; }
+  CONV_ERRO = null;
+  await aposAcao();
+  const inp2 = $('#convInput'); if(inp2) inp2.value = '';
+}
+
+async function aposAcao(){ await refrescarAberta(); await atualizarLista(); }
+
 async function aprovarMsg(id, texto){
   const body = texto ? {texto} : {};
   const r = await api('/api/conversas/'+id+'/aprovar',{method:'POST',
     headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
-  alert(r.envio ? ('envio: '+(r.envio.status||(r.envio.ok?'ok':'falhou'))+(r.envio.motivo?' — '+r.envio.motivo:'')) : (r.erro||'erro'));
-  carregar();
+  if(r.erro){ marcarErro(id, r); return; }
+  if(r.envio && !r.envio.ok){ marcarErro(id, {}, r.envio.motivo || ('não enviado — '+r.envio.status)); return; }
+  CONV_ERRO = null;
+  aposAcao();
 }
-function editarMsg(id, btn){
-  const card = btn.closest('.g'); const atual = card.querySelector('.b-ag')?.childNodes[1]?.textContent || '';
-  const novo = prompt('Editar mensagem (passa pelo Revisor):', atual.trim());
+function editarMsg(id){
+  const novo = prompt('Editar mensagem (passa pelo Revisor):', (CONV_DATA&&CONV_DATA.proposta)||'');
   if(novo) aprovarMsg(id, novo);
 }
 let AUTO=false;

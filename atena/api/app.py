@@ -29,7 +29,7 @@ def _load_env(p=pathlib.Path(__file__).resolve().parents[2] / ".env"):
 
 _load_env()  # antes dos imports que leem env no import (auth lê ATENA_USERS)
 
-from flask import Flask, jsonify, request, send_from_directory
+from flask import Flask, jsonify, request, send_from_directory, session
 
 from atena.revisor.ontologico import revisar
 from atena.core.estado import Estado
@@ -125,19 +125,37 @@ def reviewer():
 
 @app.route("/api/conversas")
 def conversas():
+    """Lista leve (estilo WhatsApp: nome, preview, hora) — a thread completa só
+    carrega quando a conversa é aberta (/api/conversas/<id>)."""
     out = []
     for l in EST.listar_leads():
+        hist = EST.historico(l["card_id"])
         prop = EST.decisao_pendente(l["card_id"])
-        ult = EST.ultima_lead_msg(l["card_id"])
-        if not prop and not ult:
-            continue
+        if not hist and not prop:
+            continue   # nunca houve contato nem proposta -> não é uma "conversa" ainda
+        ult = hist[-1] if hist else None
         out.append({"id": l["card_id"], "lead": l["nome"], "iniciais": _iniciais(l["nome"]),
                     "curso": l["curso"], "estado": l["estado_conversa"], "ha": _ha(l["atualizado"]),
-                    "ultima_lead": ult, "proposta": prop["mensagem"] if prop else None,
-                    "thread": EST.historico(l["card_id"])[-8:]})
-        if len(out) >= 12:
-            break
+                    "optout": bool(l.get("optout")),
+                    "preview": (ult["texto"] if ult else "")[:80],
+                    "preview_de_lead": bool(ult and ult["papel"] == "lead"),
+                    "aguardando": bool(ult and ult["papel"] == "lead"),   # último turno foi do lead
+                    "pendente": bool(prop)})
     return jsonify(out)
+
+
+@app.route("/api/conversas/<card_id>")
+def conversa_detalhe(card_id):
+    """Thread completa de UM lead — carregada ao abrir a conversa."""
+    lead = EST.get_lead(card_id)
+    if not lead:
+        return jsonify({"erro": "lead inexistente"}), 404
+    prop = EST.decisao_pendente(card_id)
+    return jsonify({"id": card_id, "lead": lead["nome"], "iniciais": _iniciais(lead["nome"]),
+                    "curso": lead["curso"], "estado": lead["estado_conversa"],
+                    "telefone": lead["telefone"], "optout": bool(lead.get("optout")),
+                    "thread": EST.historico(card_id),
+                    "proposta": prop["mensagem"] if prop else None})
 
 
 @app.route("/api/conversas/<card_id>/responder", methods=["POST"])
@@ -223,6 +241,32 @@ def conversa_aprovar(card_id):
     b = request.get_json(silent=True) or {}
     corpo, code = _aprovar_e_enviar(card_id, b.get("texto"))
     return jsonify(corpo), code
+
+
+@app.route("/api/conversas/<card_id>/enviar", methods=["POST"])
+def conversa_enviar(card_id):
+    """Intervenção humana: operador escreve e envia agora, sem proposta prévia
+    do agente (estilo WhatsApp). Mesmo guardrail de sempre: passa pelo Revisor
+    antes de sair (spec 07/CLAUDE.md §7) — só bloqueia se o texto citar preço/
+    data/carga/parcela que não bate com o curso do card."""
+    lead = EST.get_lead(card_id)
+    if not lead:
+        return jsonify({"erro": "lead inexistente"}), 404
+    texto = (request.get_json(silent=True) or {}).get("texto", "").strip()
+    if not texto:
+        return jsonify({"erro": "texto vazio"}), 400
+    rev = revisar(lead["curso"], texto, ONTO.ont)
+    if not rev["aprovado"]:
+        return jsonify({"erro": "mensagem bloqueada pelo Revisor", "bloqueios": rev["bloqueios"]}), 422
+    r = WA.enviar(lead["telefone"], texto)
+    if r.get("ok"):
+        EST.add_conversa(card_id, "agente", texto)
+        EST.set_lead(card_id, estado_conversa="aguardando_resposta")
+        prop = EST.decisao_pendente(card_id)
+        if prop:   # humano respondeu por fora -> a proposta do agente fica obsoleta
+            EST.set_decisao_status(prop["id"], "recusada")
+        EST.log_acao(session.get("usuario", "humano"), "enviar_livre", card_id)
+    return jsonify({"envio": r})
 
 
 @app.route("/api/config", methods=["GET", "POST"])
