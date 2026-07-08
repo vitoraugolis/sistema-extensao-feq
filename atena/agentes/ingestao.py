@@ -23,11 +23,12 @@ def _digits(p):
 
 def curso_de_texto(*textos):
     """Extrai o código do curso ('FEQ-0333') do nome do formulário/campanha.
-    Padrão acordado: nome do formulário = curso + versão (ex.: 'FEQ-0333 v1')."""
+    Padrão acordado: nome do formulário = curso + versão (ex.: 'FEQ-0333 v1').
+    Normaliza para 4 dígitos: 'FEQ 331' -> 'FEQ-0331' (catálogo usa 4 dígitos)."""
     for t in textos:
         m = FORM_CODE_RE.search(t or "")
         if m:
-            return f"FEQ-{m.group(1)}"
+            return f"FEQ-{m.group(1).zfill(4)}"
     return ""
 
 

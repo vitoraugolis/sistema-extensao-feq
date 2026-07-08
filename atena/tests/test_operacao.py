@@ -83,8 +83,13 @@ def test_lgpd_anonimiza_perdidos_antigos():
 def test_curso_do_nome_do_formulario():
     # padrão acordado: nome do formulário = curso + versão
     assert curso_de_texto("FEQ-0333 v1") == "FEQ-0333"
+    assert curso_de_texto("FEQ-0333 v2") == "FEQ-0333"   # troca de versão é transparente
+    assert curso_de_texto("FEQ-0580 v3") == "FEQ-0580"
     assert curso_de_texto("FEQ0480 v2") == "FEQ-0480"
     assert curso_de_texto("Campanha genérica sem código") == ""
+    # 3 dígitos ('Lead Magnet FEQ 331') -> normaliza p/ 4 (catálogo usa FEQ-0331)
+    assert curso_de_texto("Lead Magnet FEQ 331") == "FEQ-0331"
+    assert curso_de_texto("Lead Magnet FEQ 530") == "FEQ-0530"
     # form vazio -> cai no fallback de campanha
     assert curso_de_texto("", "Leads FEQ-0499 verão") == "FEQ-0499"
 
