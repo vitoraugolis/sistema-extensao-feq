@@ -31,10 +31,35 @@ def curso_de_texto(*textos):
     return ""
 
 
+# campos de contato conhecidos; o resto do form são perguntas qualificatórias
+CONTATO = {"full_name", "nome", "phone_number", "telefone", "email", "consent",
+           "curso", "curso_de_interesse"}
+SUPERIOR_RE = re.compile(r"superior|gradua|bacharel|licenciat", re.I)
+NEGATIVO_RE = re.compile(r"\b(n[ãa]o|nao|incompleto|cursando|ainda)\b", re.I)
+
+
+def _qualificacao(fd):
+    """Formulário com perguntas qualificatórias traz respostas além do contato.
+    Só o lead que passou no funil do form chega aqui (o não-qualificado vira 'não
+    lead' e não gera webhook). Se há pergunta sobre ensino superior respondida
+    afirmativamente, marca a escolaridade -> o gate acadêmico não re-pergunta.
+    Retorna (escolaridade|None, nota_legível)."""
+    extras = [(k, v) for k, v in fd.items() if k not in CONTATO and (v or "").strip()]
+    if not extras:
+        return None, ""
+    escolaridade = None
+    for k, v in extras:
+        if SUPERIOR_RE.search(k) or SUPERIOR_RE.search(v):
+            escolaridade = None if NEGATIVO_RE.search(v) else "Superior Completo"
+    nota = "; ".join(f"{k.replace('_', ' ').strip(' ?')}: {v}" for k, v in extras)
+    return escolaridade, nota
+
+
 def normalizar_meta(field_data, campaign_name="", leadgen_id="", curso=""):
     """Adapter Meta -> lead normalizado. field_data = [{name,values:[..]}].
     Curso vem do nome do formulário (via `curso`); fallbacks: campo do form, campanha."""
     fd = {i["name"]: (i.get("values") or [""])[0] for i in (field_data or [])}
+    escolaridade, qualif = _qualificacao(fd)
     return {
         "nome": fd.get("full_name") or fd.get("nome") or "",
         "telefone": fd.get("phone_number") or fd.get("telefone") or "",
@@ -42,6 +67,8 @@ def normalizar_meta(field_data, campaign_name="", leadgen_id="", curso=""):
         "curso": curso or fd.get("curso") or fd.get("curso_de_interesse") or curso_de_texto(campaign_name),
         "campanha": campaign_name, "lead_id": str(leadgen_id),
         "consentimento": fd.get("consent", "true"),
+        "escolaridade": escolaridade,   # pré-qualificado no formulário -> pula o gate
+        "qualificacao": qualif,
     }
 
 
@@ -97,7 +124,10 @@ class Ingestao:
         ec = "aguardando_1o_contato" if cap.get("captavel") else "aguardando_revisao"
         card_id = f"meta-{_digits(tel)}"
         self.est.upsert_lead(card_id, nome=lead.get("nome", ""), telefone=tel,
-                             curso=lead.get("curso", ""), fase="Lead", estado_conversa=ec)
+                             curso=lead.get("curso", ""), fase="Lead", estado_conversa=ec,
+                             escolaridade=lead.get("escolaridade"))
+        if lead.get("qualificacao"):   # respostas do form -> auditoria (e o gate já foi pulado)
+            self.est.log_acao("ingestao", f"pré-qualificado no formulário — {lead['qualificacao']}", card_id)
         if self.faro and self.faro.ativo:   # espelha no system of record
             try:
                 fid = self.faro.criar_lead(lead.get("nome"), tel, lead.get("curso"))

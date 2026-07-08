@@ -125,6 +125,17 @@ def _json(texto):
     return json.loads(m.group(0)) if m else None
 
 
+def _gate_instr(elegivel):
+    """Instrução do gate acadêmico — condicional à pré-qualificação (evita re-perguntar)."""
+    if elegivel is True:
+        return ("GATE ACADÊMICO JÁ SATISFEITO: o ensino superior completo do lead JÁ está "
+                "confirmado (pré-qualificado no formulário). NÃO pergunte sobre escolaridade "
+                "de novo — siga direto para orientar sobre inscrição; pode usar 'qualificar'.\n")
+    return ("GATE: ensino superior completo (todos os cursos). Use 'qualificar' SOMENTE depois "
+            "que o lead confirmar explicitamente o ensino superior completo; enquanto "
+            "pergunta/aguarda, use 'continuar'.\n")
+
+
 def _system_prompt(ctx, lead_nome=None):
     c = ctx["curso"]
     nome = (lead_nome or "").strip()
@@ -153,12 +164,11 @@ def _system_prompt(ctx, lead_nome=None):
         "para a coordenação (ex.: 'Lead pede a ementa do FEQ-0580'). O sistema envia ao lead "
         "uma mensagem padrão de espera — não redija você. EXCEÇÃO: se receber uma mensagem "
         "iniciada por [INFORMAÇÃO DA COORDENAÇÃO], use-a como fonte autorizada e responda.\n"
-        "REGRAS: gate = ensino superior completo (todos os cursos); não peça CPF/endereço nesta "
-        "fase; escale (escalar_humano) em desconto/reclamação/intenção de fechar/dúvida fora da base.\n"
+        + _gate_instr(ctx.get("elegivel")) +
+        "Não peça CPF/endereço nesta fase; escale (escalar_humano) em desconto/reclamação/"
+        "intenção de fechar/dúvida fora da base.\n"
         "TROCA DE INTERESSE: se o lead demonstrar que o curso que quer é OUTRO do portfólio, "
         'retorne o código dele em dados.curso (ex.: "FEQ-0580") e siga a conversa nesse curso.\n'
-        "AÇÕES: use 'qualificar' SOMENTE depois que o lead confirmar explicitamente o ensino "
-        "superior completo; enquanto estiver perguntando/aguardando, use 'continuar'.\n"
         'Responda SOMENTE em JSON, preenchendo os campos com conteúdo REAL (nunca reticências '
         'ou placeholder): {"mensagem_ao_lead": "<o texto completo que será enviado ao lead>", '
         '"proxima_acao": "continuar|qualificar|descartar|em_espera|escalar_humano|encerrar_optout", '

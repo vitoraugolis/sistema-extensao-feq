@@ -15,6 +15,14 @@ card no FARO em **Lead**. (Histórico: chegou-se a definir Make→FARO; revertid
   resolve o curso (o formulário coleta **só Nome, Telefone e E-mail** — não há campo de curso).
 - Resolução: `curso_de_texto(nome_do_form, campanha)` via regex `FEQ[-_ ]?(\d{3,4})` →
   `FEQ-XXXX`. Fallback: nome da campanha, se o form não casar.
+- **Formulário qualificatório (opcional).** O form pode ter perguntas de qualificação
+  condicionais (ex.: FEQ-0333 v1 pergunta ensino superior completo e disponibilidade para a
+  aula presencial 01/08/2026). Só quem responde afirmativamente chega ao fim e vira lead — o
+  desqualificado vira "não lead" e **não gera webhook**. Logo, **todo lead recebido já passou
+  no funil do form**. `_qualificacao(field_data)`: respostas além do contato → nota na auditoria;
+  se há pergunta sobre ensino superior respondida afirmativamente, grava `escolaridade=Superior
+  Completo` no lead → **o gate acadêmico do agente não re-pergunta** (o agente já parte para o
+  curso/inscrição). Corrige o incidente "perguntou ensino superior duas vezes".
 
 ## Requisitos funcionais
 - **F1** Webhook `/webhook/meta`: handshake `GET` (verify token) + `POST` leadgen.

@@ -14,6 +14,8 @@ from atena.core.faro import Faro
 from atena.transporte.whatsapp import WhatsApp
 from atena.agentes.nutricao import leads_para_reengajar, reengajar
 from atena.agentes.ingestao import Ingestao, normalizar_meta, curso_de_texto
+from atena.core.orquestrador import brain_deterministico
+from atena.core import contratos as C
 
 ONT = Ontologia()
 
@@ -108,6 +110,37 @@ def test_ingest_gate_dispara_1o_contato_so_se_captavel():
         [{"name": "full_name", "values": ["B"]}, {"name": "phone_number", "values": ["+55 19 90000-0002"]}],
         curso="FEQ-0655"))                                   # encerrado
     assert nao["captavel"] is False and nao["estado_conversa"] == "aguardando_revisao"
+
+
+def test_prequalificacao_marca_escolaridade():
+    # form qualificatório: superior=sim + disponibilidade=sim -> escolaridade marcada
+    fd = [{"name": "full_name", "values": ["Ana"]},
+          {"name": "phone_number", "values": ["+55 19 90000-0009"]},
+          {"name": "voce_ja_concluiu_o_ensino_superior?", "values": ["Sim"]},
+          {"name": "disponibilidade_aula_presencial_01_08_2026", "values": ["Sim"]}]
+    lead = normalizar_meta(fd, curso="FEQ-0333")
+    assert lead["escolaridade"] == "Superior Completo"
+    assert "ensino superior" in lead["qualificacao"] and "01 08 2026" in lead["qualificacao"]
+    # defensivo: se a resposta ao superior for negativa, NÃO marca (não pula o gate)
+    fd_neg = fd[:2] + [{"name": "tem_ensino_superior?", "values": ["Não"]}]
+    assert normalizar_meta(fd_neg, curso="FEQ-0333")["escolaridade"] is None
+    # form simples (só contato) -> nada muda
+    assert normalizar_meta(fd[:2], curso="FEQ-0333")["escolaridade"] is None
+
+
+def test_prequalificado_pula_gate_academico():
+    est = Estado(":memory:")
+    lead = normalizar_meta(
+        [{"name": "full_name", "values": ["Ana"]},
+         {"name": "phone_number", "values": ["+55 19 90000-0009"]},
+         {"name": "concluiu_ensino_superior?", "values": ["Sim"]}], curso="FEQ-0333")
+    r = Ingestao(est, ONT).ingest(lead)
+    saved = est.get_lead(r["card_id"])
+    assert saved["escolaridade"] == "Superior Completo"      # persistido
+    # 1ª resposta do lead: agente NÃO re-pergunta ensino superior -> já oferece o curso
+    dec = brain_deterministico(ONT, saved, "tenho interesse!", [])
+    assert dec.proxima_acao == C.QUALIFICAR
+    assert "ensino superior" not in (dec.mensagem_ao_lead or "").lower()
 
 
 def test_faro_noop_sem_chave():
