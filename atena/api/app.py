@@ -509,9 +509,19 @@ def _canario():
 
 
 def _despachar_alertas():
-    """Alerta novo -> tenta avisar o gestor por WhatsApp (best effort; a Central sempre mostra)."""
+    """Alerta novo -> tenta avisar o gestor por WhatsApp (best effort; a Central sempre mostra).
+    Nunca despacha para um número que também é um lead rastreado: texto interno (motivo de
+    escalonamento, estado do sistema) não pode vazar para dentro de uma conversa de lead."""
     dest = EST.get_config("alerta_whatsapp") or "5519936185086"
-    for a in EST.alertas_nao_notificados():
+    pendentes = EST.alertas_nao_notificados()
+    if not pendentes:
+        return
+    if EST.lead_por_telefone(dest):
+        EST.log_acao("sistema", f"alerta_whatsapp={dest} coincide com um lead — dispatch suprimido, só Central")
+        for a in pendentes:
+            EST.marcar_alerta_notificado(a["id"])
+        return
+    for a in pendentes:
         try:
             WA.enviar(dest, f"⚠️ Atena [{a['tipo']}]: {a['texto']}")
         except Exception:

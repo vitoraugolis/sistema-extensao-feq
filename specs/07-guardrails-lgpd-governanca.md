@@ -16,6 +16,11 @@
 5. **Escalonamento humano**: desconto, reclamação, intenção de fechar, dúvida fora da base.
 6. **WhatsApp Business**: fora da janela de 24h, só templates aprovados.
 7. **Sem ação estrutural/financeira**: agentes não chamam `delete` nem mexem em orçamento de campanha.
+8. **Alerta interno nunca vaza para lead**: notificações operacionais (escalonamento, canário,
+   degradação) ao gestor pelo WhatsApp (`alerta_whatsapp`) são suprimidas se o número de destino
+   também for um lead rastreado — o texto interno (motivo, estado do sistema) não pode aparecer
+   dentro de uma conversa de lead. A Central (aba Aprovações) sempre mostra o alerta,
+   independente do WhatsApp (`atena/api/app.py:_despachar_alertas`).
 
 ## LGPD (não-negociável)
 - **Base legal**: consentimento capturado no formulário da campanha → `Consentimento LGPD` +
