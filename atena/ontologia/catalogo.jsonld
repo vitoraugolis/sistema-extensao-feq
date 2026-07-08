@@ -98,8 +98,8 @@
     {
       "@id": "feq:FEQ-0333", "@type": "feq:Extensao", "codigo": "FEQ-0333",
       "nome": "CCUS — Carbon Capture, Utilization and Storage; Module 1: Introduction",
-      "modalidade": "Semipresencial — FEQ, Campinas/SP",
-      "horarioAula": "primeiro sábado 8h-16h; demais sábados 8h-12h",
+      "modalidade": "Semipresencial — 1º encontro presencial (FEQ, Campinas/SP); demais sábados online",
+      "horarioAula": "1º sábado presencial 8h-16h; demais sábados (online) 8h-12h",
       "professorResponsavel": "Luis Fernando Mercier Franco",
       "certificacao": "Certificado",
       "publicoAlvo": "Qualquer área de formação; setores industrial e acadêmico, agências reguladoras; participantes nacionais e internacionais.",
@@ -107,10 +107,10 @@
       "cargaHoraria": { "@type": "feq:Duracao", "horas": 40, "label": "40h (8h presenciais + 32h EAD)" },
       "vagasMin": 25, "vagasMax": 60,
       "janelaInscricao":   { "@type": "feq:JanelaTemporal", "inicio": "2025-12-03", "fim": "2026-07-19" },
-      "janelaOferecimento":{ "@type": "feq:JanelaTemporal", "inicio": "2026-06-13", "fim": "2026-09-30" },
+      "janelaOferecimento":{ "@type": "feq:JanelaTemporal", "inicio": "2026-08-01", "fim": "2026-12-19" },
       "planoPagamento": { "@type": "feq:PlanoPagamento", "taxaInscricao": "22.00", "numParcelas": 3, "valorParcela": "1000.12", "aVista": "3000.37" },
-      "urlExtecamp": "https://ins.extecamp.unicamp.br/curso/dados/FEQ-0333/001",
-      "insightVenda": "Esclarecer: (1) são módulos, não curso pela metade; (2) não é 100% em inglês. Primeiro oferecimento.",
+      "urlExtecamp": "https://ins.extecamp.unicamp.br/curso/inscricao/FEQ-0333/001",
+      "insightVenda": "Aulas ministradas EM INGLÊS. São módulos (Module 1), não curso pela metade. Primeiro oferecimento. Início 01/08/2026 (1º encontro presencial na FEQ, Campinas), término 19/12/2026.",
       "wasDerivedFrom": "feq:fonteNotion"
     },
     {

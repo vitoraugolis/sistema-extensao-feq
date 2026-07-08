@@ -141,6 +141,10 @@ def test_prequalificado_pula_gate_academico():
     dec = brain_deterministico(ONT, saved, "tenho interesse!", [])
     assert dec.proxima_acao == C.QUALIFICAR
     assert "ensino superior" not in (dec.mensagem_ao_lead or "").lower()
+    # botão do template ("Receber o link para prosseguir") -> link de INSCRIÇÃO correto
+    dec2 = brain_deterministico(ONT, saved, "Receber o link para prosseguir", [])
+    assert dec2.proxima_acao == C.QUALIFICAR
+    assert "/inscricao/FEQ-0333/" in (dec2.mensagem_ao_lead or "")
 
 
 def test_faro_noop_sem_chave():

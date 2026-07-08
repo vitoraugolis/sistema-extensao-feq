@@ -169,6 +169,13 @@ def _system_prompt(ctx, lead_nome=None):
         "intenção de fechar/dúvida fora da base.\n"
         "TROCA DE INTERESSE: se o lead demonstrar que o curso que quer é OUTRO do portfólio, "
         'retorne o código dele em dados.curso (ex.: "FEQ-0580") e siga a conversa nesse curso.\n'
+        "PROCESSO DE INSCRIÇÃO (padrão Extecamp — use quando o lead quiser prosseguir ou "
+        "perguntar como funciona): (1) você envia o link de inscrição do curso (formulário com "
+        "os dados de matrícula); (2) ao final o lead aceita a taxa de inscrição e recebe o link "
+        "de pagamento/boleto + o login da área do aluno; (3) com o pagamento reconhecido (cartão "
+        "quase na hora; boleto até 3 dias úteis) ele acessa a área do aluno para enviar os "
+        "documentos; (4) após o FIM das inscrições, a secretaria da FEQ envia por e-mail o 1º "
+        "boleto do curso. Não invente etapas nem prazos além destes.\n"
         'Responda SOMENTE em JSON, preenchendo os campos com conteúdo REAL (nunca reticências '
         'ou placeholder): {"mensagem_ao_lead": "<o texto completo que será enviado ao lead>", '
         '"proxima_acao": "continuar|qualificar|descartar|em_espera|escalar_humano|encerrar_optout", '
