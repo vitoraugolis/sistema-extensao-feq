@@ -44,6 +44,7 @@ CREATE TABLE IF NOT EXISTS alertas(
   criado TEXT, notificado INTEGER DEFAULT 0);
 CREATE TABLE IF NOT EXISTS usuarios(
   usuario TEXT PRIMARY KEY, senha_hash TEXT, papel TEXT, ativo INTEGER DEFAULT 1, criado TEXT);
+CREATE TABLE IF NOT EXISTS midias(media_id TEXT PRIMARY KEY, mime TEXT, criado TEXT);
 """
 
 FASES = ["Lead", "Prospect", "Inscrito", "Matriculado", "Em espera", "Perdido"]
@@ -65,7 +66,9 @@ class Estado:
         self._lock = threading.Lock()
         self.conn.executescript(SCHEMA)
         for mig in ("ALTER TABLE leads ADD COLUMN reengajos INTEGER DEFAULT 0",
-                    "ALTER TABLE leads ADD COLUMN faro_id TEXT"):
+                    "ALTER TABLE leads ADD COLUMN faro_id TEXT",
+                    "ALTER TABLE conversas ADD COLUMN tipo TEXT DEFAULT 'texto'",
+                    "ALTER TABLE conversas ADD COLUMN media_id TEXT"):
             try:
                 self.conn.execute(mig)
             except sqlite3.OperationalError:
@@ -242,15 +245,27 @@ class Estado:
             "SELECT * FROM auditoria ORDER BY id DESC LIMIT ?", (limite,))]
 
     # ------------------------------------------------------------ conversas
-    def add_conversa(self, card_id, papel, texto):
+    def add_conversa(self, card_id, papel, texto, tipo="texto", media_id=None):
         with self._lock:
-            self.conn.execute("INSERT INTO conversas(card_id,papel,texto,ts) VALUES(?,?,?,?)",
-                              (card_id, papel, texto, _agora()))
+            self.conn.execute(
+                "INSERT INTO conversas(card_id,papel,texto,tipo,media_id,ts) VALUES(?,?,?,?,?,?)",
+                (card_id, papel, texto, tipo, media_id, _agora()))
             self.conn.commit()
 
     def historico(self, card_id):
         return [dict(r) for r in self.conn.execute(
-            "SELECT papel,texto,ts FROM conversas WHERE card_id=? ORDER BY id", (card_id,))]
+            "SELECT papel,texto,tipo,media_id,ts FROM conversas WHERE card_id=? ORDER BY id", (card_id,))]
+
+    # --------------------------------------------------------------- mídias
+    def add_midia(self, media_id, mime):
+        with self._lock:
+            self.conn.execute("INSERT OR IGNORE INTO midias(media_id,mime,criado) VALUES(?,?,?)",
+                              (media_id, mime or "", _agora()))
+            self.conn.commit()
+
+    def midia_mime(self, media_id):
+        r = self.conn.execute("SELECT mime FROM midias WHERE media_id=?", (media_id,)).fetchone()
+        return r["mime"] if r else None
 
     def ultima_lead_msg(self, card_id):
         r = self.conn.execute(

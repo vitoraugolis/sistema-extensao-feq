@@ -42,6 +42,16 @@ WhatsApp ──► webhook (novo serviço :8091) ──► POST /converse (:8090
 ```
 O cérebro decide a mensagem; o transporte só entrega. Manter as camadas separadas.
 
+## Conteúdo recebido (✅ implementado)
+`whatsapp.extrair_mensagem` normaliza TODO tipo de mensagem do lead — texto, **cliques de
+botão** de template (feq_lead: `button`/`interactive`) e **mídias** (`image/audio/video/
+document/sticker`). Mídia: a URL da Meta expira em ~5 min e exige token, então `_baixar_midia`
+baixa os bytes na hora para `data/media/<media_id>` e registra o mime (`midias`). A conversa
+guarda `tipo`+`media_id` (colunas novas em `conversas`). `GET /api/media/<id>` serve o arquivo
+(auth-guarded, path-safe) e a Central renderiza inline (img/audio/video/link). Mídia sem legenda
+→ o cérebro recebe um rótulo (`[o lead enviou um áudio]`) p/ não misfire. Texto do lead é
+escapado na UI (evita XSS). LGPD: `anonimizar_antigos` deve apagar as mídias do lead (TODO).
+
 ## Critérios de aceitação
 - AC1 Mensagem só sai após aprovação do Revisor.
 - AC2 Fora da janela de 24h, usa template; dentro, texto livre.

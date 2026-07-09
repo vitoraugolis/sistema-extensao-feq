@@ -105,16 +105,21 @@ class Orquestrador:
         self.faro = faro or Faro()
         self.brain = brain or (lambda lead, msg, hist=None: brain_deterministico(self.ont, lead, msg, hist))
 
-    def processar_mensagem(self, card_id, mensagem_lead):
+    def processar_mensagem(self, card_id, mensagem_lead, tipo="texto", media_id=None):
         lead = self.est.get_lead(card_id)
         if not lead:
             raise ValueError(f"lead {card_id} não existe")
         if lead.get("optout"):
             return {"ignorado": "lead em opt-out"}
         historico = self.est.historico(card_id)   # antes de gravar a msg atual
-        self.est.add_conversa(card_id, "lead", mensagem_lead)
+        self.est.add_conversa(card_id, "lead", mensagem_lead, tipo=tipo, media_id=media_id)
 
-        dec = self.brain(lead, mensagem_lead, historico)
+        # mídia sem legenda: o cérebro não "ouve"/"vê" -> recebe um rótulo p/ não misfire
+        entrada = mensagem_lead or {
+            "audio": "[o lead enviou um áudio]", "image": "[o lead enviou uma imagem]",
+            "video": "[o lead enviou um vídeo]", "document": "[o lead enviou um documento]",
+            "sticker": "[o lead enviou uma figurinha]"}.get(tipo, mensagem_lead)
+        dec = self.brain(lead, entrada, historico)
         # anti-loop: repetir a MESMA mensagem é sinal de agente perdido -> humano assume
         ultima_ag = next((h["texto"] for h in reversed(historico) if h.get("papel") == "agente"), None)
         if dec.mensagem_ao_lead and dec.mensagem_ao_lead == ultima_ag:

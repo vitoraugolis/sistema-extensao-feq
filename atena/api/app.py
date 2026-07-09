@@ -124,6 +124,20 @@ def reviewer():
                            usar_semantico=bool(b.get("semantico"))))
 
 
+_MIDIA_ROTULO = {"audio": "🎤 áudio", "image": "🖼️ imagem", "video": "🎥 vídeo",
+                 "document": "📎 documento", "sticker": "🌟 figurinha"}
+
+
+def _preview(turno):
+    """Texto de preview da lista; se o último turno for mídia, mostra o rótulo."""
+    if not turno:
+        return ""
+    if turno.get("media_id") and turno.get("tipo", "texto") != "texto":
+        rot = _MIDIA_ROTULO.get(turno["tipo"], f"[{turno['tipo']}]")
+        return f"{rot} · {turno['texto']}" if turno.get("texto") else rot
+    return turno.get("texto") or ""
+
+
 @app.route("/api/conversas")
 def conversas():
     """Lista leve (estilo WhatsApp: nome, preview, hora) — a thread completa só
@@ -138,7 +152,7 @@ def conversas():
         out.append({"id": l["card_id"], "lead": l["nome"], "iniciais": _iniciais(l["nome"]),
                     "curso": l["curso"], "estado": l["estado_conversa"], "ha": _ha(l["atualizado"]),
                     "optout": bool(l.get("optout")),
-                    "preview": (ult["texto"] if ult else "")[:80],
+                    "preview": _preview(ult)[:80],
                     "preview_de_lead": bool(ult and ult["papel"] == "lead"),
                     "aguardando": bool(ult and ult["papel"] == "lead"),   # último turno foi do lead
                     "pendente": bool(prop)})
@@ -213,6 +227,19 @@ def lead_reativar(card_id):
 def meta_reconciliar():
     """Força uma reconciliação Meta agora (busca+ativa leads que o webhook não trouxe)."""
     return jsonify({"novos_ativados": reconciliacao.poll_meta(EST, ONTO.ont, ING, _primeiro_contato)})
+
+
+MEDIA_DIR = pathlib.Path(__file__).resolve().parents[1] / "data" / "media"
+
+
+@app.route("/api/media/<media_id>")
+def media(media_id):
+    """Serve a mídia recebida do lead (áudio/imagem/vídeo/doc). Guardada pela auth."""
+    safe = "".join(c for c in media_id if c.isalnum() or c in "-_")   # sanitiza (path traversal)
+    if not safe or not (MEDIA_DIR / safe).exists():
+        return jsonify({"erro": "mídia não encontrada"}), 404
+    return send_from_directory(str(MEDIA_DIR), safe,
+                               mimetype=EST.midia_mime(media_id) or "application/octet-stream")
 
 
 @app.route("/api/conversas/<card_id>/responder", methods=["POST"])

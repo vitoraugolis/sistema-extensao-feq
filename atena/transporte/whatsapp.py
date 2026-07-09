@@ -16,6 +16,26 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2]))
 from atena.core import guardrails as G
 
 _GRAPH = "https://graph.facebook.com/v19.0"
+_MEDIA_DIR = pathlib.Path(__file__).resolve().parents[1] / "data" / "media"
+_TIPOS_MIDIA = ("image", "audio", "video", "document", "sticker")
+
+
+def extrair_mensagem(m):
+    """Normaliza um message do webhook -> (tipo, texto/legenda, media_id, mime).
+    Cobre texto, cliques de botão (quick-reply de template) e mídias."""
+    t = m.get("type", "text")
+    if t == "text":
+        return "texto", (m.get("text") or {}).get("body", ""), None, None
+    if t == "button":                      # resposta de botão de template (feq_lead)
+        return "texto", (m.get("button") or {}).get("text", ""), None, None
+    if t == "interactive":
+        i = m.get("interactive") or {}
+        r = i.get("button_reply") or i.get("list_reply") or {}
+        return "texto", r.get("title", ""), None, None
+    if t in _TIPOS_MIDIA:
+        md = m.get(t) or {}
+        return t, md.get("caption", ""), md.get("id"), md.get("mime_type")
+    return t, f"[{t}]", None, None          # location/contacts/etc.: rótulo
 
 
 class WhatsApp:
@@ -30,8 +50,34 @@ class WhatsApp:
             return args.get("hub.challenge", ""), 200
         return "forbidden", 403
 
+    def _baixar_midia(self, media_id, mime):
+        """Baixa os bytes da mídia (URL da Meta expira em ~5 min + exige token) e
+        guarda em data/media/<media_id>. Idempotente. Sem token -> não baixa."""
+        if not media_id or not self.token:
+            return
+        dest = _MEDIA_DIR / media_id
+        if dest.exists():
+            self.est.add_midia(media_id, mime)   # garante o mime registrado
+            return
+        try:
+            import requests
+            meta = requests.get(f"{_GRAPH}/{media_id}", timeout=20,
+                                headers={"Authorization": f"Bearer {self.token}"})
+            if meta.status_code != 200:
+                print(f"[wa-midia] meta {media_id}: {meta.status_code}", flush=True); return
+            j = meta.json(); url = j.get("url")
+            if not url:
+                return
+            blob = requests.get(url, timeout=40, headers={"Authorization": f"Bearer {self.token}"})
+            if blob.status_code == 200:
+                _MEDIA_DIR.mkdir(parents=True, exist_ok=True)
+                dest.write_bytes(blob.content)
+                self.est.add_midia(media_id, mime or j.get("mime_type", ""))
+        except Exception as e:
+            print(f"[wa-midia] {media_id} falhou: {e}", flush=True)
+
     def receber(self, payload):
-        """Extrai telefone+texto e encaminha ao orquestrador."""
+        """Extrai telefone + conteúdo (texto/botão/mídia) e encaminha ao orquestrador."""
         out = []
         for entry in payload.get("entry", []):
             for ch in entry.get("changes", []):
@@ -40,16 +86,19 @@ class WhatsApp:
                     if self.est.msg_ja_vista(m.get("id")):
                         continue   # reentrega da Meta — já processada, não duplicar resposta
                     tel = m.get("from", "")
-                    texto = (m.get("text") or {}).get("body", "")
+                    tipo, texto, media_id, mime = extrair_mensagem(m)
+                    if media_id:
+                        self._baixar_midia(media_id, mime)
                     card_id = self.est.lead_por_telefone(tel)
                     if not card_id:  # número desconhecido -> stub p/ revisão (não inventa curso)
                         card_id = f"wa-{tel}"
                         self.est.upsert_lead(card_id, nome="", telefone=tel, curso="",
                                              fase="Lead", estado_conversa="aguardando_revisao")
-                        self.est.add_conversa(card_id, "lead", texto)
+                        self.est.add_conversa(card_id, "lead", texto, tipo=tipo, media_id=media_id)
                         out.append({"card_id": card_id, "acao": "revisao_numero_desconhecido"})
                         continue
-                    out.append({"card_id": card_id, **self.orq.processar_mensagem(card_id, texto)})
+                    out.append({"card_id": card_id,
+                                **self.orq.processar_mensagem(card_id, texto, tipo=tipo, media_id=media_id)})
         return out
 
     def enviar(self, telefone, texto):

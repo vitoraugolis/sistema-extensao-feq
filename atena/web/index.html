@@ -368,8 +368,8 @@ function renderListaConv(){
     <div class="conv-item ${c.id===CONV_ABERTA?'on':''}" onclick="abrirConversa('${c.id}')">
       <div class="conv-ava">${c.iniciais}</div>
       <div class="conv-meta">
-        <div class="conv-nome"><span>${c.lead||c.id}</span><span class="muted" style="font-size:10.5px;">${c.ha}</span></div>
-        <div class="conv-prev">${c.pendente?'<i class="ti ti-robot" style="color:#1d4ed8;"></i> proposta pronta para aprovação':(c.preview||'(sem mensagens)')}</div>
+        <div class="conv-nome"><span>${escapeHtml(c.lead||c.id)}</span><span class="muted" style="font-size:10.5px;">${c.ha}</span></div>
+        <div class="conv-prev">${c.pendente?'<i class="ti ti-robot" style="color:#1d4ed8;"></i> proposta pronta para aprovação':(escapeHtml(c.preview)||'(sem mensagens)')}</div>
       </div>
       ${(c.aguardando||c.pendente)?'<div class="conv-dot" title="aguardando você"></div>':''}
       ${c.optout?'<span class="chip t-bad" style="margin:0;">opt-out</span>':''}
@@ -397,12 +397,24 @@ async function refrescarAberta(){
   renderThread(d);
 }
 
+function escapeHtml(s){ return (s||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function bolhaConteudo(t){
+  const cap = t.texto ? `<div style="margin-top:${t.media_id?'5px':'0'};">${escapeHtml(t.texto)}</div>` : '';
+  if(t.media_id){
+    const src='/api/media/'+encodeURIComponent(t.media_id);
+    if(t.tipo==='image'||t.tipo==='sticker') return `<img src="${src}" style="max-width:230px;max-height:280px;border-radius:9px;display:block;cursor:pointer;" onclick="window.open('${src}')">${cap}`;
+    if(t.tipo==='audio') return `<audio controls preload="none" src="${src}" style="height:40px;max-width:232px;"></audio>${cap}`;
+    if(t.tipo==='video') return `<video controls preload="none" src="${src}" style="max-width:240px;border-radius:9px;display:block;"></video>${cap}`;
+    return `<a href="${src}" target="_blank"><i class="ti ti-paperclip"></i> ${t.tipo==='document'?'documento':'anexo'}</a>${cap}`;
+  }
+  return t.texto ? escapeHtml(t.texto) : '<i class="muted">(sem conteúdo)</i>';
+}
 function renderThread(d){
   const draftAtual = $('#convInput'); const draft = draftAtual ? draftAtual.value : '';
   const fios = (d.thread||[]).map(t=>{
     const eu = t.papel==='agente';
     return `<div class="bubble ${eu?'b-ag':'b-lead'}" style="align-self:${eu?'flex-end':'flex-start'};">
-      ${(t.texto||'<i>(mídia/sem texto)</i>')}<div class="conv-ts">${eu?'Vinícius · ':''}${(t.ts||'').slice(11,16)}</div></div>`;
+      ${bolhaConteudo(t)}<div class="conv-ts">${eu?'Vinícius · ':''}${(t.ts||'').slice(11,16)}</div></div>`;
   }).join('');
   const prop = d.proposta?`
     <div class="bubble b-ag" style="align-self:flex-end;border-style:dashed;">

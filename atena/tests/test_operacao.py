@@ -11,7 +11,7 @@ from atena.ontologia.servico import Ontologia
 from atena.core.estado import Estado
 from atena.core.orquestrador import Orquestrador
 from atena.core.faro import Faro
-from atena.transporte.whatsapp import WhatsApp
+from atena.transporte.whatsapp import WhatsApp, extrair_mensagem
 from atena.agentes.nutricao import leads_para_reengajar, reengajar, reengajar_um
 from atena.agentes.ingestao import Ingestao, normalizar_meta, curso_de_texto
 from atena.core.orquestrador import brain_deterministico
@@ -209,6 +209,32 @@ def test_reativar_um_respeita_travas():
     est.upsert_lead("r3", nome="C", telefone="+55 19 90000-3333", curso="FEQ-0655",
                     fase="Lead", estado_conversa="aguardando_resposta")
     assert reengajar_um(est, ONT, wa, "r3")["ok"] is False
+
+
+def test_extrair_mensagem_cobre_botao_e_midia():
+    assert extrair_mensagem({"type": "text", "text": {"body": "oi"}}) == ("texto", "oi", None, None)
+    # clique de botão de template (feq_lead) — antes chegava vazio
+    assert extrair_mensagem({"type": "button", "button": {"text": "Receber link para prosseguir"}}) \
+        == ("texto", "Receber link para prosseguir", None, None)
+    assert extrair_mensagem({"type": "interactive",
+                             "interactive": {"button_reply": {"title": "Quero tirar dúvidas"}}})[1] == "Quero tirar dúvidas"
+    assert extrair_mensagem({"type": "audio", "audio": {"id": "AUD9", "mime_type": "audio/ogg"}}) \
+        == ("audio", "", "AUD9", "audio/ogg")
+    tipo, leg, mid, _ = extrair_mensagem({"type": "image", "image": {"id": "IMG1", "caption": "olha isto"}})
+    assert tipo == "image" and leg == "olha isto" and mid == "IMG1"
+
+
+def test_receber_midia_guarda_tipo_e_media_id():
+    est = Estado(":memory:")
+    est.upsert_lead("c1", nome="X", telefone="+55 19 90000-0002", curso="FEQ-0480",
+                    fase="Lead", estado_conversa="qualificacao")
+    os.environ.pop("WHATSAPP_TOKEN", None)                 # sem token -> não baixa (sem rede)
+    wa = WhatsApp(est, Orquestrador(est, ONT))
+    wa.receber({"entry": [{"changes": [{"value": {"messages": [
+        {"id": "wamid.M1", "from": "5519900000002", "type": "audio",
+         "audio": {"id": "AUD9", "mime_type": "audio/ogg"}}]}}]}]})
+    turno = [t for t in est.historico("c1") if t["papel"] == "lead"][-1]
+    assert turno["tipo"] == "audio" and turno["media_id"] == "AUD9"
 
 
 def test_faro_noop_sem_chave():
