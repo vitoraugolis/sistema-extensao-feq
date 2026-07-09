@@ -38,7 +38,7 @@ from atena.core import guardrails as G
 from atena.core import auth
 from atena.agentes.ontologista import Ontologista
 from atena.agentes.ingestao import Ingestao, normalizar_meta, fetch_meta_lead
-from atena.agentes import nutricao
+from atena.agentes import nutricao, reconciliacao
 from atena.agentes.curador import Curador
 from atena.agentes.cerebro import cerebro_factory, modelo_atual, testar_modelo, PROVEDORES, chave_do
 from atena.transporte.whatsapp import WhatsApp
@@ -207,6 +207,12 @@ def lead_mover(card_id):
 def lead_reativar(card_id):
     """Reativação manual: dispara feq_reengajamento (opt-out/captabilidade travam)."""
     return jsonify({"envio": nutricao.reengajar_um(EST, ONTO.ont, WA, card_id)})
+
+
+@app.route("/api/meta/reconciliar", methods=["POST"])
+def meta_reconciliar():
+    """Força uma reconciliação Meta agora (busca+ativa leads que o webhook não trouxe)."""
+    return jsonify({"novos_ativados": reconciliacao.poll_meta(EST, ONTO.ont, ING, _primeiro_contato)})
 
 
 @app.route("/api/conversas/<card_id>/responder", methods=["POST"])
@@ -600,6 +606,11 @@ def _operacoes():
         _t.sleep(60)
         try:
             _despachar_alertas()
+            # reconciliação Meta (rede de segurança do webhook leadgen): varre os
+            # formulários e ingere+ativa o que o webhook não entregou. A cada ~5 min.
+            if _t.time() - float(EST.get_config("op_meta_poll") or 0) > 300:
+                EST.set_config("op_meta_poll", str(_t.time()))
+                reconciliacao.poll_meta(EST, ONTO.ont, ING, _primeiro_contato)
             # degradação: 3+ fallbacks determinísticos em 15 min -> alerta (máx. 1 a cada 30 min)
             recentes = [t for t in _cer.FALLBACKS if _t.time() - t < 900]
             ultimo = float(EST.get_config("op_fb_alerta") or 0)

@@ -65,9 +65,15 @@ card no FARO em **Lead**. (Histórico: chegou-se a definir Make→FARO; revertid
 2. **Busca no FARO** por telefone (fonte da verdade entre sessões).
 3. **Criação** + grava no cache. Em empate, fica com o card mais antigo.
 
-## Reconciliação (rede de segurança)
-Polling leve `api-cards-watch-recent` (≥1 min) detecta lead que o webhook não entregou. Idempotente
-via `cards_vistos` (ver `12`).
+## Reconciliação (rede de segurança) — ✅ IMPLEMENTADA
+`atena/agentes/reconciliacao.py::poll_meta` varre Páginas → formulários ATIVOS → leads via Graph
+API e ingere+ativa o que o webhook não entregou. Roda no agendador `_operacoes` a cada ~5 min
+(config `op_meta_poll`) e sob demanda em `POST /api/meta/reconciliar`. Idempotente: dedup por
+`leadgen:{id}` (`msgs_vistas`, via `viu_msg`/`msg_ja_vista`) + telefone (ingest).
+**Por que virou essencial (incidente 09/07/2026):** mesmo com a assinatura `page/leadgen`
+`active:True` e callback correto, a Meta **não entregou** ~23 leads reais. O push é frágil
+(depende de App Review/Advanced Access de `leads_retrieval` e da entrega da Meta); o poller
+garante ingestão independente do webhook. Curso vem do nome do form (`curso_de_texto`).
 
 ## Gate de captabilidade no roteamento (integra com o Curador)
 Ao criar o card, o roteador consulta a ontologia: se o curso **não é captável hoje** (inscrição
