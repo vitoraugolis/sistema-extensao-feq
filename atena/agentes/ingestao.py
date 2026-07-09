@@ -32,11 +32,26 @@ def curso_de_texto(*textos):
     return ""
 
 
+# chaves de nome conhecidas (os formulários variam: full_name / nome_completo / first_name…)
+NOME_KEYS = ("full_name", "nome_completo", "nome", "fullname", "first_name")
 # campos de contato conhecidos; o resto do form são perguntas qualificatórias
-CONTATO = {"full_name", "nome", "phone_number", "telefone", "email", "consent",
-           "curso", "curso_de_interesse"}
+CONTATO = set(NOME_KEYS) | {"phone_number", "telefone", "email", "consent",
+                            "curso", "curso_de_interesse"}
 SUPERIOR_RE = re.compile(r"superior|gradua|bacharel|licenciat", re.I)
 NEGATIVO_RE = re.compile(r"\b(n[ãa]o|nao|incompleto|cursando|ainda)\b", re.I)
+
+
+def _extrai_nome(fd):
+    """Nome do lead — chave varia por formulário. Tenta as conhecidas e, por fim,
+    qualquer campo com 'nome'/'name' no nome do campo (menos email/usuário)."""
+    for k in NOME_KEYS:
+        if fd.get(k):
+            return fd[k]
+    for k, v in fd.items():
+        kl = k.lower()
+        if v and ("nome" in kl or "name" in kl) and "email" not in kl and "user" not in kl:
+            return v
+    return ""
 
 
 def _qualificacao(fd):
@@ -61,8 +76,9 @@ def normalizar_meta(field_data, campaign_name="", leadgen_id="", curso=""):
     Curso vem do nome do formulário (via `curso`); fallbacks: campo do form, campanha."""
     fd = {i["name"]: (i.get("values") or [""])[0] for i in (field_data or [])}
     escolaridade, qualif = _qualificacao(fd)
+    nome = _extrai_nome(fd)
     return {
-        "nome": fd.get("full_name") or fd.get("nome") or "",
+        "nome": nome,
         "telefone": fd.get("phone_number") or fd.get("telefone") or "",
         "email": fd.get("email", ""),
         "curso": curso or fd.get("curso") or fd.get("curso_de_interesse") or curso_de_texto(campaign_name),

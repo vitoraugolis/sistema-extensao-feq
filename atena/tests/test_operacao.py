@@ -104,6 +104,21 @@ def test_normalizar_meta_so_nome_tel_email():
     assert lead["telefone"] and lead["email"] == "maria@x.com"
 
 
+def test_normalizar_meta_nome_varia_por_form():
+    # v2/v3 usam 'nome_completo' e 'telefone' (não full_name/phone_number)
+    fd = [{"name": "nome_completo", "values": ["Jean Paul Vespasiano"]},
+          {"name": "telefone", "values": ["+55 19 99602-7820"]},
+          {"name": "email", "values": ["jean@x.com"]},
+          {"name": "voce_tem_ensino_superior_completo?", "values": ["Sim"]}]
+    lead = normalizar_meta(fd, curso="FEQ-0333")
+    assert lead["nome"] == "Jean Paul Vespasiano"        # não vira genérico
+    assert lead["telefone"] and lead["escolaridade"] == "Superior Completo"
+    assert "Jean" not in lead["qualificacao"]            # nome não vaza p/ a qualificação
+    # lead magnet usa 'first_name'
+    assert normalizar_meta([{"name": "first_name", "values": ["Ana"]},
+                            {"name": "phone_number", "values": ["+55 19 9"]}])["nome"] == "Ana"
+
+
 def test_ingest_gate_dispara_1o_contato_so_se_captavel():
     est = Estado(":memory:")
     ing = Ingestao(est, ONT)
