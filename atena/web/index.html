@@ -220,7 +220,7 @@ select,textarea{width:100%;border-radius:11px;border:.5px solid rgba(148,163,184
 <script>
 const $ = (s)=>document.querySelector(s);
 const api = (p,o)=>fetch(p,o).then(r=>r.json());
-let CONV_LISTA = [], CONV_ABERTA = null, CONV_DATA = null, CONV_ERRO = null;
+let CONV_LISTA = [], CONV_ABERTA = null, CONV_DATA = null, CONV_ERRO = null, CONV_CHROME_ID = null;
 
 document.querySelectorAll('.navi').forEach(b=>b.onclick=()=>{
   document.querySelectorAll('.navi').forEach(x=>x.classList.remove('on'));
@@ -384,8 +384,9 @@ async function abrirConversa(id){
   await refrescarAberta();
 }
 function fecharConversa(){
-  CONV_ABERTA = null;
+  CONV_ABERTA = null; CONV_CHROME_ID = null;
   document.querySelector('.conv-shell').classList.remove('chat-open');
+  $('#convMain').innerHTML = '<div class="muted" style="margin:auto;text-align:center;"><i class="ti ti-message-2" style="font-size:26px;display:block;margin-bottom:6px;"></i>Selecione uma conversa</div>';
   renderListaConv();
 }
 
@@ -410,7 +411,47 @@ function bolhaConteudo(t){
   return t.texto ? escapeHtml(t.texto) : '<i class="muted">(sem conteúdo)</i>';
 }
 function renderThread(d){
-  const draftAtual = $('#convInput'); const draft = draftAtual ? draftAtual.value : '';
+  // A "moldura" (cabeçalho + campo de escrita) é montada 1x por conversa; o polling só
+  // atualiza as MENSAGENS. Assim o <textarea> nunca é recriado -> foco/cursor não se perdem.
+  const chromeKey = d.id + '|' + (d.optout ? 1 : 0);   // opt-out troca a moldura (some o composer)
+  if(CONV_CHROME_ID !== chromeKey){ renderChrome(d); CONV_CHROME_ID = chromeKey; }
+  renderMensagens(d);
+}
+
+function renderChrome(d){
+  $('#convMain').innerHTML = `
+    <div class="conv-head">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <button class="conv-back" onclick="fecharConversa()" title="Voltar"><i class="ti ti-arrow-left"></i></button>
+        <div class="conv-ava">${d.iniciais}</div>
+        <div><div style="font-weight:500;font-size:13.5px;">${escapeHtml(d.lead||d.id)}</div>
+        <div class="muted">${d.curso} · <span id="convEstado">${d.estado}</span>${d.optout?' · <span style="color:#991b1b;">opt-out</span>':''}</div></div>
+        <div style="margin-left:auto;display:flex;gap:6px;align-items:center;">
+          <select id="convFaseSel" title="mover fase" style="width:auto;padding:5px 8px;font-size:12px;" onchange="moverFase('${d.id}',this.value)">
+            ${['Lead','Prospect','Inscrito','Matriculado','Em espera','Perdido'].map(f=>`<option ${f===d.fase?'selected':''}>${f}</option>`).join('')}
+          </select>
+          <button class="btn btn-g" style="padding:6px 10px;" title="Enviar reengajamento" onclick="reativarLead('${d.id}')"><i class="ti ti-refresh"></i></button>
+        </div>
+      </div>
+    </div>
+    <div class="conv-thread" id="convThread"></div>
+    <div id="convErro"></div>
+    ${d.optout
+      ? '<div class="conv-blocked" style="margin:0 11px 11px;"><i class="ti ti-ban"></i> Lead em opt-out — não é possível enviar mensagens.</div>'
+      : `<div class="conv-composer">
+           <textarea id="convInput" rows="1" placeholder="Digite uma mensagem…" onkeydown="convKeydown(event)"></textarea>
+           <button class="btn btn-p" onclick="convEnviar()" title="Enviar (Enter)"><i class="ti ti-send"></i></button>
+         </div>`}`;
+  const inp = $('#convInput'); if(inp) inp.focus();   // pronto para digitar ao abrir
+}
+
+function renderMensagens(d){
+  const th = $('#convThread'); if(!th) return;
+  const eb = $('#convErro'); if(eb) eb.innerHTML = (CONV_ERRO && CONV_ERRO.id===d.id) ? CONV_ERRO.html : '';
+  const es = $('#convEstado'); if(es) es.textContent = d.estado;                       // atualiza estado
+  const fs = $('#convFaseSel'); if(fs && document.activeElement!==fs) fs.value = d.fase; // sem interromper o dropdown
+  const sig = (d.thread||[]).length + '|' + (d.proposta||'');
+  if(th.dataset.sig === sig) return;   // nada novo -> não recria o DOM (sem flicker nem pulo de scroll)
   const fios = (d.thread||[]).map(t=>{
     const eu = t.papel==='agente';
     return `<div class="bubble ${eu?'b-ag':'b-lead'}" style="align-self:${eu?'flex-end':'flex-start'};">
@@ -418,37 +459,17 @@ function renderThread(d){
   }).join('');
   const prop = d.proposta?`
     <div class="bubble b-ag" style="align-self:flex-end;border-style:dashed;">
-      <div style="font-size:11px;color:#1d4ed8;margin-bottom:4px;"><i class="ti ti-robot"></i> proposta · aguardando você</div>${d.proposta}
+      <div style="font-size:11px;color:#1d4ed8;margin-bottom:4px;"><i class="ti ti-robot"></i> proposta · aguardando você</div>${escapeHtml(d.proposta)}
       <div style="margin-top:6px;"><span class="chip t-ok"><i class="ti ti-check"></i> revisor ok</span></div>
       <div style="margin-top:8px;display:flex;gap:7px;">
         <button class="btn btn-p" style="padding:6px 11px;" onclick="aprovarMsg('${d.id}')"><i class="ti ti-send"></i> Aprovar</button>
         <button class="btn btn-g" style="padding:6px 11px;" onclick="editarMsg('${d.id}')">Editar</button>
         <button class="btn btn-g" style="padding:6px 11px;color:#991b1b;" onclick="api('/api/conversas/${d.id}/recusar',{method:'POST'}).then(aposAcao)">Recusar</button>
       </div></div>`:'';
-  $('#convMain').innerHTML = `
-    <div class="conv-head">
-      <div style="display:flex;align-items:center;gap:10px;">
-        <button class="conv-back" onclick="fecharConversa()" title="Voltar"><i class="ti ti-arrow-left"></i></button>
-        <div class="conv-ava">${d.iniciais}</div>
-        <div><div style="font-weight:500;font-size:13.5px;">${d.lead||d.id}</div>
-        <div class="muted">${d.curso} · ${d.estado}${d.optout?' · <span style="color:#991b1b;">opt-out</span>':''}</div></div>
-        <div style="margin-left:auto;display:flex;gap:6px;align-items:center;">
-          <select title="mover fase" style="width:auto;padding:5px 8px;font-size:12px;" onchange="moverFase('${d.id}',this.value)">
-            ${['Lead','Prospect','Inscrito','Matriculado','Em espera','Perdido'].map(f=>`<option ${f===d.fase?'selected':''}>${f}</option>`).join('')}
-          </select>
-          <button class="btn btn-g" style="padding:6px 10px;" title="Enviar reengajamento" onclick="reativarLead('${d.id}')"><i class="ti ti-refresh"></i></button>
-        </div>
-      </div>
-    </div>
-    <div class="conv-thread" id="convThread">${fios || '<div class="muted" style="margin:auto;">Sem mensagens ainda.</div>'}${prop}</div>
-    <div id="convErro">${(CONV_ERRO && CONV_ERRO.id===d.id) ? CONV_ERRO.html : ''}</div>
-    ${d.optout
-      ? '<div class="conv-blocked" style="margin:0 11px 11px;"><i class="ti ti-ban"></i> Lead em opt-out — não é possível enviar mensagens.</div>'
-      : `<div class="conv-composer">
-           <textarea id="convInput" rows="1" placeholder="Digite uma mensagem…" onkeydown="convKeydown(event)">${draft}</textarea>
-           <button class="btn btn-p" onclick="convEnviar()" title="Enviar (Enter)"><i class="ti ti-send"></i></button>
-         </div>`}`;
-  const th = $('#convThread'); if(th) th.scrollTop = th.scrollHeight;
+  const perto = th.scrollHeight - th.scrollTop - th.clientHeight < 80;   // usuário estava perto do fim?
+  th.innerHTML = (fios || '<div class="muted" style="margin:auto;">Sem mensagens ainda.</div>') + prop;
+  th.dataset.sig = sig;
+  if(perto) th.scrollTop = th.scrollHeight;   // só "cola" no fim se já estava lá (não atrapalha leitura)
 }
 
 function convKeydown(e){

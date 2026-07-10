@@ -659,7 +659,13 @@ def _operacoes():
 
 
 import threading
-threading.Thread(target=_operacoes, daemon=True).start()
+# ATENA_DEV=1 (preview local) NÃO roda o agendador: nada de poller/nutrição/envio real.
+# Evita que uma instância de desenvolvimento com tokens reais no .env dispare mensagens
+# aos leads (incidente 09/07: preview local reenviou feq_lead a ~28 leads).
+if os.environ.get("ATENA_DEV") != "1":
+    threading.Thread(target=_operacoes, daemon=True).start()
+else:
+    print("[dev] ATENA_DEV=1 — agendador (_operacoes) desativado.", flush=True)
 
 
 @app.route("/api/backup", methods=["POST"])

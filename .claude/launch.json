@@ -4,7 +4,7 @@
     {
       "name": "central",
       "runtimeExecutable": "env",
-      "runtimeArgs": ["ATENA_JANELA_LIVRE=1", "PORT=8096", "python3", "atena/api/app.py"],
+      "runtimeArgs": ["ATENA_DEV=1", "ATENA_JANELA_LIVRE=1", "PORT=8096", "WHATSAPP_TOKEN=", "META_PAGE_TOKEN=", "python3", "atena/api/app.py"],
       "port": 8096
     }
   ]
