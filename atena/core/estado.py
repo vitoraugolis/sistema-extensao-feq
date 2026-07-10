@@ -67,6 +67,7 @@ class Estado:
         self.conn.executescript(SCHEMA)
         for mig in ("ALTER TABLE leads ADD COLUMN reengajos INTEGER DEFAULT 0",
                     "ALTER TABLE leads ADD COLUMN faro_id TEXT",
+                    "ALTER TABLE leads ADD COLUMN cursos_interesse TEXT",  # CSV; ativo=coluna curso
                     "ALTER TABLE conversas ADD COLUMN tipo TEXT DEFAULT 'texto'",
                     "ALTER TABLE conversas ADD COLUMN media_id TEXT"):
             try:
@@ -109,6 +110,28 @@ class Estado:
 
     def listar_leads(self):
         return [dict(r) for r in self.conn.execute("SELECT * FROM leads ORDER BY atualizado DESC")]
+
+    @staticmethod
+    def cursos_interesse(lead):
+        """Lista de cursos de interesse do lead (o ativo `curso` sempre incluído, 1º)."""
+        s = [c for c in (lead.get("cursos_interesse") or "").split(",") if c]
+        if lead.get("curso") and lead["curso"] not in s:
+            s.insert(0, lead["curso"])
+        return s
+
+    def add_curso_interesse(self, card_id, curso, ativar=False):
+        """Acrescenta um curso ao conjunto de interesse (não remove o ativo).
+        ativar=True também torna esse curso o ativo (`curso`)."""
+        lead = self.get_lead(card_id)
+        if not lead or not curso:
+            return
+        cursos = self.cursos_interesse(lead)
+        if curso not in cursos:
+            cursos.append(curso)
+        campos = {"cursos_interesse": ",".join(cursos)}
+        if ativar:
+            campos["curso"] = curso
+        self.set_lead(card_id, **campos)
 
     def lead_por_telefone(self, telefone):
         d = re.sub(r"\D", "", telefone or "")

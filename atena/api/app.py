@@ -167,7 +167,8 @@ def conversa_detalhe(card_id):
         return jsonify({"erro": "lead inexistente"}), 404
     prop = EST.decisao_pendente(card_id)
     return jsonify({"id": card_id, "lead": lead["nome"], "iniciais": _iniciais(lead["nome"]),
-                    "curso": lead["curso"], "estado": lead["estado_conversa"], "fase": lead["fase"],
+                    "curso": lead["curso"], "cursos": EST.cursos_interesse(lead),
+                    "estado": lead["estado_conversa"], "fase": lead["fase"],
                     "telefone": lead["telefone"], "optout": bool(lead.get("optout")),
                     "thread": EST.historico(card_id),
                     "proposta": prop["mensagem"] if prop else None})
@@ -188,6 +189,7 @@ def kanban():
         cols[fase].append({
             "id": l["card_id"], "nome": l["nome"] or l["card_id"],
             "iniciais": _iniciais(l["nome"]), "curso": l["curso"],
+            "cursos": EST.cursos_interesse(l),
             "estado": l["estado_conversa"], "ha": _ha(l["atualizado"]),
             "optout": bool(l.get("optout")),
             "precisa_voce": l["estado_conversa"] == "escalado_humano",
@@ -221,6 +223,22 @@ def lead_mover(card_id):
 def lead_reativar(card_id):
     """Reativação manual: dispara feq_reengajamento (opt-out/captabilidade travam)."""
     return jsonify({"envio": nutricao.reengajar_um(EST, ONTO.ont, WA, card_id)})
+
+
+@app.route("/api/leads/<card_id>/interesse", methods=["POST"])
+def lead_interesse(card_id):
+    """Adiciona um curso de interesse ao lead. ativar=True torna-o o curso ativo
+    (o que o agente conversa). Curso precisa existir no catálogo."""
+    b = request.get_json(silent=True) or {}
+    curso = (b.get("curso") or "").strip()
+    if not EST.get_lead(card_id):
+        return jsonify({"erro": "lead inexistente"}), 404
+    if not ONTO.ont.curso(curso):
+        return jsonify({"erro": f"curso '{curso}' não está no catálogo"}), 400
+    EST.add_curso_interesse(card_id, curso, ativar=bool(b.get("ativar")))
+    EST.log_acao(session.get("usuario", "operador"),
+                 f"interesse +{curso}{' (ativo)' if b.get('ativar') else ''}", card_id)
+    return jsonify({"ok": True, "cursos": EST.cursos_interesse(EST.get_lead(card_id))})
 
 
 @app.route("/api/meta/reconciliar", methods=["POST"])

@@ -237,6 +237,33 @@ def test_receber_midia_guarda_tipo_e_media_id():
     assert turno["tipo"] == "audio" and turno["media_id"] == "AUD9"
 
 
+def test_cursos_interesse_acumula_e_ativa():
+    est = Estado(":memory:")
+    est.upsert_lead("c1", nome="X", telefone="+55 19 90000-0001", curso="FEQ-0333",
+                    cursos_interesse="FEQ-0333", fase="Lead", estado_conversa="qualificacao")
+    assert Estado.cursos_interesse(est.get_lead("c1")) == ["FEQ-0333"]
+    est.add_curso_interesse("c1", "FEQ-0580")                 # acumula, mantém o ativo
+    l = est.get_lead("c1")
+    assert l["curso"] == "FEQ-0333" and Estado.cursos_interesse(l) == ["FEQ-0333", "FEQ-0580"]
+    est.add_curso_interesse("c1", "FEQ-0480", ativar=True)    # torna ativo
+    l = est.get_lead("c1")
+    assert l["curso"] == "FEQ-0480"
+    assert set(Estado.cursos_interesse(l)) == {"FEQ-0333", "FEQ-0580", "FEQ-0480"}
+
+
+def test_ingest_segundo_form_acumula_sem_trocar_ativo():
+    est = Estado(":memory:"); ing = Ingestao(est, ONT)
+    ing.ingest(normalizar_meta([{"name": "full_name", "values": ["Ana"]},
+                                {"name": "phone_number", "values": ["+55 19 90000-0009"]}], curso="FEQ-0333"))
+    cid = est.lead_por_telefone("5519900000009")
+    r = ing.ingest(normalizar_meta([{"name": "full_name", "values": ["Ana"]},   # mesmo tel, outro curso
+                                    {"name": "phone_number", "values": ["+55 19 90000-0009"]}], curso="FEQ-0580"))
+    assert r["acao"] == "atualizado"
+    l = est.get_lead(cid)
+    assert l["curso"] == "FEQ-0333"                                   # ativo preservado
+    assert set(Estado.cursos_interesse(l)) == {"FEQ-0333", "FEQ-0580"}  # acumulou o interesse
+
+
 def test_faro_noop_sem_chave():
     os.environ.pop("FARO_KEY", None)
     f = Faro()

@@ -152,6 +152,7 @@ class Orquestrador:
             info = self.ont.curso(novo_curso)   # só troca p/ curso que EXISTE no catálogo
             if info:
                 campos["curso"] = info["codigo"]
+                self.est.add_curso_interesse(card_id, info["codigo"])  # acumula (mantém o anterior)
         campos["estado_conversa"] = C.ESTADO_POR_ACAO.get(acao, "aguardando_resposta")
         if acao == C.OPTOUT:
             campos["optout"] = 1

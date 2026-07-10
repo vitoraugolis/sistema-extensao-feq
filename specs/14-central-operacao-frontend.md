@@ -25,7 +25,18 @@ humana** quando necessário, **estatísticas** do funil e a porta do **Injetor**
 
 ## Tempo real
 SSE (ou WebSocket) para novas mensagens, mudança de contadores e novos itens na fila. Servido pelo
-próprio monólito (sem segundo serviço nesta fase).
+próprio monólito (sem segundo serviço nesta fase). **Implementado por polling (5s)**: a aba Conversas
+separa a "moldura" (cabeçalho + campo de escrita, montada 1× ao abrir) das "mensagens" (atualizadas
+no polling) — o `<textarea>` nunca é recriado, então foco/cursor do operador não se perdem.
+
+## Múltiplos cursos de interesse (✅ implementado)
+Um lead tem **um curso ativo** (`leads.curso` — o que o agente conversa / gate / template) e um
+**conjunto de cursos de interesse** (`leads.cursos_interesse`, CSV; o ativo sempre incluído). Acumula
+por: 2º formulário do mesmo telefone (ingest não troca o ativo), troca de interesse na conversa
+(orquestrador), e adição manual (`POST /api/leads/<id>/interesse {curso, ativar?}`). Na conversa,
+chips por curso (ativo com ★, clique em outro = tornar ativo). No **Funil**, filtro por curso
+(`#kbFiltro`) casa contra o conjunto de interesse; o card mostra o ativo + `+N`.
+`estado.cursos_interesse(lead)` devolve a lista.
 
 ## Stack recomendada
 SPA leve servida pela API Flask (HTML/CSS/JS com glassmorphism; charts via SVG/lib leve). Mantém o

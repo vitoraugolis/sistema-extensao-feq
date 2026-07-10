@@ -134,7 +134,11 @@ select,textarea{width:100%;border-radius:11px;border:.5px solid rgba(148,163,184
 
       <section id="kanban" class="hidden">
         <div class="g sec" style="padding:14px 16px;">
-          <h2 style="display:flex;align-items:center;gap:7px;"><i class="ti ti-layout-columns"></i> Funil de leads <span class="muted" style="font-weight:400;">· clique num card para abrir a conversa</span></h2>
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+            <h2 style="display:flex;align-items:center;gap:7px;margin:0;"><i class="ti ti-layout-columns"></i> Funil de leads</h2>
+            <select id="kbFiltro" onchange="renderKanban()" style="width:auto;padding:5px 9px;font-size:12.5px;margin-left:auto;"><option value="">Todos os cursos</option></select>
+          </div>
+          <p class="muted" style="margin:6px 2px 10px;">Clique num card para abrir a conversa. O filtro considera todos os cursos de interesse do lead.</p>
           <div class="kb-board" id="kbBoard"></div>
         </div>
       </section>
@@ -245,6 +249,8 @@ async function carregar(){
   }).join('');
 
   if(!$('#rcurso').options.length) $('#rcurso').innerHTML = cap.cursos.map(c=>`<option value="${c.curso}">${c.curso}</option>`).join('');
+  const kf=$('#kbFiltro'); if(kf && kf.options.length<=1) kf.innerHTML = '<option value="">Todos os cursos</option>' + cap.cursos.map(c=>`<option value="${c.curso}">${c.curso}</option>`).join('');
+  window.CURSOS_ALL = cap.cursos.map(c=>c.curso);
 
   await atualizarLista();
   if(CONV_ABERTA) refrescarAberta();
@@ -324,11 +330,14 @@ async function atualizarLista(){
 async function renderKanban(){
   const d = await api('/api/kanban');
   if(!d.colunas) return;
-  $('#kbBoard').innerHTML = d.colunas.map(col=>`
-    <div class="kb-col">
-      <div class="kb-col-h"><span>${col.fase}</span><span class="kb-count">${col.leads.length}</span></div>
-      ${col.leads.map(kbCard).join('') || '<div class="kb-empty">—</div>'}
-    </div>`).join('');
+  const filtro = ($('#kbFiltro')||{}).value || '';
+  const passa = c => !filtro || (c.cursos||[c.curso]).includes(filtro);
+  $('#kbBoard').innerHTML = d.colunas.map(col=>{
+    const leads = col.leads.filter(passa);
+    return `<div class="kb-col">
+      <div class="kb-col-h"><span>${col.fase}</span><span class="kb-count">${leads.length}</span></div>
+      ${leads.map(kbCard).join('') || '<div class="kb-empty">—</div>'}
+    </div>`;}).join('');
 }
 function kbCard(c){
   const b = [];
@@ -337,9 +346,11 @@ function kbCard(c){
   else if(c.aguardando) b.push('<span class="chip t-acc" style="margin:0;">aguardando lead</span>');
   if(c.optout) b.push('<span class="chip t-bad" style="margin:0;">opt-out</span>');
   if(c.curso_encerrado) b.push('<span class="chip t-bad" style="margin:0;">curso encerrado</span>');
+  const extra = (c.cursos||[]).length - 1;   // além do ativo
+  const cursoTxt = c.curso + (extra>0?` <span class="chip t-acc" style="margin:0;padding:1px 6px;" title="${escapeHtml((c.cursos||[]).join(', '))}">+${extra}</span>`:'');
   return `<div class="kb-card" onclick="abrirDoKanban('${c.id}')">
-    <div class="kb-nome"><span class="conv-ava" style="width:22px;height:22px;font-size:9.5px;">${c.iniciais}</span>${c.nome}</div>
-    <div class="kb-sub">${c.curso} · ${c.ha}</div>
+    <div class="kb-nome"><span class="conv-ava" style="width:22px;height:22px;font-size:9.5px;">${c.iniciais}</span>${escapeHtml(c.nome)}</div>
+    <div class="kb-sub">${cursoTxt} · ${c.ha}</div>
     ${b.length?`<div class="kb-badges">${b.join('')}</div>`:''}
   </div>`;
 }
@@ -425,7 +436,7 @@ function renderChrome(d){
         <button class="conv-back" onclick="fecharConversa()" title="Voltar"><i class="ti ti-arrow-left"></i></button>
         <div class="conv-ava">${d.iniciais}</div>
         <div><div style="font-weight:500;font-size:13.5px;">${escapeHtml(d.lead||d.id)}</div>
-        <div class="muted">${d.curso} · <span id="convEstado">${d.estado}</span>${d.optout?' · <span style="color:#991b1b;">opt-out</span>':''}</div></div>
+        <div class="muted"><span id="convCurso">${d.curso}</span> · <span id="convEstado">${d.estado}</span>${d.optout?' · <span style="color:#991b1b;">opt-out</span>':''}</div></div>
         <div style="margin-left:auto;display:flex;gap:6px;align-items:center;">
           <select id="convFaseSel" title="mover fase" style="width:auto;padding:5px 8px;font-size:12px;" onchange="moverFase('${d.id}',this.value)">
             ${['Lead','Prospect','Inscrito','Matriculado','Em espera','Perdido'].map(f=>`<option ${f===d.fase?'selected':''}>${f}</option>`).join('')}
@@ -434,6 +445,7 @@ function renderChrome(d){
         </div>
       </div>
     </div>
+    <div id="convCursos" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:7px 14px;border-bottom:.5px solid rgba(148,163,184,.2);font-size:12px;flex-shrink:0;"></div>
     <div class="conv-thread" id="convThread"></div>
     <div id="convErro"></div>
     ${d.optout
@@ -445,11 +457,34 @@ function renderChrome(d){
   const inp = $('#convInput'); if(inp) inp.focus();   // pronto para digitar ao abrir
 }
 
+function barraCursosHTML(d){
+  const cursos = d.cursos || [d.curso];
+  const chips = cursos.map(c => c===d.curso
+    ? `<span class="chip t-acc" style="margin:0;" title="curso ativo — o agente conversa este">${c} ★</span>`
+    : `<span class="chip" style="margin:0;background:rgba(148,163,184,.2);cursor:pointer;" title="tornar ativo" onclick="tornarAtivo('${d.id}','${c}')">${c}</span>`).join(' ');
+  const opts = (window.CURSOS_ALL||[]).filter(x=>!cursos.includes(x)).map(x=>`<option value="${x}">${x}</option>`).join('');
+  return `<span class="muted">Interesse:</span> ${chips}
+    <select onchange="addInteresse('${d.id}',this.value)" style="width:auto;padding:3px 7px;font-size:11.5px;margin-left:2px;"><option value="">+ curso…</option>${opts}</select>`;
+}
+async function addInteresse(id, curso){
+  if(!curso) return;
+  const r = await api('/api/leads/'+id+'/interesse',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({curso})});
+  if(r.erro){ marcarErro(id, r); return; }
+  aposAcao();
+}
+async function tornarAtivo(id, curso){
+  const r = await api('/api/leads/'+id+'/interesse',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({curso, ativar:true})});
+  if(r.erro){ marcarErro(id, r); return; }
+  aposAcao();
+}
 function renderMensagens(d){
   const th = $('#convThread'); if(!th) return;
   const eb = $('#convErro'); if(eb) eb.innerHTML = (CONV_ERRO && CONV_ERRO.id===d.id) ? CONV_ERRO.html : '';
+  const cc = $('#convCurso'); if(cc) cc.textContent = d.curso;                          // curso ativo
   const es = $('#convEstado'); if(es) es.textContent = d.estado;                       // atualiza estado
   const fs = $('#convFaseSel'); if(fs && document.activeElement!==fs) fs.value = d.fase; // sem interromper o dropdown
+  const cs = $('#convCursos'); const csig = d.curso + '|' + (d.cursos||[]).join(',');    // ativo + conjunto
+  if(cs && cs.dataset.sig !== csig){ cs.innerHTML = barraCursosHTML(d); cs.dataset.sig = csig; }
   const sig = (d.thread||[]).length + '|' + (d.proposta||'');
   if(th.dataset.sig === sig) return;   // nada novo -> não recria o DOM (sem flicker nem pulo de scroll)
   const fios = (d.thread||[]).map(t=>{

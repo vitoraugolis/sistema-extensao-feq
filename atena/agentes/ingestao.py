@@ -134,15 +134,21 @@ class Ingestao:
             return {"ok": False, "motivo": "lead sem telefone"}
         existente = self.est.lead_por_telefone(tel)
         if existente:
-            self.est.set_lead(existente, curso=lead.get("curso") or self.est.get_lead(existente)["curso"])
+            # mesma pessoa, outro formulário -> ACUMULA o curso de interesse; NÃO troca o
+            # curso ativo (não interrompe a conversa em andamento). Se o card não tinha
+            # curso ativo, o novo assume.
+            atual = self.est.get_lead(existente)
+            novo = lead.get("curso")
+            if novo:
+                self.est.add_curso_interesse(existente, novo, ativar=not atual.get("curso"))
             return {"ok": True, "acao": "atualizado", "card_id": existente}
         cap = self.ont.captavel(lead.get("curso", ""))
         # gate de captabilidade: curso não captável -> não engaja, vai p/ revisão
         ec = "aguardando_1o_contato" if cap.get("captavel") else "aguardando_revisao"
         card_id = f"meta-{_digits(tel)}"
         self.est.upsert_lead(card_id, nome=lead.get("nome", ""), telefone=tel,
-                             curso=lead.get("curso", ""), fase="Lead", estado_conversa=ec,
-                             escolaridade=lead.get("escolaridade"))
+                             curso=lead.get("curso", ""), cursos_interesse=lead.get("curso", ""),
+                             fase="Lead", estado_conversa=ec, escolaridade=lead.get("escolaridade"))
         if lead.get("qualificacao"):   # respostas do form -> auditoria (e o gate já foi pulado)
             self.est.log_acao("ingestao", f"pré-qualificado no formulário — {lead['qualificacao']}", card_id)
         if self.faro and self.faro.ativo:   # espelha no system of record
