@@ -69,7 +69,9 @@ class Estado:
                     "ALTER TABLE leads ADD COLUMN faro_id TEXT",
                     "ALTER TABLE leads ADD COLUMN cursos_interesse TEXT",  # CSV; ativo=coluna curso
                     "ALTER TABLE conversas ADD COLUMN tipo TEXT DEFAULT 'texto'",
-                    "ALTER TABLE conversas ADD COLUMN media_id TEXT"):
+                    "ALTER TABLE conversas ADD COLUMN media_id TEXT",
+                    "ALTER TABLE conversas ADD COLUMN wamid TEXT",     # id do WhatsApp p/ status
+                    "ALTER TABLE conversas ADD COLUMN status TEXT"):   # enviado/entregue/lido/falhou
             try:
                 self.conn.execute(mig)
             except sqlite3.OperationalError:
@@ -268,16 +270,35 @@ class Estado:
             "SELECT * FROM auditoria ORDER BY id DESC LIMIT ?", (limite,))]
 
     # ------------------------------------------------------------ conversas
-    def add_conversa(self, card_id, papel, texto, tipo="texto", media_id=None):
+    def add_conversa(self, card_id, papel, texto, tipo="texto", media_id=None,
+                     wamid=None, status=None):
         with self._lock:
             self.conn.execute(
-                "INSERT INTO conversas(card_id,papel,texto,tipo,media_id,ts) VALUES(?,?,?,?,?,?)",
-                (card_id, papel, texto, tipo, media_id, _agora()))
+                "INSERT INTO conversas(card_id,papel,texto,tipo,media_id,wamid,status,ts)"
+                " VALUES(?,?,?,?,?,?,?,?)",
+                (card_id, papel, texto, tipo, media_id, wamid, status, _agora()))
             self.conn.commit()
 
     def historico(self, card_id):
         return [dict(r) for r in self.conn.execute(
-            "SELECT papel,texto,tipo,media_id,ts FROM conversas WHERE card_id=? ORDER BY id", (card_id,))]
+            "SELECT papel,texto,tipo,media_id,wamid,status,ts FROM conversas WHERE card_id=? ORDER BY id",
+            (card_id,))]
+
+    def atualizar_status_msg(self, wamid, status):
+        """Webhook de status do WhatsApp -> atualiza o status da nossa mensagem enviada.
+        Não rebaixa (lido não vira entregue). Retorna o card_id (ou None)."""
+        if not wamid:
+            return None
+        ordem = {"enviado": 1, "entregue": 2, "lido": 3, "falhou": 9}
+        with self._lock:
+            r = self.conn.execute(
+                "SELECT card_id, status FROM conversas WHERE wamid=?", (wamid,)).fetchone()
+            if not r:
+                return None
+            if ordem.get(status, 0) >= ordem.get(r["status"], 0):   # falhou sempre passa
+                self.conn.execute("UPDATE conversas SET status=? WHERE wamid=?", (status, wamid))
+                self.conn.commit()
+            return r["card_id"]
 
     # --------------------------------------------------------------- mídias
     def add_midia(self, media_id, mime):

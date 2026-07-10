@@ -421,6 +421,12 @@ function bolhaConteudo(t){
   }
   return t.texto ? escapeHtml(t.texto) : '<i class="muted">(sem conteúdo)</i>';
 }
+function statusGlyph(t){   // ✓ enviado · ✓✓ entregue · ✓✓ azul lido · ! falhou (só msgs do agente)
+  if(t.papel!=='agente'||!t.status) return '';
+  if(t.status==='falhou') return ' <i class="ti ti-alert-circle" style="color:#ef4444;" title="não entregue"></i>';
+  const g = {enviado:['ti-check',''], entregue:['ti-checks',''], lido:['ti-checks','color:#3b82f6;']}[t.status];
+  return g ? ` <i class="ti ${g[0]}" style="${g[1]}" title="${t.status}"></i>` : '';
+}
 function renderThread(d){
   // A "moldura" (cabeçalho + campo de escrita) é montada 1x por conversa; o polling só
   // atualiza as MENSAGENS. Assim o <textarea> nunca é recriado -> foco/cursor não se perdem.
@@ -485,12 +491,13 @@ function renderMensagens(d){
   const fs = $('#convFaseSel'); if(fs && document.activeElement!==fs) fs.value = d.fase; // sem interromper o dropdown
   const cs = $('#convCursos'); const csig = d.curso + '|' + (d.cursos||[]).join(',');    // ativo + conjunto
   if(cs && cs.dataset.sig !== csig){ cs.innerHTML = barraCursosHTML(d); cs.dataset.sig = csig; }
-  const sig = (d.thread||[]).length + '|' + (d.proposta||'');
-  if(th.dataset.sig === sig) return;   // nada novo -> não recria o DOM (sem flicker nem pulo de scroll)
+  const sig = (d.thread||[]).map(t=>(t.status||'')).join('') + '|' + (d.thread||[]).length + '|' + (d.proposta||'');
+  if(th.dataset.sig === sig) return;   // muda com nova msg OU novo status -> re-render; senão nada
   const fios = (d.thread||[]).map(t=>{
     const eu = t.papel==='agente';
-    return `<div class="bubble ${eu?'b-ag':'b-lead'}" style="align-self:${eu?'flex-end':'flex-start'};">
-      ${bolhaConteudo(t)}<div class="conv-ts">${eu?'Vinícius · ':''}${(t.ts||'').slice(11,16)}</div></div>`;
+    const falhou = t.status==='falhou';
+    return `<div class="bubble ${eu?'b-ag':'b-lead'}" style="align-self:${eu?'flex-end':'flex-start'};${falhou?'border:1.5px solid #ef4444;':''}">
+      ${bolhaConteudo(t)}<div class="conv-ts">${eu?'Vinícius · ':''}${(t.ts||'').slice(11,16)}${statusGlyph(t)}</div></div>`;
   }).join('');
   const prop = d.proposta?`
     <div class="bubble b-ag" style="align-self:flex-end;border-style:dashed;">

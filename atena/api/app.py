@@ -293,7 +293,8 @@ def _primeiro_contato(card_id):
     for tpl in TEMPLATES_ABERTURA:      # feq_lead quando aprovado; senão feq_abertura_curso
         r = WA.enviar_template(lead["telefone"], tpl, params=params)
         if r.get("ok"):
-            EST.add_conversa(card_id, "agente", f"[template {tpl}] {curso}")
+            EST.add_conversa(card_id, "agente", f"[template {tpl}] {curso}",
+                             wamid=r.get("wamid"), status="enviado")
             EST.set_lead(card_id, estado_conversa="aguardando_resposta")
             return r
     return r
@@ -330,9 +331,9 @@ def _aprovar_e_enviar(card_id, texto=None, ator="humano"):
         rev = revisar(lead["curso"], texto, ONTO.ont)
         if not rev["aprovado"]:
             return {"erro": "edição bloqueada pelo Revisor", "bloqueios": rev["bloqueios"]}, 422
-    r = WA.enviar(lead["telefone"], texto)
+    r = WA.enviar(lead["telefone"], texto, forcar=True)   # resposta humana: não trava por horário
     if r.get("ok"):
-        EST.add_conversa(card_id, "agente", texto)
+        EST.add_conversa(card_id, "agente", texto, wamid=r.get("wamid"), status="enviado")
         EST.set_decisao_status(prop["id"], "enviada")
         EST.log_acao(ator, "aprovar_enviar", card_id)
     return {"envio": r}, 200
@@ -360,9 +361,9 @@ def conversa_enviar(card_id):
     rev = revisar(lead["curso"], texto, ONTO.ont)
     if not rev["aprovado"]:
         return jsonify({"erro": "mensagem bloqueada pelo Revisor", "bloqueios": rev["bloqueios"]}), 422
-    r = WA.enviar(lead["telefone"], texto)
+    r = WA.enviar(lead["telefone"], texto, forcar=True)   # envio humano: passa fora do horário
     if r.get("ok"):
-        EST.add_conversa(card_id, "agente", texto)
+        EST.add_conversa(card_id, "agente", texto, wamid=r.get("wamid"), status="enviado")
         EST.set_lead(card_id, estado_conversa="aguardando_resposta")
         prop = EST.decisao_pendente(card_id)
         if prop:   # humano respondeu por fora -> a proposta do agente fica obsoleta
@@ -670,8 +671,14 @@ def _operacoes():
                 EST.anonimizar_antigos(dias=180)
             if h == 11 and not _rodou_hoje("op_canario"):     # 08h BRT
                 _canario()
-            if h == 14 and not _rodou_hoje("op_nutricao"):    # 11h BRT
-                nutricao.reengajar(EST, ONTO.ont, WA)
+            # reativação comercial: só dentro do horário, a cada ~2h. Nudge em texto livre p/
+            # quem travou na janela de 24h; template escalonado p/ quem esfriou fora dela.
+            if G.dentro_janela() and _t.time() - float(EST.get_config("op_reativacao") or 0) > 7200:
+                EST.set_config("op_reativacao", str(_t.time()))
+                res = nutricao.reativar(EST, ONTO.ont, WA, propor=ORQ.propor_reativacao)
+                if CFG["auto_aprovar"]:              # nudges free-text respeitam o toggle (tier externa)
+                    for cid in res["nudges"]:
+                        _aprovar_e_enviar(cid, ator="reativacao")
         except Exception as e:
             print(f"[operacoes] tick falhou: {e}", flush=True)
 

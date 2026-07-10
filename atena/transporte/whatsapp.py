@@ -18,6 +18,11 @@ from atena.core import guardrails as G
 _GRAPH = "https://graph.facebook.com/v19.0"
 _MEDIA_DIR = pathlib.Path(__file__).resolve().parents[1] / "data" / "media"
 _TIPOS_MIDIA = ("image", "audio", "video", "document", "sticker")
+_STATUS_PT = {"sent": "enviado", "delivered": "entregue", "read": "lido", "failed": "falhou"}
+
+
+def _wamid(j):
+    return ((j or {}).get("messages") or [{}])[0].get("id")
 
 
 def extrair_mensagem(m):
@@ -99,9 +104,21 @@ class WhatsApp:
                         continue
                     out.append({"card_id": card_id,
                                 **self.orq.processar_mensagem(card_id, texto, tipo=tipo, media_id=media_id)})
+                for s in v.get("statuses", []):        # status das NOSSAS mensagens enviadas
+                    self._processar_status(s, out)
         return out
 
-    def enviar(self, telefone, texto):
+    def _processar_status(self, s, out):
+        """Webhook de status: atualiza a mensagem enviada; falha vira alerta na Central."""
+        st = _STATUS_PT.get(s.get("status"), s.get("status") or "")
+        cid = self.est.atualizar_status_msg(s.get("id"), st)
+        if st == "falhou" and cid:
+            errs = s.get("errors") or [{}]
+            motivo = errs[0].get("title") or errs[0].get("message") or "erro desconhecido"
+            self.est.add_alerta("envio_falhou", f"Mensagem ao lead {cid} NÃO foi entregue: {motivo}")
+            out.append({"card_id": cid, "acao": "envio_falhou", "motivo": motivo})
+
+    def enviar(self, telefone, texto, forcar=False):
         if not texto:
             return {"ok": False, "motivo": "sem texto"}
         # guardrails de destinatário: opt-out e janela de 24h (texto livre só dentro dela)
@@ -115,9 +132,10 @@ class WhatsApp:
             if not ts or (datetime.datetime.now() - datetime.datetime.fromisoformat(ts)).total_seconds() > 86400:
                 return {"ok": False, "status": "fora_da_janela_24h",
                         "motivo": "sem mensagem do lead nas últimas 24h — use template aprovado"}
-        if not G.dentro_janela():
-            self.est.log_acao("sistema", "envio_enfileirado", telefone)
-            return {"ok": True, "status": "enfileirado", "motivo": "fora do horário comercial"}
+        # horário comercial: só barra cadência automática; envio humano (forcar) passa.
+        if not forcar and not G.dentro_janela():
+            return {"ok": False, "status": "fora_do_horario",
+                    "motivo": "fora do horário comercial (reenvie no horário)"}
         if not self.token:
             return {"ok": True, "status": "dry_run", "para": telefone, "texto": texto}
         import requests
@@ -126,7 +144,10 @@ class WhatsApp:
                                    "Content-Type": "application/json"},
                           json={"messaging_product": "whatsapp", "to": telefone,
                                 "type": "text", "text": {"body": texto}})
-        return {"ok": r.status_code == 200, "status": r.status_code}
+        j = r.json() if r.text else {}
+        return {"ok": r.status_code == 200, "status": r.status_code,
+                "wamid": _wamid(j) if r.status_code == 200 else None,
+                "motivo": None if r.status_code == 200 else str(j.get("error", {}).get("message", ""))[:120]}
 
     def enviar_template(self, telefone, nome, idioma="pt_BR", params=None):
         """1º contato / fora da janela de 24h: exige template aprovado.
@@ -147,5 +168,6 @@ class WhatsApp:
                           headers={"Authorization": f"Bearer {self.token}", "Content-Type": "application/json"},
                           json={"messaging_product": "whatsapp", "to": telefone,
                                 "type": "template", "template": tpl})
+        j = r.json() if r.text else {}
         return {"ok": r.status_code == 200, "status": r.status_code,
-                "resp": r.json() if r.text else {}}
+                "wamid": _wamid(j) if r.status_code == 200 else None, "resp": j}

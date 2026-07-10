@@ -212,3 +212,34 @@ class Orquestrador:
                              bloqueios=rev.get("bloqueios", []),
                              status="proposta" if rev["aprovado"] else "bloqueada")
         return {"card_id": card_id, "mensagem": msg, "revisor": rev}
+
+    GANCHO_REATIVACAO = (
+        "[GANCHO DE REATIVAÇÃO — o lead ficou em silêncio; NÃO chegou mensagem nova dele. "
+        "Escreva UMA mensagem curta, calorosa e natural para retomar o contato: relembre o "
+        "curso de interesse, ofereça ajuda com um próximo passo concreto (tirar dúvida, "
+        "inscrição, prazo) e convide-o a responder. NÃO repita mensagens anteriores; NÃO "
+        "invente preço/data/prazo. Se não houver o que dizer sem repetir, use em_espera com "
+        "mensagem vazia.]")
+
+    def propor_reativacao(self, card_id):
+        """Nudge proativo (texto livre) na janela de 24h -> PROPOSTA, reusando cérebro+Revisor.
+        Não loga mensagem falsa do lead. Retorna card_id se criou proposta aprovada, senão None."""
+        lead = self.est.get_lead(card_id)
+        if not lead or lead.get("optout"):
+            return None
+        if self.est.decisao_pendente(card_id):      # já há proposta esperando -> não empilha
+            return None
+        hist = self.est.historico(card_id)
+        dec = self.brain(lead, self.GANCHO_REATIVACAO, hist)
+        msg = (dec.mensagem_ao_lead or "").strip()
+        ultima_ag = next((h["texto"] for h in reversed(hist) if h.get("papel") == "agente"), None)
+        if not msg or msg == ultima_ag:             # nada a dizer / repetiria -> desiste
+            return None
+        rev = revisar(lead["curso"], msg, self.ont)
+        self.est.add_decisao(card_id, agente="reativacao", acao=C.CONTINUAR, mensagem=msg,
+                             motivo="reativação proativa (janela 24h)",
+                             ancoras=rev.get("ancoras", []),
+                             aprovado_revisor=1 if rev["aprovado"] else 0,
+                             bloqueios=rev.get("bloqueios", []),
+                             status="proposta" if rev["aprovado"] else "bloqueada")
+        return card_id if rev["aprovado"] else None

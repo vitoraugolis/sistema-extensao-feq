@@ -30,6 +30,20 @@ pontual — o dado entra na ontologia e vale para todas as conversas.
 `qualificar`→Prospect · `descartar`→Perdido (+motivo) · `em_espera`→Em espera · `encerrar_optout`→
 opt-out · `escalar_humano`→pausa a cadência, grava motivo, entra na fila (corrige o no-op da v1).
 
+## Reativação comercial (`atena/agentes/nutricao.py::reativar`)
+Jamais perder um lead conquistado pela campanha. O agendador (`_operacoes`) roda a passada a
+cada ~2h **dentro do horário comercial**; a escolha do canal é pela **janela de 24h** do WhatsApp:
+- **Dentro da janela** (lead falou <24h e travou ≥8h, e só respondemos 1×): nudge em **texto livre**
+  gerado pelo cérebro (`Orquestrador.propor_reativacao`) → Revisor → **proposta** (envia se
+  auto-aprovar; senão espera o operador). 1 nudge por janela (gate: nº de msgs do agente após a
+  última fala do lead == 1). Sem gastar template.
+- **Fora da janela** (lead frio): **cadência de templates aprovados** escalonando por toque —
+  `feq_reengajamento` (≥3 dias de silêncio) → `feq_lembrete_inscricao` (≥7). Máx. 2 toques frios
+  (`leads.reengajos`). Botão do kanban (`reengajar_um`) faz reativação manual imediata (template).
+- **Guardrails**: só curso captável, sem opt-out; free-text respeita o toggle de auto-aprovação
+  (tier externa); templates são pré-aprovados e enviados diretos. Status de entrega da mensagem
+  (✓/✓✓/lido/falhou) chega pelo webhook `statuses` e atualiza a bolha; falha vira alerta.
+
 ## Critérios de aceitação (todos cobertos por teste)
 - Inelegível nunca vira Prospect; curso encerrado não é engajado (escala).
 - Toda mensagem passou pelo Revisor; preço/data/carga/parcelas inventados bloqueiam.
