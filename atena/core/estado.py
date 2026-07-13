@@ -54,6 +54,18 @@ def _agora():
     return datetime.datetime.now().isoformat(timespec="seconds")
 
 
+def _tel_key(telefone):
+    """Chave canônica de telefone tolerante ao 9º dígito móvel brasileiro.
+    O formulário Meta guarda o número COM o 9 (5579996529586); o wa_id do WhatsApp
+    entrega SEM o 9 (557996529586). Reduz ambos a DDD(2)+assinante(8) para casarem."""
+    d = re.sub(r"\D", "", telefone or "")
+    if d.startswith("55") and len(d) in (12, 13):
+        d = d[2:]                          # tira o país -> DDD + local
+    if len(d) == 11 and d[2] == "9":       # DDD + 9(tronco móvel) + 8 -> remove o 9
+        d = d[:2] + d[3:]
+    return d[-10:] if len(d) >= 10 else d   # DDD(2) + 8 dígitos
+
+
 class Estado:
     def __init__(self, db=None):
         self.path = ":memory:" if db == ":memory:" else str(db or DEFAULT_DB)
@@ -139,10 +151,14 @@ class Estado:
         d = re.sub(r"\D", "", telefone or "")
         if len(d) < 8:
             return None
+        k = _tel_key(telefone)
         for l in self.listar_leads():  # ponytail: scan linear; indexar por telefone se crescer
             e = re.sub(r"\D", "", l["telefone"] or "")
-            # match por sufixo (bidirecional) tolera +55/DDD divergentes, como o FARO
-            if len(e) >= 8 and (e.endswith(d) or d.endswith(e)):
+            if len(e) < 8:
+                continue
+            # 1) chave canônica BR (tolera 9º dígito móvel que o wa_id do WhatsApp omite);
+            # 2) sufixo bidirecional (tolera +55/DDD divergentes, como o FARO)
+            if _tel_key(l["telefone"]) == k or e.endswith(d) or d.endswith(e):
                 return l["card_id"]
         return None
 
