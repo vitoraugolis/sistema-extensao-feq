@@ -350,6 +350,14 @@ class Estado:
             (card_id,)).fetchone()
         return dict(r) if r else None
 
+    def coordenacao_represada(self, card_id):
+        """Resposta de coordenação (dúvida respondida) represada por ter caído fora da
+        janela de 24h. A mais ANTIGA pendente — entregue quando o lead reabrir a conversa."""
+        r = self.conn.execute(
+            "SELECT * FROM decisoes WHERE card_id=? AND agente='coordenacao' AND status='proposta' "
+            "ORDER BY id LIMIT 1", (card_id,)).fetchone()
+        return dict(r) if r else None
+
     def listar_decisoes(self, card_id):
         return [dict(r) for r in self.conn.execute(
             "SELECT * FROM decisoes WHERE card_id=? ORDER BY id DESC", (card_id,))]

@@ -339,6 +339,35 @@ def _aprovar_e_enviar(card_id, texto=None, ator="humano"):
     return {"envio": r}, 200
 
 
+def _entregar_represada(card_id):
+    """Lead reabriu a conversa e havia resposta de coordenação represada (dúvida
+    respondida fora da janela de 24h): entrega agora (a janela acabou de reabrir).
+    Retorna True se entregou."""
+    prop = EST.coordenacao_represada(card_id)
+    if not prop:
+        return False
+    lead = EST.get_lead(card_id)
+    r = WA.enviar(lead["telefone"], prop["mensagem"], forcar=True)
+    if r.get("ok"):
+        EST.add_conversa(card_id, "agente", prop["mensagem"], wamid=r.get("wamid"), status="enviado")
+        EST.set_decisao_status(prop["id"], "enviada")
+        EST.log_acao("sistema", "resposta_duvida_represada_entregue", card_id)
+        return True
+    return False
+
+
+def _reabrir_conversa(card_id):
+    """Fora da janela de 24h: envia o template de retomada para o lead reabrir; a
+    resposta represada é entregue quando ele responder (_entregar_represada)."""
+    lead = EST.get_lead(card_id)
+    r = WA.enviar_template(lead["telefone"], "retomar_atendimento")
+    if r.get("ok"):
+        EST.add_conversa(card_id, "agente", "[template retomar_atendimento]",
+                         wamid=r.get("wamid"), status="enviado")
+        EST.log_acao("sistema", "retomada_enviada_duvida_represada", card_id)
+    return r
+
+
 @app.route("/api/conversas/<card_id>/aprovar", methods=["POST"])
 def conversa_aprovar(card_id):
     b = request.get_json(silent=True) or {}
@@ -530,10 +559,17 @@ def webhook_whatsapp():
 def _processar_whatsapp(payload):
     try:
         res = WA.receber(payload)
-        if CFG["auto_aprovar"]:
-            for r in res:
-                if r.get("card_id") and r.get("revisor", {}).get("aprovado"):
-                    _aprovar_e_enviar(r["card_id"], ator="auto")
+        for r in res:
+            cid = r.get("card_id")
+            if not cid:
+                continue
+            # lead reabriu -> entrega a resposta de dúvida represada (fora da janela).
+            # Se entregou, a proposta nova do cérebro (resposta ao "Quero continuar")
+            # fica em Aprovações; não enviamos as duas.
+            if _entregar_represada(cid):
+                continue
+            if CFG["auto_aprovar"] and r.get("revisor", {}).get("aprovado"):
+                _aprovar_e_enviar(cid, ator="auto")
     except Exception as e:
         print(f"[webhook] processamento falhou: {e}", flush=True)
         EST.add_alerta("webhook", f"falha ao processar mensagem: {e}")
@@ -560,6 +596,9 @@ def duvidas_responder(did):
     if CFG["auto_aprovar"] and r["revisor"]["aprovado"]:
         corpo, _ = _aprovar_e_enviar(r["card_id"], ator="coordenacao")
         r["envio"] = corpo.get("envio") or corpo.get("erro")
+        # resposta caiu fora da janela de 24h? fica represada -> reabre com template
+        if not (corpo.get("envio") or {}).get("ok"):
+            r["reativacao"] = _reabrir_conversa(r["card_id"])
     return jsonify(r)
 
 
