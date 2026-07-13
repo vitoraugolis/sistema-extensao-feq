@@ -119,6 +119,8 @@ class Ontologia:
             "aulas_inicio": ini_o.isoformat() if ini_o else None,
             "aulas_fim": fim_o.isoformat() if fim_o else None,
             "url_extecamp": str(self.g.value(u, FEQ.urlExtecamp) or ""),
+            "objetivo": str(self.g.value(u, FEQ.objetivo) or "") or None,
+            "conteudo_programatico": str(self.g.value(u, FEQ.conteudoProgramatico) or "") or None,
             "insight_venda": str(self.g.value(u, FEQ.insightVenda) or "") or None,
             "alerta": str(self.g.value(u, FEQ.alertaCatalogo) or "") or None,
         }

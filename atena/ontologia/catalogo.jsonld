@@ -13,6 +13,8 @@
     "certificacao": "feq:certificacao",
     "urlExtecamp": "feq:urlExtecamp",
     "insightVenda": "feq:insightVenda",
+    "conteudoProgramatico": "feq:conteudoProgramatico",
+    "objetivo": "feq:objetivo",
     "alertaCatalogo": "feq:alertaCatalogo",
     "requisito": "feq:requisito",
     "nivelMinimo": { "@id": "feq:nivelMinimo", "@type": "@id" },
@@ -110,6 +112,8 @@
       "janelaOferecimento":{ "@type": "feq:JanelaTemporal", "inicio": "2026-08-01", "fim": "2026-12-19" },
       "planoPagamento": { "@type": "feq:PlanoPagamento", "taxaInscricao": "22.00", "numParcelas": 3, "valorParcela": "1000.12", "aVista": "3000.37" },
       "urlExtecamp": "https://ins.extecamp.unicamp.br/curso/inscricao/FEQ-0333/001",
+      "objetivo": "Compreender captura, utilização e armazenamento de carbono (CCUS) e seu papel na mitigação climática e na descarbonização: dominar a cadeia de valor (captura-transporte-utilização-armazenamento de CO₂), tecnologias de captura e aplicações comerciais, o cenário global e brasileiro, e políticas públicas/mercados de carbono. Desenvolve pensamento crítico sobre o tema. Ministrado EM INGLÊS.",
+      "conteudoProgramatico": "8 módulos: (1) Mudanças Climáticas e o Papel do CCUS — Acordo de Paris, metas net-zero, por que reduzir emissões não basta; (2) O que é CCUS? — definição, CCS vs CCUS, história da tecnologia; (3) A Cadeia de Valor do CCUS — captura de CO₂ (fontes e tecnologias), transporte (modais e infraestrutura, realidade brasileira), utilização (aplicações comerciais e pesquisas) e armazenamento (geológico, mineralização; potencial do Brasil); (4) Panorama Global do CCUS — projetos em operação/desenvolvimento, países líderes, hubs; (5) Desafios Técnicos do CCUS — principais barreiras no Brasil; (6) CCUS no Brasil — perfil de emissões, prioridades de descarbonização, licenciamento e percepção pública; (7) Desafios e Oportunidades — barreiras técnicas, econômicas, regulatórias e sociais, e oportunidades de inovação e investimento; (8) CCUS e Políticas Públicas — incentivos internacionais, créditos de carbono, mercados voluntários. Professores: Luis Fernando Mercier Franco e Gustavo Doubek.",
       "insightVenda": "Aulas ministradas EM INGLÊS. São módulos (Module 1), não curso pela metade. Primeiro oferecimento. Início 01/08/2026 (1º encontro presencial na FEQ, Campinas), término 19/12/2026.",
       "wasDerivedFrom": "feq:fonteNotion"
     },
@@ -126,6 +130,8 @@
       "janelaOferecimento":{ "@type": "feq:JanelaTemporal", "inicio": "2026-08-22", "fim": "2027-11-27" },
       "planoPagamento": { "@type": "feq:PlanoPagamento", "taxaInscricao": "22.00", "numParcelas": 13, "valorParcela": "733.34", "aVista": "9533.46" },
       "urlExtecamp": "https://ins.extecamp.unicamp.br/curso/inscricao/FEQ-0580/001",
+      "objetivo": "Jornada completa: dos fundamentos de programação em Python (bibliotecas, lógica, manipulação de dados) às técnicas avançadas de otimização e simulação — pesquisa operacional, solvers, otimização por força bruta e algoritmos genéticos, programação por restrições, simulação de Monte Carlo e de eventos discretos/processos contínuos — culminando em um projeto final aplicado. Curso mão-na-massa: Python aplicado à tomada de decisão em processos industriais.",
+      "conteudoProgramatico": "17 módulos obrigatórios: (1) Introdução à Programação com Python; (2) Introdução à Pesquisa Operacional; (3) Laboratório ao Vivo I; (4) Introdução à Simulação; (5) Técnicas de Simulação Aplicadas; (6) Laboratório ao Vivo II; (7) Programação Linear; (8) Programação Linear Inteira Mista; (9) Laboratório ao Vivo III; (10) Programação Não Linear; (11) Programação Não Linear Inteira Mista; (12) Programação por Restrições; (13) Laboratório ao Vivo IV; (14) Técnicas de IA aplicadas à Otimização e Apoio à Decisão; (15) Laboratório ao Vivo V; (16) Introdução à Pesquisa Científica; (17) Projeto Final de Curso. Professores: Flávio Vasconcelos da Silva e Claudio Vieira (cientista de dados).",
       "insightVenda": "Curso extremamente prático/mão na massa (Python aplicado a otimização e simulação de processos industriais). Entrave costuma ser clareza, não preço; leads pedem o conteúdo programático.",
       "wasDerivedFrom": "feq:fonteNotion"
     },
