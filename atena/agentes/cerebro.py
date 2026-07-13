@@ -174,7 +174,12 @@ def _system_prompt(ctx, lead_nome=None):
         "útil, nunca evasivo. EXCEÇÃO: mensagem iniciada por [INFORMAÇÃO DA COORDENAÇÃO] é fonte "
         "autorizada — responda com ela.\n"
         + _gate_instr(ctx.get("elegivel")) +
-        "Não peça CPF/endereço nesta fase; escale (escalar_humano) em desconto/reclamação/"
+        "DESCONTOS: TODOS os cursos da Extensão FEQ dão 10% para alunos e ex-alunos da Unicamp "
+        "(qualquer nível — graduação, pós, extensão etc.) — informe isso diretamente quando "
+        "perguntarem e confirme se o lead se enquadra. Se houver política específica do curso, ela "
+        "estará no campo 'descontos' dos dados; use-a. Para OUTRAS categorias de desconto não "
+        "listadas (ex.: servidor público) ou negociação de valor, use consultar_coordenacao. "
+        "Não peça CPF/endereço nesta fase; escale (escalar_humano) em reclamação/insatisfação/"
         "intenção de fechar/dúvida fora da base.\n"
         "TROCA DE INTERESSE: se o lead demonstrar que o curso que quer é OUTRO do portfólio, "
         'retorne o código dele em dados.curso (ex.: "FEQ-0580") e siga a conversa nesse curso.\n'

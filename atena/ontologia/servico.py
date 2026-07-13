@@ -121,6 +121,7 @@ class Ontologia:
             "url_extecamp": str(self.g.value(u, FEQ.urlExtecamp) or ""),
             "objetivo": str(self.g.value(u, FEQ.objetivo) or "") or None,
             "conteudo_programatico": str(self.g.value(u, FEQ.conteudoProgramatico) or "") or None,
+            "descontos": str(self.g.value(u, FEQ.descontos) or "") or None,
             "insight_venda": str(self.g.value(u, FEQ.insightVenda) or "") or None,
             "alerta": str(self.g.value(u, FEQ.alertaCatalogo) or "") or None,
         }
