@@ -3,9 +3,9 @@
 Atena · Transporte WhatsApp Business Cloud.
 Webhook de entrada -> orquestrador; envio guardado. Sem WHATSAPP_TOKEN o envio é
 DRY-RUN (não manda nada). Fora do horário comercial, enfileira (tarefa) em vez de
-enviar. Opt-out respeitado. Decisão da mensagem é do orquestrador; aqui só entrega.
-ponytail: janela de 24h não rastreada por timestamp ainda -> envia texto livre em
-dev; em produção, fora de 24h exige template (TODO marcado).
+enviar; o agendador drena a fila via despachar_fila() no horário (spec 09 AC3).
+Janela de 24h por timestamp (fora dela: template aprovado). Opt-out respeitado.
+Decisão da mensagem é do orquestrador; aqui só entrega.
 """
 import os
 import sys
@@ -132,10 +132,14 @@ class WhatsApp:
             if not ts or (datetime.datetime.now() - datetime.datetime.fromisoformat(ts)).total_seconds() > 86400:
                 return {"ok": False, "status": "fora_da_janela_24h",
                         "motivo": "sem mensagem do lead nas últimas 24h — use template aprovado"}
-        # horário comercial: só barra cadência automática; envio humano (forcar) passa.
+        # horário comercial: fora dele enfileira (spec 09 AC3); envio humano (forcar) passa.
         if not forcar and not G.dentro_janela():
-            return {"ok": False, "status": "fora_do_horario",
-                    "motivo": "fora do horário comercial (reenvie no horário)"}
+            if not self.est:
+                return {"ok": False, "status": "fora_do_horario",
+                        "motivo": "fora do horário comercial (reenvie no horário)"}
+            tid = self.est.enfileirar_envio(telefone, texto)
+            return {"ok": True, "status": "enfileirado", "tarefa": tid,
+                    "motivo": "fora do horário comercial — entrega no próximo horário"}
         if not self.token:
             return {"ok": True, "status": "dry_run", "para": telefone, "texto": texto}
         import requests
@@ -148,6 +152,21 @@ class WhatsApp:
         return {"ok": r.status_code == 200, "status": r.status_code,
                 "wamid": _wamid(j) if r.status_code == 200 else None,
                 "motivo": None if r.status_code == 200 else str(j.get("error", {}).get("message", ""))[:120]}
+
+    def despachar_fila(self):
+        """Entrega o que ficou enfileirado fora do horário. Reaplica os guardrails no
+        momento do envio: opt-out ou janela de 24h fechada durante a noite -> descarta
+        (fora de 24h só template, spec 09 AC2)."""
+        out = []
+        for t in self.est.fila_envio_pendente():
+            r = self.enviar(t["telefone"], t["texto"])
+            if r.get("status") == "enfileirado":     # virada de horário: nova tarefa criada
+                st = "reenfileirada"
+            else:
+                st = "enviada" if r.get("ok") else "descartada"
+            self.est.concluir_tarefa(t["id"], st)
+            out.append({"tarefa": t["id"], **r})
+        return out
 
     def enviar_template(self, telefone, nome, idioma="pt_BR", params=None):
         """1º contato / fora da janela de 24h: exige template aprovado.

@@ -124,6 +124,22 @@ def test_enviar_respeita_24h_e_optout():
     assert wa.enviar_template("5519977770009", "feq_abertura_curso")["status"] == "bloqueado"
 
 
+def test_fila_fora_do_horario_despacha():
+    os.environ.pop("WHATSAPP_TOKEN", None)
+    est = Estado(":memory:")
+    est.upsert_lead("c7", nome="Z", telefone="+55 19 96666-0007", curso="FEQ-0480",
+                    fase="Lead", estado_conversa="qualificacao")
+    est.add_conversa("c7", "lead", "oi")                     # janela de 24h aberta
+    est.enfileirar_envio("5519966660007", "bom dia")         # ficou da noite anterior
+    os.environ["ATENA_JANELA_LIVRE"] = "1"                   # simula horário comercial
+    try:
+        out = WhatsApp(est, None).despachar_fila()
+    finally:
+        os.environ.pop("ATENA_JANELA_LIVRE", None)
+    assert out[0]["status"] == "dry_run"                     # entregou (sem token: dry-run)
+    assert est.fila_envio_pendente() == []                   # fila esvaziou
+
+
 def test_bibliotecario_portfolio_e_citados():
     from atena.agentes.bibliotecario import Bibliotecario
     ctx = Bibliotecario(ONT).contexto("FEQ-0480", "Superior Completo",

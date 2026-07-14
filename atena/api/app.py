@@ -691,6 +691,8 @@ def _operacoes():
         _t.sleep(60)
         try:
             _despachar_alertas()
+            if G.dentro_janela():   # entrega o que ficou enfileirado fora do horário (spec 09 AC3)
+                WA.despachar_fila()
             # reconciliação Meta (rede de segurança do webhook leadgen): varre os
             # formulários e ingere+ativa o que o webhook não entregou. A cada ~5 min.
             if _t.time() - float(EST.get_config("op_meta_poll") or 0) > 300:

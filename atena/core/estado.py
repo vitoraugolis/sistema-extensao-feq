@@ -83,7 +83,9 @@ class Estado:
                     "ALTER TABLE conversas ADD COLUMN tipo TEXT DEFAULT 'texto'",
                     "ALTER TABLE conversas ADD COLUMN media_id TEXT",
                     "ALTER TABLE conversas ADD COLUMN wamid TEXT",     # id do WhatsApp p/ status
-                    "ALTER TABLE conversas ADD COLUMN status TEXT"):   # enviado/entregue/lido/falhou
+                    "ALTER TABLE conversas ADD COLUMN status TEXT",    # enviado/entregue/lido/falhou
+                    "ALTER TABLE tarefas ADD COLUMN telefone TEXT",    # fila de envio fora do horário
+                    "ALTER TABLE tarefas ADD COLUMN texto TEXT"):
             try:
                 self.conn.execute(mig)
             except sqlite3.OperationalError:
@@ -372,6 +374,26 @@ class Estado:
             "SELECT ts FROM conversas WHERE card_id=? AND papel='lead' ORDER BY id DESC LIMIT 1",
             (card_id,)).fetchone()
         return r["ts"] if r else None
+
+    # ---------------------------------------------------- fila de envio (spec 09 AC3)
+    def enfileirar_envio(self, telefone, texto):
+        with self._lock:
+            cur = self.conn.execute(
+                "INSERT INTO tarefas(card_id, tipo, agendado_para, status, telefone, texto) "
+                "VALUES(?, 'enviar_texto', ?, 'pendente', ?, ?)",
+                (self.lead_por_telefone(telefone), _agora(), telefone, texto))
+            self.conn.commit()
+            return cur.lastrowid
+
+    def fila_envio_pendente(self):
+        rs = self.conn.execute(
+            "SELECT * FROM tarefas WHERE tipo='enviar_texto' AND status='pendente' ORDER BY id")
+        return [dict(r) for r in rs.fetchall()]
+
+    def concluir_tarefa(self, tid, status="feita"):
+        with self._lock:
+            self.conn.execute("UPDATE tarefas SET status=? WHERE id=?", (status, tid))
+            self.conn.commit()
 
     # -------------------------------------------------------------- métricas
     def stats_funil(self):
