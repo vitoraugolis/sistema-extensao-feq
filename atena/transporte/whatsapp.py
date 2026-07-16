@@ -118,7 +118,7 @@ class WhatsApp:
             self.est.add_alerta("envio_falhou", f"Mensagem ao lead {cid} NÃO foi entregue: {motivo}")
             out.append({"card_id": cid, "acao": "envio_falhou", "motivo": motivo})
 
-    def enviar(self, telefone, texto, forcar=False):
+    def enviar(self, telefone, texto, forcar=False, agora=None):
         if not texto:
             return {"ok": False, "motivo": "sem texto"}
         # guardrails de destinatário: opt-out e janela de 24h (texto livre só dentro dela)
@@ -133,7 +133,7 @@ class WhatsApp:
                 return {"ok": False, "status": "fora_da_janela_24h",
                         "motivo": "sem mensagem do lead nas últimas 24h — use template aprovado"}
         # horário comercial: só barra cadência automática; envio humano (forcar) passa.
-        if not forcar and not G.dentro_janela():
+        if not forcar and not G.dentro_janela(agora):
             return {"ok": False, "status": "fora_do_horario",
                     "motivo": "fora do horário comercial (reenvie no horário)"}
         if not self.token:

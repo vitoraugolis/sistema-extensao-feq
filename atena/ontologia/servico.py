@@ -99,10 +99,14 @@ class Ontologia:
         return {
             "codigo": str(self.g.value(u, FEQ.codigo)),
             "nome": str(self.g.value(u, FEQ.nome)),
-            "tipo": "Especialização (lato sensu)" if FEQ.Especializacao in tipos else "Curso de Extensão",
+            "tipo": "Formação de Especialistas" if FEQ.Especializacao in tipos else "Curso de Extensão",
             "modalidade": str(self.g.value(u, FEQ.modalidade) or ""),
             "horario": str(self.g.value(u, FEQ.horarioAula) or ""),
+            "formato_aulas_resumo": str(self.g.value(u, FEQ.formatoAulasResumo) or "") or None,
+            "formato_aulas_detalhe": str(self.g.value(u, FEQ.formatoAulasDetalhe) or "") or None,
             "professor": str(self.g.value(u, FEQ.professorResponsavel) or ""),
+            "professores_adicionais": [str(n) for n in self.g.items(
+                self.g.value(u, FEQ.professoresAdicionais))] if self.g.value(u, FEQ.professoresAdicionais) else [],
             "requisito": str(nm).split("#")[-1] if nm else None,
             "carga_horas": horas,
             "publico_alvo": str(self.g.value(u, FEQ.publicoAlvo) or "") or None,

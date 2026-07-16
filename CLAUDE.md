@@ -64,8 +64,11 @@ specs/                          # ESPECIFICAÇÕES (fonte da verdade)
   09-transporte-whatsapp.md
   10-testes-criterios-aceitacao.md
   11-ontologia-anchoring.md · 12-orquestracao-estado.md · 13-injetor-evolucao-ontologia.md · 14-central-operacao-frontend.md
+  15-growth-engine.md           # RevOps: pacing, Meta Ads/CAPI, recuperação de checkout
+  16-funil-conversoes-hub.md    # bridge page (dedup Pixel×CAPI), matrículas offline, ferramentas p/ agentes
+  17-fluxo-consolidado-lp.md    # FLUXO DEFINITIVO: LP órfã no WP FEQ, telemetria de sessão, 5 toques, conversão offline via Central
 atena/                          # SISTEMA v2 (monólito modular) — ver atena/README.md
-  ontologia/  core/  agentes/  revisor/  transporte/  api/  web/  tests/
+  ontologia/  core/  agentes/  revisor/  transporte/  api/  web/  growth/  tests/
 feq_ingestao_meta_faro.py       # legado v1 (referência)
 feq_cerebro_revisor.py          # legado v1 (referência)
 faro_probe.py                   # utilitário: sonda fases/campos do FARO
@@ -90,6 +93,9 @@ META_APP_SECRET=...             # verifica X-Hub-Signature-256 dos webhooks (v2)
 ATENA_USERS=nome:senha:supervisor,...   # Central v2 (sem isto: operador/operador DEV)
 ATENA_SECRET=...                # chave de sessão da Central v2
 PORT=8080                       # 8090 cérebro v1 · 8095 Central v2
+# Growth Engine (spec 15) — sem estes tokens, tudo roda em dry-run:
+META_ADS_TOKEN=... META_AD_ACCOUNT_ID=act_... META_PIXEL_ID=... META_CAPI_TOKEN=...
+GROWTH_CPL_MAX=60 GROWTH_SHIFT_PCT=20 GROWTH_AUTO_APPLY=0 GROWTH_TEST_EVENT_CODE=...
 ```
 
 ## 6. Como rodar e testar
@@ -98,11 +104,21 @@ PORT=8080                       # 8090 cérebro v1 · 8095 Central v2
 pip install flask requests rdflib pyshacl
 set -a && source .env && set +a
 
-# Sistema v2 (atena/) — roda 24/7 como serviço launchd (br.unicamp.feq.atena + .ngrok)
-launchctl kickstart -k gui/$UID/br.unicamp.feq.atena   # reiniciar após mudar código
+# Sistema v2 (atena/) — PRODUÇÃO no VPS Lightsail (systemd atena+caddy, https://3.218.159.36.sslip.io)
+zsh atena/ops/deploy_vps.sh 3.218.159.36 ubuntu   # deploy (rsync; NÃO sobrescreve .env/data)
+# (launchd local br.unicamp.feq.atena foi desativado no cutover de 07/07/2026)
 python3 atena/api/app.py            # dev manual · http://localhost:8095 (bootstrap: operador/operador até criar usuários reais)
-for t in revisor orquestrador injetor agentes; do python3 atena/tests/test_$t.py; done
+for t in revisor orquestrador injetor agentes growth; do python3 atena/tests/test_$t.py; done
 python3 atena/ontologia/validar.py  # valida a ontologia (SHACL)
+
+# Growth Engine (spec 15) — cron: pacing 07:30 · recuperar */30
+python3 -m atena.growth.motor status      # ritmo por curso (sem efeito colateral)
+python3 -m atena.growth.motor pacing      # insights + ritmo + CPL + realocação
+python3 -m atena.growth.motor recuperar   # régua de checkout abandonado (24h)
+python3 -m atena.growth.motor evento <card_id> inscricao_confirmada   # funil + CAPI
+python3 -m atena.growth.matriculas add <tel|email> --curso FEQ-0480 --valor 3900  # offline -> Purchase
+# Bridge page (spec 16): GET /ponte?curso=FEQ-0480 · POST /webhook/ponte (públicas, CORS)
+python3 -m atena.growth.wp_deploy_bridge   # publica as 4 LPs no WordPress (sem creds = dry-run)
 
 # --- Legado v1 (referência) ---
 # Fase 1 — ingestão (porta 8080)
@@ -145,6 +161,17 @@ Reescrita **v2** (monólito modular `atena/`, ancoragem ontológica) implementad
 - ✅ Cérebro LLM com fallback determinístico offline; ingestão Variante B; transporte WhatsApp (dry-run sem token).
 - ✅ Injetor de ontologia: diff + impacto + SHACL + aprovação + rollback (`specs/13`).
 - ✅ Central de Operação (Flask + SPA glass) com auth/RBAC/auditoria (`specs/14`).
+- ✅ Growth Engine (`atena/growth/`): pacing 4 turmas, regra de CPL, realocação de verba,
+  CAPI, scoring, recuperação de checkout 24h, opt-in LGPD (`specs/15`).
+  Aplicação externa (pausar/mover verba) só com `GROWTH_AUTO_APPLY=1`; default sugere.
+- ✅ Hub do funil (`specs/16`): bridge page `/ponte` (Pixel×CAPI com desduplicação por
+  event_id), CLI de matrículas offline (SHA-256 → Purchase c/ valor, ROAS), ferramentas
+  de tool calling p/ agentes (`growth/ferramentas.py`, mesmo gate AUTO_APPLY).
+- ✅ Fluxo consolidado (`specs/17`) — 84 checks: LP completa estilo PUC (copy 100%
+  ancorada na ontologia, destino `/curso/inscricao/`), telemetria de sessão
+  (`lp_sessoes`, `/api/lp/analytics`, ferramenta `analise_lp`), botão WhatsApp,
+  cadência de 5 toques, conversão offline ao mover card na Central (CAPI), deploy
+  WP em bloco `wp:html` com validação pós-publicação.
 - ⏳ Fases 3 e 4 (inscrição/matrícula) (`specs/06`); envio WhatsApp e cérebro LLM reais dependem de chaves.
 - ⏳ Legado v1 (`feq_*.py`) mantido só como referência.
 

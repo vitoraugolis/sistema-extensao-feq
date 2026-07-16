@@ -146,9 +146,14 @@ class Ingestao:
         # gate de captabilidade: curso não captável -> não engaja, vai p/ revisão
         ec = "aguardando_1o_contato" if cap.get("captavel") else "aguardando_revisao"
         card_id = f"meta-{_digits(tel)}"
+        # LGPD: o envio do formulário Lead Ads com consentimento é o opt-in — registrado explícito
+        optin = {} if str(lead.get("consentimento", "")).strip().lower() in ("false", "0", "nao", "não") \
+            else {"optin_ts": datetime.datetime.now().isoformat(timespec="seconds"),
+                  "optin_fonte": lead.get("fonte") or "meta_lead_ad"}
         self.est.upsert_lead(card_id, nome=lead.get("nome", ""), telefone=tel,
                              curso=lead.get("curso", ""), cursos_interesse=lead.get("curso", ""),
-                             fase="Lead", estado_conversa=ec, escolaridade=lead.get("escolaridade"))
+                             fase="Lead", estado_conversa=ec, escolaridade=lead.get("escolaridade"),
+                             **optin)
         if lead.get("qualificacao"):   # respostas do form -> auditoria (e o gate já foi pulado)
             self.est.log_acao("ingestao", f"pré-qualificado no formulário — {lead['qualificacao']}", card_id)
         if self.faro and self.faro.ativo:   # espelha no system of record

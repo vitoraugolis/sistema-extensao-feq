@@ -12,7 +12,7 @@ from atena.core.estado import Estado
 from atena.core.orquestrador import Orquestrador
 from atena.core.faro import Faro
 from atena.transporte.whatsapp import WhatsApp, extrair_mensagem
-from atena.agentes.nutricao import leads_para_reengajar, reengajar, reengajar_um
+from atena.agentes.nutricao import reativar, reengajar_um
 from atena.agentes.ingestao import Ingestao, normalizar_meta, curso_de_texto
 from atena.core.orquestrador import brain_deterministico
 from atena.core import contratos as C
@@ -56,14 +56,21 @@ def test_nutricao_eligibilidade_e_guardrails():
                         optout=optout, reengajos=reeng)
         est.conn.execute("UPDATE leads SET atualizado=? WHERE card_id=?", (velho, cid))
     est.conn.commit()
-    eleg = [l["card_id"] for l in leads_para_reengajar(est, ONT)]
-    assert eleg == ["a"]
     os.environ.pop("WHATSAPP_TOKEN", None)                # dry-run
-    assert reengajar(est, ONT, WhatsApp(est, None)) == 1
+    wa = WhatsApp(est, None)
+    # passada fria: só 'a' recebe o 1º template da cadência
+    assert reativar(est, ONT, wa) == {"templates": 1, "nudges": []}
     assert est.get_lead("a")["reengajos"] == 1
-    assert leads_para_reengajar(est, ONT) == []           # silêncio zerado pelo envio? não:
-    # (reengajo enviado agora -> 'atualizado' recente não conta; elegibilidade usa última msg do LEAD,
-    #  mas o guard de reengajos/atualizado evita repetição imediata)
+    # passada seguinte: 'a' acabou de ser tocado (2º template exige 7d de silêncio) -> nada
+    assert reativar(est, ONT, wa) == {"templates": 0, "nudges": []}
+    # DENTRO da janela (lead falou 10h atrás, 1 resposta nossa) -> nudge free-text via propor
+    est.upsert_lead("e", nome="E", telefone="+55 19 90000-0005", curso="FEQ-0480",
+                    fase="Lead", estado_conversa="aguardando_resposta")
+    est.add_conversa("e", "lead", "oi"); est.add_conversa("e", "agente", "resposta")
+    h10 = (datetime.datetime.now() - datetime.timedelta(hours=10)).isoformat(timespec="seconds")
+    est.conn.execute("UPDATE conversas SET ts=? WHERE card_id='e'", (h10,))
+    est.conn.commit()
+    assert reativar(est, ONT, wa, propor=lambda cid: cid)["nudges"] == ["e"]
 
 
 def test_lgpd_anonimiza_perdidos_antigos():

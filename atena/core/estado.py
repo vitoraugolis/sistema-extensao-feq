@@ -80,6 +80,8 @@ class Estado:
         for mig in ("ALTER TABLE leads ADD COLUMN reengajos INTEGER DEFAULT 0",
                     "ALTER TABLE leads ADD COLUMN faro_id TEXT",
                     "ALTER TABLE leads ADD COLUMN cursos_interesse TEXT",  # CSV; ativo=coluna curso
+                    "ALTER TABLE leads ADD COLUMN optin_ts TEXT",      # LGPD: quando consentiu
+                    "ALTER TABLE leads ADD COLUMN optin_fonte TEXT",   # LGPD: onde (ex.: meta_lead_ad)
                     "ALTER TABLE conversas ADD COLUMN tipo TEXT DEFAULT 'texto'",
                     "ALTER TABLE conversas ADD COLUMN media_id TEXT",
                     "ALTER TABLE conversas ADD COLUMN wamid TEXT",     # id do WhatsApp p/ status

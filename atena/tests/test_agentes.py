@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Checks dos módulos novos: cérebro (fallback), ingestão, whatsapp, auth, curador."""
+import datetime
 import os
 import sys
 from pathlib import Path
@@ -18,6 +19,7 @@ from atena.agentes.curador import Curador
 from atena.transporte.whatsapp import WhatsApp
 
 ONT = Ontologia()
+AGORA = datetime.datetime(2026, 7, 13, 10, 0)   # segunda, 10h — dentro do horário comercial
 
 
 def test_cerebro_fallback_sem_key():
@@ -67,7 +69,7 @@ def test_whatsapp_assinatura_e_envio():
     os.environ.pop("WHATSAPP_TOKEN", None)
     est = Estado(":memory:")
     wa = WhatsApp(est, Orquestrador(est, ONT))
-    r = wa.enviar("5519999990001", "oi")
+    r = wa.enviar("5519999990001", "oi", agora=AGORA)
     assert r["ok"] and r["status"] in ("dry_run", "enfileirado")  # nunca envia sem token
 
 
@@ -114,13 +116,13 @@ def test_enviar_respeita_24h_e_optout():
     est.upsert_lead("c9", nome="Y", telefone="+55 19 97777-0009", curso="FEQ-0480",
                     fase="Lead", estado_conversa="qualificacao")
     wa = WhatsApp(est, None)
-    r = wa.enviar("5519977770009", "oi")                    # sem msg do lead nas 24h
+    r = wa.enviar("5519977770009", "oi", agora=AGORA)       # sem msg do lead nas 24h
     assert r["ok"] is False and r["status"] == "fora_da_janela_24h"
     est.add_conversa("c9", "lead", "olá")                    # abre a janela
-    r = wa.enviar("5519977770009", "oi")
+    r = wa.enviar("5519977770009", "oi", agora=AGORA)
     assert r["ok"] and r["status"] in ("dry_run", "enfileirado")
     est.set_lead("c9", optout=1)                             # opt-out bloqueia tudo
-    assert wa.enviar("5519977770009", "oi")["status"] == "bloqueado"
+    assert wa.enviar("5519977770009", "oi", agora=AGORA)["status"] == "bloqueado"
     assert wa.enviar_template("5519977770009", "feq_abertura_curso")["status"] == "bloqueado"
 
 

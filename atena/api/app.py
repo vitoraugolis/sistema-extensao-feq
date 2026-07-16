@@ -10,6 +10,7 @@ Rodar:
 """
 import os
 import sys
+import time
 import datetime
 import pathlib
 
@@ -42,6 +43,10 @@ from atena.agentes import nutricao, reconciliacao
 from atena.agentes.curador import Curador
 from atena.agentes.cerebro import cerebro_factory, modelo_atual, testar_modelo, PROVEDORES, chave_do
 from atena.transporte.whatsapp import WhatsApp
+from atena.growth.db import Growth
+from atena.growth.meta_ads import MetaAds
+from atena.growth import ponte
+from atena.growth import funil as growth_funil
 
 EST = Estado()
 if os.environ.get("ATENA_SEED_DEMO") == "1":   # produção fica só com leads reais do sistema
@@ -54,6 +59,8 @@ ORQ = Orquestrador(estado=EST, ont=ONTO.ont, brain=cerebro_factory(ONTO.ont))
 ING = Ingestao(EST, ONTO.ont, faro=ORQ.faro)
 WA = WhatsApp(EST, ORQ)
 CUR = Curador(EST, ONTO.ont)
+GRW = Growth()                       # growth engine (specs 15/16) — mesmo SQLite, WAL
+ADS = MetaAds()
 WEB = pathlib.Path(__file__).resolve().parents[1] / "web"
 app = Flask(__name__)
 from werkzeug.middleware.proxy_fix import ProxyFix
@@ -216,7 +223,18 @@ def lead_mover(card_id):
         except Exception as e:
             print(f"[faro] mover falhou: {e}", flush=True)
     EST.log_acao(session.get("usuario", "operador"), f"mover fase -> {fase}", card_id)
-    return jsonify({"ok": True, "fase": fase})
+    # Conversão offline (spec 17 §8): o gesto do operador É o reporte à Meta.
+    capi = None
+    tipo = {"Inscrito": "inscricao_confirmada", "Matriculado": "matricula_confirmada"}.get(fase)
+    if tipo and not any(e["tipo"] == tipo for e in GRW.eventos(card_id=card_id)):
+        try:
+            c = ONTO.ont.curso(lead.get("curso") or "")
+        except Exception:
+            c = None
+        valor = growth_funil.valor_curso(c) if tipo == "matricula_confirmada" else None
+        capi = growth_funil.registrar(GRW, ADS, EST, card_id, tipo,
+                                      valor=valor).get("capi")
+    return jsonify({"ok": True, "fase": fase, "conversao_offline": capi})
 
 
 @app.route("/api/leads/<card_id>/reativar", methods=["POST"])
@@ -486,6 +504,72 @@ def injetor_aprovar(pid):
 @app.route("/api/ingestao/simulate", methods=["POST"])
 def ingestao_simulate():
     return jsonify(ING.ingest(request.get_json(silent=True) or {}))
+
+
+@app.route("/ponte")
+def ponte_page():
+    """Bridge page pública (spec 16 §2): anúncio -> modal -> Pixel+CAPI -> Extecamp."""
+    html = ponte.render(GRW, _ont(), (request.args.get("curso") or "").strip().upper())
+    return (html, 200, {"Content-Type": "text/html; charset=utf-8"}) if html \
+        else ("curso desconhecido", 404)
+
+
+_CORS_LP = {"Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Headers": "Content-Type",
+            "Access-Control-Allow-Methods": "POST, OPTIONS"}
+_RL = {}
+
+
+def _rate_ok(ip, limite=30, janela=60):
+    """Rate limit simples por IP p/ webhooks públicos da LP (in-memory).
+    ponytail: por-processo; um WAF/Caddy na frente cobre ataque distribuído."""
+    agora = time.time()
+    fila = _RL.setdefault(ip or "?", [])
+    while fila and agora - fila[0] > janela:
+        fila.pop(0)
+    if len(fila) >= limite:
+        return False
+    fila.append(agora)
+    return True
+
+
+@app.route("/webhook/ponte", methods=["POST", "OPTIONS"])
+def webhook_ponte():
+    """Recebe o modal da ponte: mesmo event_id do Pixel -> CAPI desduplica.
+    CORS liberado: a LP publicada no WordPress vive em outra origem (spec 16 §2)."""
+    if request.method == "OPTIONS":
+        return "", 204, _CORS_LP
+    if not _rate_ok(request.remote_addr):
+        return jsonify({"ok": False, "motivo": "rate limit"}), 429, _CORS_LP
+    dados = {**(request.get_json(silent=True) or {}),
+             "ip": request.remote_addr, "ua": request.headers.get("User-Agent", "")}
+    r = ponte.processar(dados, EST, GRW, ADS, ING, ont=_ont())
+    return jsonify(r), (200 if r.get("ok") else 400), _CORS_LP
+
+
+@app.route("/webhook/lp", methods=["POST", "OPTIONS"])
+def webhook_lp():
+    """Telemetria de sessão da LP (spec 17 §5). sendBeacon manda text/plain."""
+    if request.method == "OPTIONS":
+        return "", 204, _CORS_LP
+    if not _rate_ok(request.remote_addr):
+        return jsonify({"ok": False}), 429, _CORS_LP
+    import json as _json
+    try:
+        d = _json.loads(request.get_data(as_text=True) or "{}")
+    except ValueError:
+        return jsonify({"ok": False}), 400, _CORS_LP
+    if not d.get("sessao_id") or not d.get("curso"):
+        return jsonify({"ok": False}), 400, _CORS_LP
+    GRW.upsert_lp_sessao(d)
+    return jsonify({"ok": True}), 200, _CORS_LP
+
+
+@app.route("/api/lp/analytics")
+def lp_analytics():
+    """Funil de leitura da LP p/ a Central: alcance/tempo por seção, abandono, taxas."""
+    return jsonify(GRW.lp_analytics(request.args.get("curso") or None,
+                                    int(request.args.get("dias", 30))))
 
 
 @app.route("/webhook/meta", methods=["GET", "POST"])
