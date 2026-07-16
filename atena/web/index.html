@@ -5,108 +5,148 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Central de Operação · Extensão FEQ</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.7.0/dist/tabler-icons.min.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
-:root{--ink:#1e293b;--ink2:#475569;--ink3:#64748b;--accent:#2563eb;--ok:#0f6e56;--warn:#854f0b;--bad:#991b1b;}
+/* Neobrutalismo (spec: pedido do usuário, ref. Pinterest 39617671719796967):
+   fundo creme de papel, bordas pretas grossas, sombras DURAS deslocadas (sem
+   blur), cores chapadas — laranja Guará como primária, teal FEQ como
+   secundária, vermelho Unicamp para o negativo. Mesmas classes/IDs do glass
+   antigo: o JS não muda uma linha. */
+:root{--ink:#141414;--ink2:#3a3a3a;--ink3:#6d6459;--b:#141414;
+ --paper:#FAF3E8;--guara:#F96A10;--feq:#1CA8B4;--uni:#ED1C24;
+ --sun:#FFD23F;--mint:#8BEBAF;--sky:#9BD6FF;--rosa:#FFAFA6;--laranjinha:#FFE1CC;
+ --accent:#F96A10;--ok:#0b5c3d;--warn:#6e4a00;--bad:#a01212;}
 *{box-sizing:border-box;}
-body{margin:0;min-height:100vh;color:var(--ink);font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
- background:radial-gradient(circle at 16% 10%,#c7d2fe,transparent 42%),radial-gradient(circle at 86% 4%,#a7f3d0,transparent 40%),radial-gradient(circle at 72% 94%,#ddd6fe,transparent 46%),linear-gradient(135deg,#eef2ff,#faf5ff);background-attachment:fixed;}
+body{margin:0;min-height:100vh;color:var(--ink);
+ font:15px/1.55 "Space Grotesk",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+ background:var(--paper);
+ background-image:radial-gradient(rgba(20,20,20,.09) 1.2px,transparent 1.2px);
+ background-size:22px 22px;}
 .wrap{max-width:1080px;margin:0 auto;padding:22px;}
-.g{background:rgba(255,255,255,.52);-webkit-backdrop-filter:blur(22px) saturate(170%);backdrop-filter:blur(22px) saturate(170%);
- border:.5px solid rgba(255,255,255,.7);border-radius:18px;box-shadow:0 10px 34px rgba(31,41,55,.10);}
-.top{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;}
-.brand{display:flex;align-items:center;gap:11px;}
-.logo{width:34px;height:34px;border-radius:10px;background:rgba(37,99,235,.16);color:#1d4ed8;display:flex;align-items:center;justify-content:center;font-size:19px;}
-.pill{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;padding:4px 9px;border-radius:999px;}
-.layout{display:grid;grid-template-columns:170px 1fr;gap:16px;}
+.g{background:#fff;border:2px solid var(--b);border-radius:12px;box-shadow:6px 6px 0 var(--b);}
+.top{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;gap:12px;flex-wrap:wrap;}
+.brand{display:flex;align-items:center;gap:12px;}
+.logo{width:46px;height:46px;border-radius:10px;background:#fff;border:2px solid var(--b);
+ box-shadow:3px 3px 0 var(--b);padding:5px;object-fit:contain;display:flex;align-items:center;justify-content:center;}
+.brand-title{font-weight:700;font-size:16px;letter-spacing:-.01em;}
+.logos-inst{display:flex;align-items:center;gap:8px;}
+.logo-plaque{height:44px;background:#fff;border:2px solid var(--b);border-radius:10px;
+ box-shadow:3px 3px 0 var(--b);padding:6px 10px;display:flex;align-items:center;}
+.logo-plaque img{height:100%;width:auto;display:block;}
+.pill{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:700;padding:5px 10px;
+ border-radius:8px;border:2px solid var(--b);box-shadow:2px 2px 0 var(--b);color:var(--ink);}
+.layout{display:grid;grid-template-columns:178px 1fr;gap:18px;}
+.layout>main{min-width:0;} /* sem isto o 1fr cresce com o kanban em vez de deixá-lo rolar */
 .nav{padding:10px 9px;align-self:start;position:sticky;top:22px;}
-.navi{display:flex;align-items:center;gap:10px;padding:9px 11px;border-radius:12px;font-size:13.5px;color:#334155;cursor:pointer;border:none;background:none;width:100%;text-align:left;font-family:inherit;}
-.navi:hover{background:rgba(255,255,255,.5);}
-.navi.on{background:rgba(37,99,235,.14);color:#1d4ed8;}
+.navi{display:flex;align-items:center;gap:9px;padding:9px 11px;border-radius:9px;font-size:13.5px;font-weight:500;
+ color:var(--ink);cursor:pointer;border:2px solid transparent;background:none;width:100%;text-align:left;font-family:inherit;margin-bottom:3px;}
+.navi:hover{background:var(--sun);border-color:var(--b);}
+.navi.on{background:var(--guara);color:#fff;border-color:var(--b);box-shadow:3px 3px 0 var(--b);font-weight:700;}
 .navi i{font-size:18px;}
-.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:16px;}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin-bottom:18px;}
 .card{padding:13px 15px;}
-.lab{font-size:12px;color:var(--ink3);margin:0;}
-.num{font-size:27px;font-weight:500;margin:3px 0 0;letter-spacing:-.01em;}
-.sec{padding:16px 18px;margin-bottom:16px;}
-.sec h2{font-size:15px;font-weight:500;margin:0 0 12px;}
+.lab{font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--ink3);margin:0;}
+.num{font-size:30px;font-weight:700;margin:3px 0 0;letter-spacing:-.02em;}
+.sec{padding:16px 18px;margin-bottom:18px;}
+.sec h2{font-size:15px;font-weight:700;margin:0 0 12px;}
 .hidden{display:none;}
-.row{display:flex;align-items:center;gap:10px;padding:9px 11px;border-radius:12px;background:rgba(255,255,255,.5);margin-bottom:8px;font-size:13px;}
-.tag{font-size:11px;padding:3px 8px;border-radius:999px;margin-left:auto;white-space:nowrap;}
-.t-ok{background:rgba(16,158,117,.16);color:#04342C;}
-.t-bad{background:rgba(226,75,74,.16);color:#791F1F;}
-.t-acc{background:rgba(37,99,235,.14);color:#1d4ed8;}
-.t-warn{background:rgba(239,159,39,.18);color:#633806;}
-.bubble{max-width:80%;padding:9px 12px;font-size:13.5px;border-radius:14px;}
-.b-lead{align-self:flex-start;background:rgba(255,255,255,.72);border-radius:14px 14px 14px 4px;}
-.b-ag{align-self:flex-end;background:rgba(37,99,235,.12);border:1.5px solid rgba(37,99,235,.45);border-radius:14px 14px 4px 14px;}
-select,textarea{width:100%;border-radius:11px;border:.5px solid rgba(148,163,184,.55);background:rgba(255,255,255,.62);padding:9px 11px;font:inherit;font-size:13.5px;color:var(--ink);}
-.btn{border:none;border-radius:11px;padding:9px 14px;font-size:13px;font-weight:500;cursor:pointer;font-family:inherit;}
-.btn-p{background:var(--accent);color:#fff;}
-.btn-v{background:#534ab7;color:#fff;}
-.btn-g{background:rgba(255,255,255,.6);color:#334155;border:.5px solid rgba(148,163,184,.55);}
-.chip{display:inline-flex;align-items:center;gap:4px;font-size:11px;padding:3px 8px;border-radius:999px;margin:3px 4px 0 0;}
-.muted{color:var(--ink3);font-size:12px;}
+.row{display:flex;align-items:center;gap:10px;padding:9px 11px;border-radius:9px;background:var(--paper);
+ border:2px solid var(--b);margin-bottom:8px;font-size:13px;}
+.tag{font-size:11px;font-weight:700;padding:3px 8px;border-radius:7px;margin-left:auto;white-space:nowrap;
+ border:2px solid var(--b);color:var(--ink);}
+.t-ok{background:var(--mint);color:var(--ink);}
+.t-bad{background:var(--rosa);color:var(--ink);}
+.t-acc{background:var(--sky);color:var(--ink);}
+.t-warn{background:var(--sun);color:var(--ink);}
+.bubble{max-width:80%;padding:9px 12px;font-size:13.5px;border:2px solid var(--b);box-shadow:3px 3px 0 var(--b);}
+.b-lead{align-self:flex-start;background:#fff;border-radius:12px 12px 12px 2px;}
+.b-ag{align-self:flex-end;background:var(--laranjinha);border-radius:12px 12px 2px 12px;}
+input,select,textarea{width:100%;border-radius:8px;border:2px solid var(--b);background:#fff;
+ padding:9px 11px;font:inherit;font-size:13.5px;color:var(--ink);}
+input:focus,select:focus,textarea:focus{outline:none;box-shadow:3px 3px 0 var(--guara);}
+.btn{border:2px solid var(--b);border-radius:9px;padding:9px 14px;font-size:13px;font-weight:700;cursor:pointer;
+ font-family:inherit;box-shadow:3px 3px 0 var(--b);transition:transform .06s,box-shadow .06s;}
+.btn:active{transform:translate(3px,3px);box-shadow:0 0 0 var(--b);}
+.btn-p{background:var(--guara);color:#fff;}
+.btn-v{background:var(--feq);color:#fff;}
+.btn-g{background:#fff;color:var(--ink);}
+.chip{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:700;padding:3px 8px;
+ border-radius:7px;border:1.5px solid var(--b);color:var(--ink);margin:3px 4px 0 0;background:#fff;}
+.muted{color:var(--ink3);font-size:12px;font-weight:400;}
 .conv-shell{display:grid;grid-template-columns:270px 1fr;height:72vh;min-height:420px;overflow:hidden;padding:0;}
-.conv-side{border-right:.5px solid rgba(148,163,184,.35);display:flex;flex-direction:column;overflow:hidden;}
-.conv-search{padding:12px;border-bottom:.5px solid rgba(148,163,184,.25);flex-shrink:0;}
-.conv-search input{width:100%;border-radius:10px;border:.5px solid rgba(148,163,184,.55);background:rgba(255,255,255,.65);padding:8px 10px;font:inherit;font-size:13px;}
+.conv-side{border-right:2px solid var(--b);display:flex;flex-direction:column;overflow:hidden;}
+.conv-search{padding:12px;border-bottom:2px solid var(--b);flex-shrink:0;background:var(--sun);}
+.conv-search input{width:100%;border-radius:8px;border:2px solid var(--b);background:#fff;padding:8px 10px;font:inherit;font-size:13px;}
 .conv-list{overflow-y:auto;flex:1;}
-.conv-item{display:flex;align-items:center;gap:10px;padding:11px 13px;cursor:pointer;border-bottom:.5px solid rgba(148,163,184,.14);}
-.conv-item:hover{background:rgba(255,255,255,.55);}
-.conv-item.on{background:rgba(37,99,235,.12);}
-.conv-ava{width:38px;height:38px;flex-shrink:0;border-radius:50%;background:rgba(83,74,183,.18);color:#3C3489;display:flex;align-items:center;justify-content:center;font-size:12.5px;font-weight:500;}
+.conv-item{display:flex;align-items:center;gap:10px;padding:11px 13px;cursor:pointer;border-bottom:1.5px solid rgba(20,20,20,.18);}
+.conv-item:hover{background:var(--paper);}
+.conv-item.on{background:var(--laranjinha);box-shadow:inset 4px 0 0 var(--guara);}
+.conv-ava{width:38px;height:38px;flex-shrink:0;border-radius:9px;background:var(--sun);border:2px solid var(--b);
+ color:var(--ink);display:flex;align-items:center;justify-content:center;font-size:12.5px;font-weight:700;}
 .conv-meta{min-width:0;flex:1;}
-.conv-nome{font-size:13.5px;font-weight:500;display:flex;justify-content:space-between;gap:6px;}
+.conv-nome{font-size:13.5px;font-weight:700;display:flex;justify-content:space-between;gap:6px;}
 .conv-prev{font-size:12px;color:var(--ink3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px;}
-.conv-dot{width:9px;height:9px;border-radius:50%;background:var(--accent);flex-shrink:0;}
+.conv-dot{width:11px;height:11px;border-radius:50%;background:var(--guara);border:2px solid var(--b);flex-shrink:0;}
 .conv-main{display:flex;flex-direction:column;overflow:hidden;}
-.conv-head{padding:12px 16px;border-bottom:.5px solid rgba(148,163,184,.25);flex-shrink:0;}
-.conv-thread{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:9px;}
+.conv-head{padding:12px 16px;border-bottom:2px solid var(--b);flex-shrink:0;background:var(--paper);}
+.conv-thread{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:11px;}
 .conv-ts{font-size:10px;color:var(--ink3);margin-top:3px;}
-.conv-composer{padding:11px;border-top:.5px solid rgba(148,163,184,.25);display:flex;gap:8px;align-items:flex-end;flex-shrink:0;}
+.conv-composer{padding:11px;border-top:2px solid var(--b);display:flex;gap:8px;align-items:flex-end;flex-shrink:0;background:var(--paper);}
 .conv-composer textarea{resize:none;max-height:110px;}
-.conv-blocked{font-size:12px;color:#991b1b;background:rgba(226,75,74,.10);border-radius:10px;padding:7px 10px;margin:0 11px 9px;}
-.conv-back{display:none;align-items:center;justify-content:center;width:28px;height:28px;flex-shrink:0;border-radius:50%;border:none;background:rgba(148,163,184,.25);cursor:pointer;margin-right:2px;font-size:15px;color:#334155;}
+.conv-blocked{font-size:12px;font-weight:500;color:var(--ink);background:var(--rosa);border:2px solid var(--b);
+ border-radius:9px;padding:7px 10px;margin:0 11px 9px;}
+.conv-back{display:none;align-items:center;justify-content:center;width:30px;height:30px;flex-shrink:0;border-radius:8px;
+ border:2px solid var(--b);background:#fff;cursor:pointer;margin-right:2px;font-size:15px;color:var(--ink);box-shadow:2px 2px 0 var(--b);}
 @media (max-width:900px){
   .conv-shell{grid-template-columns:1fr;}
   .conv-shell:not(.chat-open) .conv-main{display:none;}
   .conv-shell.chat-open .conv-side{display:none;}
   .conv-back{display:inline-flex;}
+  .logos-inst{display:none;}
 }
-.kb-board{display:flex;gap:12px;overflow-x:auto;padding:4px 2px 8px;}
-.kb-col{flex:0 0 210px;background:rgba(255,255,255,.4);border-radius:14px;padding:10px 9px;align-self:flex-start;}
-.kb-col-h{display:flex;justify-content:space-between;align-items:center;font-size:12.5px;font-weight:600;margin:2px 4px 9px;color:var(--ink2);}
-.kb-count{color:var(--ink3);font-weight:500;background:rgba(148,163,184,.2);border-radius:999px;padding:1px 8px;font-size:11px;}
-.kb-card{background:rgba(255,255,255,.72);border-radius:11px;padding:9px 11px;margin-bottom:8px;cursor:pointer;border:.5px solid rgba(148,163,184,.3);transition:border-color .12s;}
-.kb-card:hover{border-color:var(--accent);}
-.kb-nome{font-size:13px;font-weight:500;display:flex;align-items:center;gap:7px;}
+.kb-board{display:flex;gap:14px;overflow-x:auto;padding:4px 2px 10px;}
+.kb-col{flex:0 0 214px;background:var(--paper);border:2px solid var(--b);border-radius:11px;
+ box-shadow:4px 4px 0 var(--b);padding:10px 9px;align-self:flex-start;}
+.kb-col-h{display:flex;justify-content:space-between;align-items:center;font-size:12.5px;font-weight:700;
+ text-transform:uppercase;letter-spacing:.04em;margin:2px 4px 9px;color:var(--ink);}
+.kb-count{color:var(--ink);font-weight:700;background:var(--sun);border:1.5px solid var(--b);border-radius:7px;padding:1px 8px;font-size:11px;}
+.kb-card{background:#fff;border:2px solid var(--b);border-radius:9px;padding:9px 11px;margin-bottom:9px;cursor:pointer;
+ transition:transform .06s,box-shadow .06s;}
+.kb-card:hover{transform:translate(-2px,-2px);box-shadow:3px 3px 0 var(--b);}
+.kb-nome{font-size:13px;font-weight:700;display:flex;align-items:center;gap:7px;}
 .kb-sub{font-size:11px;color:var(--ink3);margin-top:3px;}
 .kb-badges{display:flex;flex-wrap:wrap;gap:4px;margin-top:7px;}
 .kb-empty{color:var(--ink3);font-size:11.5px;padding:6px 4px;}
 </style>
 </head>
 <body>
-<div id="login" style="display:none;position:fixed;inset:0;background:rgba(30,41,59,.35);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);align-items:center;justify-content:center;z-index:50;">
-  <div class="g" style="padding:22px;width:300px;">
-    <div style="font-weight:500;margin-bottom:12px;"><i class="ti ti-lock"></i> Central FEQ — acesso</div>
+<div id="login" style="display:none;position:fixed;inset:0;background:rgba(20,20,20,.55);align-items:center;justify-content:center;z-index:50;">
+  <div class="g" style="padding:24px;width:320px;box-shadow:9px 9px 0 var(--b);text-align:center;">
+    <img src="/assets/guara.png" alt="Guará Marketing" style="width:64px;height:64px;object-fit:contain;margin-bottom:6px;">
+    <div style="font-weight:700;font-size:16px;margin-bottom:14px;">Central FEQ — acesso</div>
     <input id="lu" placeholder="usuário" style="margin-bottom:8px;">
     <input id="lp" type="password" placeholder="senha" style="margin-bottom:12px;">
     <button class="btn btn-p" style="width:100%;" onclick="login()">Entrar</button>
-    <div id="lerr" class="muted" style="color:#991b1b;margin-top:8px;"></div>
+    <div id="lerr" class="muted" style="color:var(--bad);margin-top:8px;"></div>
   </div>
 </div>
 <div class="wrap">
   <div class="top">
     <div class="brand">
-      <div class="logo"><i class="ti ti-shield-bolt"></i></div>
+      <img class="logo" src="/assets/guara.png" alt="Guará Marketing">
       <div>
-        <div style="font-weight:500;">Central de Operação · Extensão FEQ</div>
-        <div class="muted">Atena · captação de alunos Unicamp</div>
+        <div class="brand-title">Central de Operação · Extensão FEQ</div>
+        <div class="muted">Atena · Guará Marketing × FEQ Unicamp</div>
       </div>
     </div>
-    <div style="display:flex;align-items:center;gap:10px;">
-      <button id="autoTgl" class="pill" style="border:none;cursor:pointer;font-family:inherit;background:rgba(148,163,184,.25);color:#334155;" onclick="toggleAuto()"><i class="ti ti-bolt"></i> aprovação automática: OFF</button>
-      <span class="pill" style="background:rgba(16,158,117,.16);color:#04342C;"><i class="ti ti-circle-filled" style="font-size:9px;"></i> sistema ativo</span>
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+      <div class="logos-inst">
+        <span class="logo-plaque"><img src="/assets/feq.png" alt="FEQ"></span>
+        <span class="logo-plaque"><img src="/assets/unicamp.svg" alt="Unicamp"></span>
+      </div>
+      <button id="autoTgl" class="pill" style="cursor:pointer;font-family:inherit;background:#fff;" onclick="toggleAuto()"><i class="ti ti-bolt"></i> aprovação automática: OFF</button>
+      <span class="pill" style="background:var(--mint);"><i class="ti ti-circle-filled" style="font-size:9px;"></i> sistema ativo</span>
     </div>
   </div>
 
@@ -257,7 +297,7 @@ async function carregar(){
   $('#hoje').textContent = '· ' + cap.hoje.split('-').reverse().join('/');
   $('#capt').innerHTML = cap.cursos.map(c=>{
     const cls = c.status==='aberta'?'t-ok':(c.status==='encerrada'?'t-bad':'t-warn');
-    const al = c.alerta?` <i class="ti ti-alert-triangle" title="${c.alerta}" style="color:#854f0b;"></i>`:'';
+    const al = c.alerta?` <i class="ti ti-alert-triangle" title="${c.alerta}" style="color:var(--warn);"></i>`:'';
     return `<div class="row"><strong>${c.curso}</strong>${al}<span style="color:var(--ink2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${c.nome}</span><span class="tag ${cls}">${c.status}</span></div>`;
   }).join('');
 
@@ -276,7 +316,7 @@ async function carregar(){
     $('#dvs').innerHTML = dv.length ? dv.map(d=>`
       <div class="g" style="padding:12px 14px;margin-bottom:10px;">
         <div style="display:flex;align-items:center;gap:8px;font-size:13px;">
-          <i class="ti ti-help-circle" style="color:#854f0b;"></i>
+          <i class="ti ti-help-circle" style="color:var(--warn);"></i>
           <strong>${d.pergunta}</strong>
           <span class="muted" style="margin-left:auto;">${d.lead} · ${d.curso} · ${(d.criado||'').slice(11,16)}</span>
         </div>
@@ -316,7 +356,7 @@ async function testarRevisor(){
   const head = r.aprovado
     ? `<span class="tag t-ok"><i class="ti ti-check"></i> aprovado</span>`
     : `<span class="tag t-bad"><i class="ti ti-ban"></i> bloqueado</span>`;
-  const bl = (r.bloqueios||[]).map(b=>`<div class="row" style="background:rgba(226,75,74,.10);"><i class="ti ti-alert-triangle" style="color:#991b1b;"></i><span>${b}</span></div>`).join('');
+  const bl = (r.bloqueios||[]).map(b=>`<div class="row" style="background:var(--rosa);"><i class="ti ti-alert-triangle" style="color:var(--bad);"></i><span>${b}</span></div>`).join('');
   const an = (r.ancoras||[]).map(a=>`<span class="chip t-ok"><i class="ti ti-check"></i> ${a}</span>`).join('');
   $('#rout').innerHTML = `<div style="margin-bottom:8px;">${head}</div>${bl}${an?('<div style="margin-top:6px;">'+an+'</div>'):''}`;
 }
@@ -335,8 +375,8 @@ function renderProposta(p){
     : (p.status==='esclarecer'
         ? `<span class="tag t-warn"><i class="ti ti-help"></i> precisa de esclarecimento</span>`
         : `<span class="tag t-bad"><i class="ti ti-ban"></i> ${p.status}</span>`);
-  const diff = (p.diff||[]).map(d=>`<div class="row"><i class="ti ti-arrow-right"></i><span><strong>${d.campo}</strong>: <span style="color:#991b1b;">${d.de??'—'}</span> → <span style="color:#04342C;">${d.para}</span></span></div>`).join('');
-  const imp = (p.impacto||[]).map(i=>`<div class="row t-acc" style="background:rgba(37,99,235,.08);"><i class="ti ti-bolt"></i><span>${i}</span></div>`).join('');
+  const diff = (p.diff||[]).map(d=>`<div class="row"><i class="ti ti-arrow-right"></i><span><strong>${d.campo}</strong>: <span style="color:var(--bad);">${d.de??'—'}</span> → <span style="color:var(--ok);font-weight:700;">${d.para}</span></span></div>`).join('');
+  const imp = (p.impacto||[]).map(i=>`<div class="row t-acc" style="background:var(--sky);"><i class="ti ti-bolt"></i><span>${i}</span></div>`).join('');
   const aprovar = p.status==='proposta'
     ? `<div style="margin-top:10px;display:flex;gap:8px;"><button class="btn btn-p" onclick="aprovarProposta('${p.id}')"><i class="ti ti-check"></i> Aprovar e aplicar</button><button class="btn btn-g" onclick="api('/api/injetor/${p.id}/rejeitar',{method:'POST'}).then(()=>{$('#injout').innerHTML='';carregar();})">Rejeitar</button></div>`
     : '';
@@ -347,8 +387,8 @@ function renderProposta(p){
 
 async function aprovarProposta(pid){
   const r = await api('/api/injetor/'+pid+'/aprovar',{method:'POST'});
-  if(r.ok){ $('#injout').innerHTML = `<div class="row t-ok" style="background:rgba(16,158,117,.10);"><i class="ti ti-circle-check"></i><span>Aplicado e versionado (${r.versao.versao}). Ontologia recarregada.</span></div>`; carregar(); }
-  else { $('#injout').innerHTML = `<div class="row t-bad" style="background:rgba(226,75,74,.10);"><i class="ti ti-ban"></i><span>${r.erro}</span></div>`; }
+  if(r.ok){ $('#injout').innerHTML = `<div class="row t-ok" style="background:var(--mint);"><i class="ti ti-circle-check"></i><span>Aplicado e versionado (${r.versao.versao}). Ontologia recarregada.</span></div>`; carregar(); }
+  else { $('#injout').innerHTML = `<div class="row t-bad" style="background:var(--rosa);"><i class="ti ti-ban"></i><span>${r.erro}</span></div>`; }
 }
 
 async function verificar(id, sim){
@@ -404,7 +444,7 @@ async function moverFase(id, fase){
 async function reativarLead(id){
   const r = await api('/api/leads/'+id+'/reativar',{method:'POST'});
   if(r.envio && !r.envio.ok){ marcarErro(id, {}, 'não reativado — '+(r.envio.motivo||'')); return; }
-  CONV_ERRO = {id, html:'<div class="conv-blocked" style="color:#04342C;background:rgba(16,158,117,.12);"><i class="ti ti-check"></i> Reengajamento enviado.</div>'};
+  CONV_ERRO = {id, html:'<div class="conv-blocked" style="background:var(--mint);"><i class="ti ti-check"></i> Reengajamento enviado.</div>'};
   aposAcao();
 }
 
@@ -417,7 +457,7 @@ function renderListaConv(){
       <div class="conv-ava">${c.iniciais}</div>
       <div class="conv-meta">
         <div class="conv-nome"><span>${escapeHtml(c.lead||c.id)}</span><span class="muted" style="font-size:10.5px;">${c.ha}</span></div>
-        <div class="conv-prev">${c.pendente?'<i class="ti ti-robot" style="color:#1d4ed8;"></i> proposta pronta para aprovação':(escapeHtml(c.preview)||'(sem mensagens)')}</div>
+        <div class="conv-prev">${c.pendente?'<i class="ti ti-robot" style="color:var(--guara);"></i> proposta pronta para aprovação':(escapeHtml(c.preview)||'(sem mensagens)')}</div>
       </div>
       ${(c.aguardando||c.pendente)?'<div class="conv-dot" title="aguardando você"></div>':''}
       ${c.optout?'<span class="chip t-bad" style="margin:0;">opt-out</span>':''}
@@ -479,7 +519,7 @@ function renderChrome(d){
         <button class="conv-back" onclick="fecharConversa()" title="Voltar"><i class="ti ti-arrow-left"></i></button>
         <div class="conv-ava">${d.iniciais}</div>
         <div><div style="font-weight:500;font-size:13.5px;">${escapeHtml(d.lead||d.id)}</div>
-        <div class="muted"><span id="convCurso">${d.curso}</span> · <span id="convEstado">${d.estado}</span>${d.optout?' · <span style="color:#991b1b;">opt-out</span>':''}</div></div>
+        <div class="muted"><span id="convCurso">${d.curso}</span> · <span id="convEstado">${d.estado}</span>${d.optout?' · <span style="color:var(--bad);">opt-out</span>':''}</div></div>
         <div style="margin-left:auto;display:flex;gap:6px;align-items:center;">
           <select id="convFaseSel" title="mover fase" style="width:auto;padding:5px 8px;font-size:12px;" onchange="moverFase('${d.id}',this.value)">
             ${['Lead','Prospect','Inscrito','Matriculado','Em espera','Perdido'].map(f=>`<option ${f===d.fase?'selected':''}>${f}</option>`).join('')}
@@ -488,7 +528,7 @@ function renderChrome(d){
         </div>
       </div>
     </div>
-    <div id="convCursos" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:7px 14px;border-bottom:.5px solid rgba(148,163,184,.2);font-size:12px;flex-shrink:0;"></div>
+    <div id="convCursos" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:7px 14px;border-bottom:2px solid var(--b);background:var(--paper);font-size:12px;flex-shrink:0;"></div>
     <div class="conv-thread" id="convThread"></div>
     <div id="convErro"></div>
     ${d.optout
@@ -504,7 +544,7 @@ function barraCursosHTML(d){
   const cursos = d.cursos || [d.curso];
   const chips = cursos.map(c => c===d.curso
     ? `<span class="chip t-acc" style="margin:0;" title="curso ativo — o agente conversa este">${c} ★</span>`
-    : `<span class="chip" style="margin:0;background:rgba(148,163,184,.2);cursor:pointer;" title="tornar ativo" onclick="tornarAtivo('${d.id}','${c}')">${c}</span>`).join(' ');
+    : `<span class="chip" style="margin:0;background:var(--paper);cursor:pointer;" title="tornar ativo" onclick="tornarAtivo('${d.id}','${c}')">${c}</span>`).join(' ');
   const opts = (window.CURSOS_ALL||[]).filter(x=>!cursos.includes(x)).map(x=>`<option value="${x}">${x}</option>`).join('');
   return `<span class="muted">Interesse:</span> ${chips}
     <select onchange="addInteresse('${d.id}',this.value)" style="width:auto;padding:3px 7px;font-size:11.5px;margin-left:2px;"><option value="">+ curso…</option>${opts}</select>`;
@@ -538,12 +578,12 @@ function renderMensagens(d){
   }).join('');
   const prop = d.proposta?`
     <div class="bubble b-ag" style="align-self:flex-end;border-style:dashed;">
-      <div style="font-size:11px;color:#1d4ed8;margin-bottom:4px;"><i class="ti ti-robot"></i> proposta · aguardando você</div>${escapeHtml(d.proposta)}
+      <div style="font-size:11px;color:var(--guara);margin-bottom:4px;"><i class="ti ti-robot"></i> proposta · aguardando você</div>${escapeHtml(d.proposta)}
       <div style="margin-top:6px;"><span class="chip t-ok"><i class="ti ti-check"></i> revisor ok</span></div>
       <div style="margin-top:8px;display:flex;gap:7px;">
         <button class="btn btn-p" style="padding:6px 11px;" onclick="aprovarMsg('${d.id}')"><i class="ti ti-send"></i> Aprovar</button>
         <button class="btn btn-g" style="padding:6px 11px;" onclick="editarMsg('${d.id}')">Editar</button>
-        <button class="btn btn-g" style="padding:6px 11px;color:#991b1b;" onclick="api('/api/conversas/${d.id}/recusar',{method:'POST'}).then(aposAcao)">Recusar</button>
+        <button class="btn btn-g" style="padding:6px 11px;color:var(--bad);" onclick="api('/api/conversas/${d.id}/recusar',{method:'POST'}).then(aposAcao)">Recusar</button>
       </div></div>`:'';
   const perto = th.scrollHeight - th.scrollTop - th.clientHeight < 80;   // usuário estava perto do fim?
   th.innerHTML = (fios || '<div class="muted" style="margin:auto;">Sem mensagens ainda.</div>') + prop;
@@ -596,8 +636,8 @@ let AUTO=false;
 function pintaAuto(){
   const b=document.getElementById('autoTgl');
   b.innerHTML='<i class="ti ti-bolt"></i> aprovação automática: '+(AUTO?'ON':'OFF');
-  b.style.background=AUTO?'rgba(239,159,39,.25)':'rgba(148,163,184,.25)';
-  b.style.color=AUTO?'#633806':'#334155';
+  b.style.background=AUTO?'var(--sun)':'#fff';
+  b.style.color='var(--ink)';
 }
 async function toggleAuto(){
   const r=await api('/api/config',{method:'POST',headers:{'Content-Type':'application/json'},
@@ -651,7 +691,7 @@ async function usrListar(){
       <span class="chip ${u.papel==='supervisor'?'t-warn':'t-acc'}">${u.papel}</span>
       ${u.ativo? '' : '<span class="chip t-bad">desativado</span>'}
       <span class="muted" style="margin-left:auto;">${(u.criado||'').slice(0,10)}</span>
-      ${u.ativo? `<button class="btn btn-g" style="padding:4px 9px;color:#991b1b;" onclick="api('/api/usuarios/${u.usuario}/desativar',{method:'POST'}).then(usrListar)">Desativar</button>`:''}
+      ${u.ativo? `<button class="btn btn-g" style="padding:4px 9px;color:var(--bad);" onclick="api('/api/usuarios/${u.usuario}/desativar',{method:'POST'}).then(usrListar)">Desativar</button>`:''}
     </div>`).join('') : '<div class="muted">Nenhum usuário criado — o acesso operador/operador (bootstrap) está ativo. Crie o seu primeiro usuário.</div>';
 }
 async function usrCriar(){

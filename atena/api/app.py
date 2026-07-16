@@ -98,6 +98,12 @@ def index():
     return send_from_directory(WEB, "index.html")
 
 
+@app.route("/assets/<path:arq>")
+def assets(arq):
+    """Logos e estáticos da Central (públicos — a tela de login também usa)."""
+    return send_from_directory(str(WEB / "assets"), arq)
+
+
 @app.route("/api/stats")
 def stats():
     f = EST.stats_funil()
