@@ -221,6 +221,35 @@ est5.add_conversa("c7", "lead", "tive um problema no site")   # respondeu APÓS 
 r = funil.recuperar(g5, est5, FakeOnt(), wa5, agora=AGORA + datetime.timedelta(days=30))
 check("c7" not in r["enviados"], "lead que respondeu após o checkout sai da régua (cérebro cuida)")
 
+# --- aba Verificação: fila + veredito do operador fecha o loop (spec 17 §8b) ------
+g6, est6, wa6 = Growth(":memory:"), Estado(":memory:"), FakeWA()
+est6.upsert_lead("v1", nome="Vera", telefone="+5519977770001", curso="FEQ-0480")
+g6.add_evento("v1", "FEQ-0480", "inicio_inscricao",
+              ts=(AGORA - datetime.timedelta(minutes=10)).isoformat())
+check([p["card_id"] for p in g6.verificacoes_pendentes()] == ["v1"],
+      "lead da ponte sem desfecho entra na fila de verificação")
+r = funil.ativar_um(g6, est6, FakeOnt(), wa6, "v1", agora=AGORA)
+check(r["ok"] and r["toque"] == 1 and wa6.enviados[0][1] == "feq_lead",
+      "'não inscreveu' -> 1º toque AGORA (10min após o checkout, sem esperar as 2h)")
+g6.add_evento("v1", "FEQ-0480", "verificacao_negativa")
+check(g6.verificacoes_pendentes() == [] and
+      [p["card_id"] for p in g6.checkouts_pendentes()] == ["v1"],
+      "verificacao_negativa: sai da fila de verificação mas SEGUE na régua")
+r = funil.recuperar(g6, est6, FakeOnt(), wa6, agora=AGORA + datetime.timedelta(hours=3))
+check(r["enviados"] == [], "régua respeita a espera do 2º toque (24h) após a ativação imediata")
+r = funil.recuperar(g6, est6, FakeOnt(), wa6, agora=AGORA + datetime.timedelta(hours=25))
+check(r["enviados"] == ["v1"] and wa6.enviados[-1][1] == "feq_lembrete_inscricao",
+      "24h depois a régua continua do toque 2 (cadência não recomeça)")
+est6.upsert_lead("v2", nome="Otto", telefone="+5519977770002", curso="FEQ-0480", optout=1)
+g6.add_evento("v2", "FEQ-0480", "inicio_inscricao", ts=AGORA.isoformat())
+check(not funil.ativar_um(g6, est6, FakeOnt(), wa6, "v2", agora=AGORA)["ok"],
+      "ativação imediata respeita opt-out (guarda de conteúdo vale sempre)")
+check(not funil.ativar_um(g6, est6, FakeOnt(), wa6, "v-nao-existe", agora=AGORA)["ok"],
+      "card sem checkout pendente -> ativação recusada com motivo")
+g6.add_evento("v1", "FEQ-0480", "inscricao_confirmada")
+check("v1" not in [p["card_id"] for p in g6.checkouts_pendentes()],
+      "'inscreveu' (inscricao_confirmada) tira o lead da régua e da fila")
+
 # --- render da LP: tokens preenchidos, modal, CTAs e destino ---------------------
 lp = ponte.render(g5, FakeOnt(), "FEQ-0480")
 check(lp and "{{" not in lp, "LP renderiza sem tokens {{...}} sobrando")

@@ -138,6 +138,27 @@ na LP no momento do modal — é isso que liga a conversão à campanha original
 maximiza o Event Match Quality. Enviar em até 7 dias (janela de atribuição);
 `GROWTH_TEST_EVENT_CODE` para homologar no Test Events antes de valer.
 
+## 8b. Verificação humana do desfecho (fecha o loop da LP)
+
+O lead da ponte declara intenção (modal) e é redirecionado à Extecamp — mas a
+inscrição em si acontece num sistema que não emite webhook para nós. O loop fecha
+com o operador: a Central ganha a aba **Verificação**, que lista todo lead vindo
+da LP (`inicio_inscricao`/`boleto_gerado` registrado) ainda **sem** conversão
+confirmada e **sem** veredito humano. Para cada um, o operador confere no sistema
+da Extecamp se a inscrição foi concluída e registra o desfecho:
+
+| Veredito | Efeito |
+|---|---|
+| **Inscreveu** | Mesmo caminho do kanban (§8): fase → **Inscrito**, espelho no FARO, `inscricao_confirmada` na CAPI (idempotente). Sai da fila e da régua. |
+| **Não inscreveu** | Continua **Lead**; evento `verificacao_negativa` tira o card da fila (não da régua) e o agente dispara o **1º toque da cadência do §7 imediatamente** — sem esperar as 2h do relógio. Os toques seguintes continuam pelo relógio normal. |
+
+A ativação imediata usa o MESMO código da régua (`funil._toque`): guardas de
+opt-out, captabilidade e "lead já respondeu → cérebro cuida" valem igual; só os
+gatilhos de tempo são pulados (o gatilho aqui é o gesto do operador, não o
+relógio). Endpoints: `GET /api/verificacao` (fila com nome/telefone/curso/quando)
+e `POST /api/leads/<id>/verificar` `{inscrito: true|false}`. Toda decisão é
+auditada (`log_acao`).
+
 ## 9. Critérios de aceitação
 
 1. LP renderiza com as 8 seções ancoradas, botão WhatsApp e destino `/curso/inscricao/`.
@@ -150,3 +171,6 @@ maximiza o Event Match Quality. Enviar em até 7 dias (janela de atribuição);
 5. Deploy WP publica fragmento em bloco wp:html, valida os scripts publicados e
    falha ruidosamente se o WP os remover; sem credenciais, dry-run.
 6. Tudo roda em dry-run sem tokens.
+7. Lead da ponte sem conversão aparece na aba Verificação; "inscreveu" move a
+   Inscrito (+CAPI); "não inscreveu" registra `verificacao_negativa`, mantém Lead
+   e envia o 1º toque na hora (guardas de opt-out/captável/respondeu preservadas).

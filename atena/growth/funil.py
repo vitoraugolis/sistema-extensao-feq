@@ -120,10 +120,44 @@ def _horas(ts, agora):
         return None
 
 
+def _toque(g, est, ont, wa, p, agora):
+    """Envia o PRÓXIMO toque da cadência pro pendente p, sem checar tempos —
+    o gatilho é de quem chama (relógio na régua, gesto do operador na aba
+    Verificação). Guardas de conteúdo valem sempre: teto de toques, opt-out,
+    lead que respondeu (cérebro cuida) e captabilidade. Retorna card_id se
+    enviou; None caso contrário."""
+    if p["toques"] >= MAX_TOQUES:
+        return None
+    lead = est.get_lead(p["card_id"])
+    if not lead or lead.get("optout"):
+        return None
+    falou = est.ultima_lead_ts(p["card_id"])
+    if falou and falou > p["ultimo_checkout"]:
+        return None   # respondeu no WhatsApp após o checkout: cérebro cuida, régua não
+    if not ont.captavel(p["curso"]).get("captavel"):
+        return None
+    tpl, _ = CADENCIA[p["toques"]]
+    c = ont.curso(p["curso"])
+    # parâmetro vazio a Meta rejeita -> fallback "breve" quando não há prazo na ontologia
+    prazo = "/".join(reversed((c.get("inscricoes_fim") or "").split("-"))) or "breve"
+    nome_curso = f"{c['nome']} ({c['codigo']})"
+    params = [lead.get("nome") or "olá", nome_curso] if tpl == "feq_lead" \
+        else [lead.get("nome") or "olá", nome_curso, prazo]
+    r = wa.enviar_template(lead["telefone"], tpl, params=params)
+    if not r.get("ok"):
+        return None
+    g.add_evento(p["card_id"], p["curso"], "recuperacao_enviada",
+                 ts=agora.isoformat(timespec="seconds"))
+    est.add_conversa(p["card_id"], "agente",
+                     f"[recuperação de inscrição — template {tpl}] prazo {prazo}",
+                     wamid=r.get("wamid"), status="enviado")
+    return p["card_id"]
+
+
 def recuperar(g, est, ont, wa, agora=None):
     """Uma passada da régua de recuperação: checkout sem conversão -> template
     aprovado (espera por tipo: ponte 2h, boleto 24h). Lead que RESPONDEU depois
-    do checkout sai da régua (a conversa é do cérebro). Máx. 3 toques, >=48h."""
+    do checkout sai da régua (a conversa é do cérebro). Máx. 5 toques."""
     agora = agora or datetime.datetime.now()
     enviados = []
     for p in g.checkouts_pendentes():
@@ -134,32 +168,26 @@ def recuperar(g, est, ont, wa, agora=None):
         espera = RECUPERAR_APOS_H.get(p.get("tipo_checkout"), 24)
         if h is None or h < espera or p["toques"] >= MAX_TOQUES:
             continue
-        tpl, espera_toque = CADENCIA[p["toques"]]
+        espera_toque = CADENCIA[p["toques"]][1]
         ht = _horas(p["ultimo_toque"], agora)
         if espera_toque is not None and ht is not None and ht < espera_toque:
             continue
-        lead = est.get_lead(p["card_id"])
-        if not lead or lead.get("optout"):
-            continue
-        falou = est.ultima_lead_ts(p["card_id"])
-        if falou and falou > p["ultimo_checkout"]:
-            continue   # respondeu no WhatsApp após o checkout: cérebro cuida, régua não
-        if not ont.captavel(p["curso"]).get("captavel"):
-            continue
-        c = ont.curso(p["curso"])
-        # parâmetro vazio a Meta rejeita -> fallback "breve" quando não há prazo na ontologia
-        prazo = "/".join(reversed((c.get("inscricoes_fim") or "").split("-"))) or "breve"
-        nome_curso = f"{c['nome']} ({c['codigo']})"
-        params = [lead.get("nome") or "olá", nome_curso] if tpl == "feq_lead" \
-            else [lead.get("nome") or "olá", nome_curso, prazo]
-        r = wa.enviar_template(lead["telefone"], tpl, params=params)
-        if r.get("ok"):
-            g.add_evento(p["card_id"], p["curso"], "recuperacao_enviada",
-                         ts=agora.isoformat(timespec="seconds"))
-            est.add_conversa(p["card_id"], "agente",
-                             f"[recuperação de inscrição — template {tpl}] prazo {prazo}",
-                             wamid=r.get("wamid"), status="enviado")
+        if _toque(g, est, ont, wa, p, agora):
             enviados.append(p["card_id"])
     if enviados:
         est.log_acao("growth", f"recuperacao: {len(enviados)} toque(s) — {', '.join(enviados)}")
     return {"enviados": enviados}
+
+
+def ativar_um(g, est, ont, wa, card_id, agora=None):
+    """Ativação imediata (aba Verificação, spec 17 §8b): o operador conferiu na
+    Extecamp que o lead NÃO se inscreveu -> próximo toque da cadência AGORA,
+    pulando só os gatilhos de tempo (as guardas de conteúdo continuam)."""
+    agora = agora or datetime.datetime.now()
+    p = next((x for x in g.checkouts_pendentes() if x["card_id"] == card_id), None)
+    if not p:
+        return {"ok": False, "motivo": "sem checkout pendente (já converteu ou nunca iniciou)"}
+    if _toque(g, est, ont, wa, p, agora):
+        return {"ok": True, "toque": p["toques"] + 1}
+    return {"ok": False,
+            "motivo": "não enviado (teto de toques, opt-out, lead já respondeu ou curso encerrado)"}

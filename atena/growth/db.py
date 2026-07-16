@@ -159,6 +159,14 @@ class Growth:
                                   WHERE tipo IN ('inscricao_confirmada','matricula_confirmada'))
             GROUP BY card_id""")]
 
+    def verificacoes_pendentes(self):
+        """Fila da aba Verificação (spec 17 §8b): checkouts sem conversão E sem
+        veredito humano. 'Não inscreveu' grava verificacao_negativa e sai daqui
+        (mas segue na régua); 'Inscreveu' grava inscricao_confirmada e sai das duas."""
+        negs = {r[0] for r in self.conn.execute(
+            "SELECT DISTINCT card_id FROM eventos_funil WHERE tipo='verificacao_negativa'")}
+        return [p for p in self.checkouts_pendentes() if p["card_id"] not in negs]
+
     # --------------------------------------------------- telemetria da LP
     def upsert_lp_sessao(self, d):
         """Resumo de sessão da LP (beacon). Upsert por sessao_id preservando o

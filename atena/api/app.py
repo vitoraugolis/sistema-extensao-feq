@@ -207,6 +207,27 @@ def kanban():
     return jsonify({"colunas": [{"fase": f, "leads": cols[f]} for f in FASES]})
 
 
+def _mover_fase(lead, card_id, fase):
+    """Núcleo do move de fase (kanban E aba Verificação): estado + espelho FARO +
+    conversão offline idempotente (spec 17 §8). Retorna o event_id CAPI ou None."""
+    EST.set_lead(card_id, fase=fase)
+    if lead.get("faro_id") and ORQ.faro.ativo:
+        try:
+            ORQ.faro.mover(lead["faro_id"], fase)
+        except Exception as e:
+            print(f"[faro] mover falhou: {e}", flush=True)
+    # Conversão offline (spec 17 §8): o gesto do operador É o reporte à Meta.
+    tipo = {"Inscrito": "inscricao_confirmada", "Matriculado": "matricula_confirmada"}.get(fase)
+    if not tipo or any(e["tipo"] == tipo for e in GRW.eventos(card_id=card_id)):
+        return None
+    try:
+        c = ONTO.ont.curso(lead.get("curso") or "")
+    except Exception:
+        c = None
+    valor = growth_funil.valor_curso(c) if tipo == "matricula_confirmada" else None
+    return growth_funil.registrar(GRW, ADS, EST, card_id, tipo, valor=valor).get("capi")
+
+
 @app.route("/api/leads/<card_id>/mover", methods=["POST"])
 def lead_mover(card_id):
     """Move manual de fase (override humano). Espelha no FARO se ativo."""
@@ -216,25 +237,46 @@ def lead_mover(card_id):
     fase = (request.get_json(silent=True) or {}).get("fase", "")
     if fase not in FASES:
         return jsonify({"erro": "fase inválida"}), 400
-    EST.set_lead(card_id, fase=fase)
-    if lead.get("faro_id") and ORQ.faro.ativo:
-        try:
-            ORQ.faro.mover(lead["faro_id"], fase)
-        except Exception as e:
-            print(f"[faro] mover falhou: {e}", flush=True)
+    capi = _mover_fase(lead, card_id, fase)
     EST.log_acao(session.get("usuario", "operador"), f"mover fase -> {fase}", card_id)
-    # Conversão offline (spec 17 §8): o gesto do operador É o reporte à Meta.
-    capi = None
-    tipo = {"Inscrito": "inscricao_confirmada", "Matriculado": "matricula_confirmada"}.get(fase)
-    if tipo and not any(e["tipo"] == tipo for e in GRW.eventos(card_id=card_id)):
-        try:
-            c = ONTO.ont.curso(lead.get("curso") or "")
-        except Exception:
-            c = None
-        valor = growth_funil.valor_curso(c) if tipo == "matricula_confirmada" else None
-        capi = growth_funil.registrar(GRW, ADS, EST, card_id, tipo,
-                                      valor=valor).get("capi")
     return jsonify({"ok": True, "fase": fase, "conversao_offline": capi})
+
+
+@app.route("/api/verificacao")
+def verificacao_lista():
+    """Fila da aba Verificação (spec 17 §8b): leads da LP que seguiram pra
+    Extecamp e ainda não têm desfecho — nem conversão, nem veredito humano."""
+    out = []
+    for p in GRW.verificacoes_pendentes():
+        l = EST.get_lead(p["card_id"]) or {}
+        out.append({**p, "nome": l.get("nome"), "telefone": l.get("telefone"),
+                    "fase": l.get("fase")})
+    out.sort(key=lambda x: x.get("ultimo_checkout") or "", reverse=True)
+    return jsonify(out)
+
+
+@app.route("/api/leads/<card_id>/verificar", methods=["POST"])
+def lead_verificar(card_id):
+    """Veredito do operador após conferir no sistema da Extecamp (spec 17 §8b):
+    inscrito=true -> fase Inscrito (+CAPI offline, mesmo caminho do kanban);
+    inscrito=false -> continua Lead, sai da fila (verificacao_negativa) e recebe
+    o próximo toque da cadência AGORA. Fecha o loop da LP."""
+    lead = EST.get_lead(card_id)
+    if not lead:
+        return jsonify({"erro": "lead inexistente"}), 404
+    b = request.get_json(silent=True) or {}
+    if not isinstance(b.get("inscrito"), bool):
+        return jsonify({"erro": "faltou 'inscrito' (true/false)"}), 400
+    usuario = session.get("usuario", "operador")
+    if b["inscrito"]:
+        capi = _mover_fase(lead, card_id, "Inscrito")
+        EST.log_acao(usuario, "verificação Extecamp: inscrito ✓", card_id)
+        return jsonify({"ok": True, "fase": "Inscrito", "conversao_offline": capi})
+    GRW.add_evento(card_id, lead.get("curso") or "", "verificacao_negativa")
+    r = growth_funil.ativar_um(GRW, EST, ONTO.ont, WA, card_id)
+    EST.log_acao(usuario, "verificação Extecamp: NÃO inscrito -> ativação imediata "
+                          f"({'toque enviado' if r.get('ok') else r.get('motivo', '?')})", card_id)
+    return jsonify({"ok": True, "fase": lead["fase"], "ativacao": r})
 
 
 @app.route("/api/leads/<card_id>/reativar", methods=["POST"])
