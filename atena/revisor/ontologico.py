@@ -41,11 +41,16 @@ def _ancoras_escopo(codigo, texto, ont):
 def revisar_estrutural(codigo, texto, ont, fonte_extra=None):
     """Passada determinística, sem rede. Retorna {aprovado, bloqueios, ancoras}.
     `fonte_extra`: texto autorizado por humano (ex.: resposta da coordenação) cujos
-    fatos viram âncoras válidas para ESTA mensagem (proveniência humana)."""
+    fatos viram âncoras válidas para ESTA mensagem (proveniência humana).
+    Sem curso associado (lead fora da base — ex.: número desconhecido que chegou
+    pelo botão de WhatsApp sem campanha): NÃO bloqueia de cara. Aprova mensagens
+    sem afirmação factual (preço/data/carga/parcela) — não há o que verificar,
+    então não há o que alucinar. Qualquer afirmação desse tipo, porém, segue
+    bloqueada: sem âncora pra checar, o valor cai fora dos conjuntos abaixo e os
+    passos 1-4 barram normalmente."""
     ancs = _ancoras_escopo(codigo, texto, ont)
-    if not ancs:
-        return {"aprovado": False, "bloqueios": [f"Curso '{codigo}' não está na base."], "ancoras": []}
-    escopo = "/".join(a["codigo"] for a in ancs)
+    escopo = "/".join(a["codigo"] for a in ancs) or (
+        f"curso '{codigo}' desconhecido" if codigo else "nenhum curso associado")
     money = set().union(*(a["money"] for a in ancs))
     datas = set().union(*(a["datas"] for a in ancs))
     cargas = {a["carga_horas"] for a in ancs if a["carga_horas"] is not None}

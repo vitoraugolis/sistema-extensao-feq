@@ -75,6 +75,41 @@ def test_curso_inexistente_citado_fail_closed():
     assert not _ok("FEQ-0480", "O FEQ-9999 custa R$ 500,00.")
 
 
+# ------------------------- lead fora da base (spec: botão de WhatsApp sem curso) ---
+# Sem curso associado (card novo do WhatsApp, número desconhecido, curso="" —
+# ver atena/transporte/whatsapp.py) o operador precisa poder responder perguntas
+# gerais. Bloquear TUDO só por faltar curso (comportamento antigo) impedia até
+# um "oi, tudo bem?" de sair. Sem afirmação factual = nada pra verificar = aprova;
+# com afirmação factual = continua fail-closed (não tem âncora pra checar).
+def test_sem_curso_mensagem_neutra_aprovada():
+    assert _ok("", "Oi! Tudo bem? Qual curso é do seu interesse?")
+
+
+def test_sem_curso_pergunta_generica_aprovada():
+    assert _ok("", "Temos cursos de extensão e formação de especialistas na área de "
+                    "Engenharia Química. Me conta o que você procura que te ajudo a escolher!")
+
+
+def test_sem_curso_com_preco_bloqueia():
+    r = revisar_estrutural("", "O curso custa R$ 500,00.", ONT)
+    assert not r["aprovado"] and "500,00" in r["bloqueios"][0]
+
+
+def test_sem_curso_com_carga_bloqueia():
+    assert not _ok("", "São 300 horas de curso.")
+
+
+def test_sem_curso_mas_cita_curso_real_usa_a_ancora_dele():
+    # mensagem sem curso no card, mas cita um código real -> tem âncora, tem que bater.
+    assert _ok("", "O FEQ-0480 são 19x de R$ 866,09.")
+    assert not _ok("", "O FEQ-0480 custa R$ 1,00.")
+
+
+def test_curso_desconhecido_mensagem_neutra_aprovada():
+    # não é só string vazia: um código que não existe também não tem âncora.
+    assert _ok("FEQ-9999", "Oi! Em que posso te ajudar hoje?")
+
+
 # ------------------------------------------- fonte extra (resposta da coordenação)
 def test_fonte_extra_autoriza_fato_humano():
     from atena.revisor.ontologico import revisar_estrutural
