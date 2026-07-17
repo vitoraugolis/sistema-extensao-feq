@@ -64,7 +64,12 @@ if [ ! -x /usr/local/bin/caddy ]; then
 fi
 IP_PUB=$(curl -4 -fsS ifconfig.me)
 sudo mkdir -p /etc/caddy
-printf '%s.sslip.io {\n  reverse_proxy localhost:8095\n}\n' "$IP_PUB" | sudo tee /etc/caddy/Caddyfile >/dev/null
+# feq.vitoraugolis.com.br: domínio definitivo (registro A -> este IP). O bloco
+# sslip.io fica como fallback de acesso direto por IP (útil p/ diagnóstico e
+# enquanto o DNS do domínio não propagou). Caddy emite/renova os dois
+# certificados via ACME sozinho; se o domínio ainda não resolver pra cá, só a
+# tentativa dele falha e tenta de novo depois — o site em sslip.io não é afetado.
+printf '%s.sslip.io {\n  reverse_proxy localhost:8095\n}\n\nfeq.vitoraugolis.com.br {\n  reverse_proxy localhost:8095\n}\n' "$IP_PUB" | sudo tee /etc/caddy/Caddyfile >/dev/null
 # systemd: app
 sudo tee /etc/systemd/system/atena.service >/dev/null <<EOF
 [Unit]
@@ -94,8 +99,10 @@ EOF
 sudo systemctl daemon-reload
 sudo systemctl enable --now atena caddy
 sudo systemctl restart atena          # re-deploys: garante que o código novo carregue
+sudo systemctl restart caddy          # idem p/ o Caddyfile: já rodando não recarrega sozinho
 sleep 4
 echo "--- saúde local:" && curl -fsS localhost:8095/health && echo
 echo "--- URL pública: https://$IP_PUB.sslip.io"
+echo "--- domínio definitivo: https://feq.vitoraugolis.com.br (precisa do registro A -> $IP_PUB)"
 REMOTE
 echo "==> deploy concluído"

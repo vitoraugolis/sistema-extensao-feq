@@ -104,7 +104,8 @@ GROWTH_CPL_MAX=60 GROWTH_SHIFT_PCT=20 GROWTH_AUTO_APPLY=0 GROWTH_TEST_EVENT_CODE
 pip install flask requests rdflib pyshacl
 set -a && source .env && set +a
 
-# Sistema v2 (atena/) — PRODUÇÃO no VPS Lightsail (systemd atena+caddy, https://3.218.159.36.sslip.io)
+# Sistema v2 (atena/) — PRODUÇÃO no VPS Lightsail (systemd atena+caddy)
+# https://feq.vitoraugolis.com.br (domínio definitivo) · https://3.218.159.36.sslip.io (fallback por IP)
 zsh atena/ops/deploy_vps.sh 3.218.159.36 ubuntu   # deploy (rsync; NÃO sobrescreve .env/data)
 # (launchd local br.unicamp.feq.atena foi desativado no cutover de 07/07/2026)
 python3 atena/api/app.py            # dev manual · http://localhost:8095 (bootstrap: operador/operador até criar usuários reais)
