@@ -78,21 +78,21 @@ g.add_desempenho({"dia": dia, "objeto_id": "as1", "nome": "Conj A", "campanha": 
                   "curso": "FEQ-0480", "gasto": 300.0, "leads": 2})       # CPL 150 > 60
 g.add_desempenho({"dia": dia, "objeto_id": "as2", "nome": "Conj B", "campanha": "FEQ-0580 v1",
                   "curso": "FEQ-0580", "gasto": 100.0, "leads": 10})      # CPL 10, ok
-acoes = pacing.regra_cpl(g, ads)
+acoes = pacing.regra_cpl(g, ads, agora=AGORA)
 check([a["objeto_id"] for a in acoes] == ["as1"], "só o adset com CPL estourado é pausado")
 check(not acoes[0]["aplicado"], "sem GROWTH_AUTO_APPLY=1 a pausa é só sugestão")
-check(pacing.regra_cpl(g, ads) == [], "mesma sugestão não se repete em <3 dias")
+check(pacing.regra_cpl(g, ads, agora=AGORA) == [], "mesma sugestão não se repete em <3 dias")
 
 # --- realocação: adiantado -> atrasado ------------------------------------------
 ritmos = {"FEQ-0480": {"status": "atrasado", "razao": 0.3, "vel_necessaria": 1.0, "vel_7d": 0.3},
           "FEQ-0580": {"status": "adiantado", "razao": 2.0, "vel_necessaria": 0.1, "vel_7d": 0.2},
           "FEQ-0333": {"status": "no_ritmo", "razao": 1.0, "vel_necessaria": 0.5, "vel_7d": 0.5}}
-r = pacing.realocar(g, ads, ritmos)
+r = pacing.realocar(g, ads, ritmos, agora=AGORA)
 check(r and r["doador"] == "FEQ-0580" and r["receptor"] == "FEQ-0480",
       "verba sai do adiantado e vai para o atrasado")
 check(not r["aplicado"], "realocação sem AUTO_APPLY = sugestão registrada")
-check(pacing.realocar(g, ads, ritmos) is None, "máx. 1 realocação/dia por par")
-check(pacing.realocar(g, ads, {"FEQ-0480": ritmos["FEQ-0480"]}) is None,
+check(pacing.realocar(g, ads, ritmos, agora=AGORA) is None, "máx. 1 realocação/dia por par")
+check(pacing.realocar(g, ads, {"FEQ-0480": ritmos["FEQ-0480"]}, agora=AGORA) is None,
       "sem curso adiantado não há doador")
 
 # --- recuperação de checkout abandonado (espera por tipo, escalonamento) ---------

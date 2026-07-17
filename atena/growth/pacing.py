@@ -53,10 +53,10 @@ def _alerta(est, tipo, texto):
         est.add_alerta(tipo, texto)
 
 
-def regra_cpl(g, ads, est=None, dias=3):
+def regra_cpl(g, ads, est=None, dias=3, agora=None):
     """Pausa (ou sugere pausar) adset com CPL acima do teto na janela de N dias."""
     agg = {}
-    for r in g.desempenho(dias=dias):
+    for r in g.desempenho(dias=dias, agora=agora):
         a = agg.setdefault(r["objeto_id"], {"gasto": 0.0, "leads": 0, "nome": r["nome"]})
         a["gasto"] += r["gasto"]
         a["leads"] += r["leads"]
@@ -67,7 +67,7 @@ def regra_cpl(g, ads, est=None, dias=3):
         cpl = a["gasto"] / a["leads"] if a["leads"] else None
         if cpl is not None and cpl <= CPL_MAX:
             continue
-        if g.acao_recente("pausa_cpl", oid, dias=dias):
+        if g.acao_recente("pausa_cpl", oid, dias=dias, agora=agora):
             continue
         aplicado = AUTO and ads.ativo and ads.pausar(oid).get("ok")
         det = (f"{a['nome'] or oid}: CPL {'R$%.2f' % cpl if cpl else 'infinito (0 leads)'} "
@@ -78,17 +78,17 @@ def regra_cpl(g, ads, est=None, dias=3):
     return acoes
 
 
-def _adsets_do_curso(g, curso, dias=7):
-    return sorted({r["objeto_id"] for r in g.desempenho(dias=dias)
+def _adsets_do_curso(g, curso, dias=7, agora=None):
+    return sorted({r["objeto_id"] for r in g.desempenho(dias=dias, agora=agora)
                    if r["curso"] == curso and r["objeto_id"]})
 
 
-def _gasto_diario(g, curso, dias=7):
-    gasto = sum(r["gasto"] for r in g.desempenho(dias=dias) if r["curso"] == curso)
+def _gasto_diario(g, curso, dias=7, agora=None):
+    gasto = sum(r["gasto"] for r in g.desempenho(dias=dias, agora=agora) if r["curso"] == curso)
     return gasto / dias
 
 
-def realocar(g, ads, ritmos, est=None):
+def realocar(g, ads, ritmos, est=None, agora=None):
     """Move SHIFT_PCT% da verba diária do curso mais adiantado p/ o mais atrasado."""
     atras = sorted((c for c, r in ritmos.items() if r["status"] == "atrasado"),
                    key=lambda c: ritmos[c]["razao"])
@@ -98,9 +98,9 @@ def realocar(g, ads, ritmos, est=None):
         return None
     receptor, doador = atras[0], adiant[0]
     chave = f"{doador}->{receptor}"
-    if g.acao_recente("realocacao", chave, dias=1):   # no máx. 1 realocação/dia por par
+    if g.acao_recente("realocacao", chave, dias=1, agora=agora):   # no máx. 1 realocação/dia por par
         return None
-    base = _gasto_diario(g, doador)                   # proxy da verba: gasto médio 7d
+    base = _gasto_diario(g, doador, agora=agora)       # proxy da verba: gasto médio 7d
     mover = base * SHIFT_PCT / 100
     det = (f"mover ~R${mover:.2f}/dia ({SHIFT_PCT:.0f}% de R${base:.2f}) "
            f"de {doador} ({ritmos[doador]['status']}) para {receptor} (atrasado, "
@@ -161,4 +161,5 @@ def passada(g, ads, ont=None, est=None, agora=None):
                     f"{c['curso']}/{c['turma']}: faltam {r['faltam']} p/ meta {r['meta_seg']} "
                     f"em {r['dias']}d — precisa {r['vel_necessaria']}/dia, faz {r['vel_7d']}/dia")
     return {"insights": n_ins, "ritmos": ritmos,
-            "cpl": regra_cpl(g, ads, est), "realocacao": realocar(g, ads, ritmos, est)}
+            "cpl": regra_cpl(g, ads, est, agora=agora),
+            "realocacao": realocar(g, ads, ritmos, est, agora=agora)}

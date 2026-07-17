@@ -245,8 +245,9 @@ class Growth:
                 (_agora(), tipo, objeto_id, detalhe, 1 if aplicado else 0))
             self.conn.commit()
 
-    def acao_recente(self, tipo, objeto_id, dias=3):
-        desde = (datetime.datetime.now() - datetime.timedelta(days=dias)).isoformat(timespec="seconds")
+    def acao_recente(self, tipo, objeto_id, dias=3, agora=None):
+        agora = agora or datetime.datetime.now()
+        desde = (agora - datetime.timedelta(days=dias)).isoformat(timespec="seconds")
         return bool(self.conn.execute(
             "SELECT 1 FROM acoes_orcamento WHERE tipo=? AND objeto_id=? AND ts>=?",
             (tipo, objeto_id, desde)).fetchone())
