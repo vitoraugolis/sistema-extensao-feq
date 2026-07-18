@@ -79,7 +79,9 @@ class Growth:
 
     # ------------------------------------------------------------- cursos
     def cursos(self):
-        return [dict(r) for r in self.conn.execute("SELECT * FROM cursos_metas")]
+        with self._lock:
+            rows = self.conn.execute("SELECT * FROM cursos_metas").fetchall()
+        return [dict(r) for r in rows]
 
     def set_prazo(self, curso, prazo):
         with self._lock:
@@ -88,20 +90,22 @@ class Growth:
             self.conn.commit()
 
     def inscritos(self, curso):
-        n = self.conn.execute(
-            "SELECT COUNT(DISTINCT card_id) FROM eventos_funil"
-            " WHERE curso=? AND tipo='inscricao_confirmada'", (curso,)).fetchone()[0]
-        extra = self.conn.execute(
-            "SELECT inscritos_extra FROM cursos_metas WHERE curso=?", (curso,)).fetchone()
+        with self._lock:
+            n = self.conn.execute(
+                "SELECT COUNT(DISTINCT card_id) FROM eventos_funil"
+                " WHERE curso=? AND tipo='inscricao_confirmada'", (curso,)).fetchone()[0]
+            extra = self.conn.execute(
+                "SELECT inscritos_extra FROM cursos_metas WHERE curso=?", (curso,)).fetchone()
         return n + (extra[0] if extra else 0)
 
     def vel_7d(self, curso, agora=None):
         """Inscrições confirmadas nos últimos 7 dias / 7 (inscrições/dia)."""
         agora = agora or datetime.datetime.now()
         desde = (agora - datetime.timedelta(days=7)).isoformat(timespec="seconds")
-        n = self.conn.execute(
-            "SELECT COUNT(DISTINCT card_id) FROM eventos_funil"
-            " WHERE curso=? AND tipo='inscricao_confirmada' AND ts>=?", (curso, desde)).fetchone()[0]
+        with self._lock:
+            n = self.conn.execute(
+                "SELECT COUNT(DISTINCT card_id) FROM eventos_funil"
+                " WHERE curso=? AND tipo='inscricao_confirmada' AND ts>=?", (curso, desde)).fetchone()[0]
         return n / 7.0
 
     # -------------------------------------------------------------- mídia
@@ -119,8 +123,9 @@ class Growth:
     def desempenho(self, dias=7, agora=None):
         agora = agora or datetime.datetime.now()
         desde = (agora - datetime.timedelta(days=dias)).date().isoformat()
-        return [dict(r) for r in self.conn.execute(
-            "SELECT * FROM ad_desempenho WHERE dia>=?", (desde,))]
+        with self._lock:
+            rows = self.conn.execute("SELECT * FROM ad_desempenho WHERE dia>=?", (desde,)).fetchall()
+        return [dict(r) for r in rows]
 
     # ------------------------------------------------------------- funil
     def add_evento(self, card_id, curso, tipo, ts=None, capi=None, valor=None):
@@ -136,35 +141,40 @@ class Growth:
             q += " AND card_id=?"; args.append(card_id)
         if tipo:
             q += " AND tipo=?"; args.append(tipo)
-        return [dict(r) for r in self.conn.execute(q + " ORDER BY ts", args)]
+        with self._lock:
+            rows = self.conn.execute(q + " ORDER BY ts", args).fetchall()
+        return [dict(r) for r in rows]
 
     def checkouts_pendentes(self):
         """Leads com inicio_inscricao/boleto_gerado e SEM inscricao_confirmada.
         Retorna [{card_id, curso, ultimo_checkout, tipo_checkout, toques, ultimo_toque}]."""
-        return [dict(r) for r in self.conn.execute("""
-            SELECT card_id, MAX(ts) ultimo_checkout,
-              (SELECT curso FROM eventos_funil t WHERE t.card_id=e.card_id
-                 AND t.tipo IN ('inicio_inscricao','boleto_gerado')
-                 ORDER BY t.ts DESC LIMIT 1) curso,
-              (SELECT tipo FROM eventos_funil t WHERE t.card_id=e.card_id
-                 AND t.tipo IN ('inicio_inscricao','boleto_gerado')
-                 ORDER BY t.ts DESC LIMIT 1) tipo_checkout,
-              (SELECT COUNT(*) FROM eventos_funil r WHERE r.card_id=e.card_id
-                 AND r.tipo='recuperacao_enviada') toques,
-              (SELECT MAX(ts) FROM eventos_funil r WHERE r.card_id=e.card_id
-                 AND r.tipo='recuperacao_enviada') ultimo_toque
-            FROM eventos_funil e
-            WHERE tipo IN ('inicio_inscricao','boleto_gerado')
-              AND card_id NOT IN (SELECT card_id FROM eventos_funil
-                                  WHERE tipo IN ('inscricao_confirmada','matricula_confirmada'))
-            GROUP BY card_id""")]
+        with self._lock:
+            rows = self.conn.execute("""
+                SELECT card_id, MAX(ts) ultimo_checkout,
+                  (SELECT curso FROM eventos_funil t WHERE t.card_id=e.card_id
+                     AND t.tipo IN ('inicio_inscricao','boleto_gerado')
+                     ORDER BY t.ts DESC LIMIT 1) curso,
+                  (SELECT tipo FROM eventos_funil t WHERE t.card_id=e.card_id
+                     AND t.tipo IN ('inicio_inscricao','boleto_gerado')
+                     ORDER BY t.ts DESC LIMIT 1) tipo_checkout,
+                  (SELECT COUNT(*) FROM eventos_funil r WHERE r.card_id=e.card_id
+                     AND r.tipo='recuperacao_enviada') toques,
+                  (SELECT MAX(ts) FROM eventos_funil r WHERE r.card_id=e.card_id
+                     AND r.tipo='recuperacao_enviada') ultimo_toque
+                FROM eventos_funil e
+                WHERE tipo IN ('inicio_inscricao','boleto_gerado')
+                  AND card_id NOT IN (SELECT card_id FROM eventos_funil
+                                      WHERE tipo IN ('inscricao_confirmada','matricula_confirmada'))
+                GROUP BY card_id""").fetchall()
+        return [dict(r) for r in rows]
 
     def verificacoes_pendentes(self):
         """Fila da aba Verificação (spec 17 §8b): checkouts sem conversão E sem
         veredito humano. 'Não inscreveu' grava verificacao_negativa e sai daqui
         (mas segue na régua); 'Inscreveu' grava inscricao_confirmada e sai das duas."""
-        negs = {r[0] for r in self.conn.execute(
-            "SELECT DISTINCT card_id FROM eventos_funil WHERE tipo='verificacao_negativa'")}
+        with self._lock:
+            negs = {r[0] for r in self.conn.execute(
+                "SELECT DISTINCT card_id FROM eventos_funil WHERE tipo='verificacao_negativa'")}
         return [p for p in self.checkouts_pendentes() if p["card_id"] not in negs]
 
     # --------------------------------------------------- telemetria da LP
@@ -205,7 +215,8 @@ class Growth:
         q, args = "SELECT * FROM lp_sessoes WHERE ts>=?", [desde]
         if curso:
             q += " AND curso=?"; args.append(curso)
-        rows = [dict(r) for r in self.conn.execute(q, args)]
+        with self._lock:
+            rows = [dict(r) for r in self.conn.execute(q, args).fetchall()]
         n = len(rows)
         if not n:
             return {"sessoes": 0}
@@ -248,10 +259,14 @@ class Growth:
     def acao_recente(self, tipo, objeto_id, dias=3, agora=None):
         agora = agora or datetime.datetime.now()
         desde = (agora - datetime.timedelta(days=dias)).isoformat(timespec="seconds")
-        return bool(self.conn.execute(
-            "SELECT 1 FROM acoes_orcamento WHERE tipo=? AND objeto_id=? AND ts>=?",
-            (tipo, objeto_id, desde)).fetchone())
+        with self._lock:
+            r = self.conn.execute(
+                "SELECT 1 FROM acoes_orcamento WHERE tipo=? AND objeto_id=? AND ts>=?",
+                (tipo, objeto_id, desde)).fetchone()
+        return bool(r)
 
     def listar_acoes(self, limite=50):
-        return [dict(r) for r in self.conn.execute(
-            "SELECT * FROM acoes_orcamento ORDER BY id DESC LIMIT ?", (limite,))]
+        with self._lock:
+            rows = self.conn.execute(
+                "SELECT * FROM acoes_orcamento ORDER BY id DESC LIMIT ?", (limite,)).fetchall()
+        return [dict(r) for r in rows]

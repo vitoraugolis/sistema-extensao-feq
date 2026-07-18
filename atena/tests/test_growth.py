@@ -484,4 +484,48 @@ check(not _faltando, f"toda classe usada no template tem definição no CSS (fal
 check("input:-webkit-autofill" in _css and "-webkit-text-fill-color" in _css,
       "autofill do navegador recolorido (sem isso o texto digitado some: branco sobre branco)")
 
+# --- Growth.conn é compartilhado entre threads (waitress) — leitura sem lock ------
+# corrompe o cursor concorrente com escrita (mesmo bug de atena/core/estado.py,
+# 18/07/2026: checkouts_pendentes/verificacoes_pendentes/add_evento são exatamente
+# o caminho da aba Verificação). 6 leitoras + 3 escritoras por ~1s.
+import threading as _threading
+import time as _time
+g7 = Growth(":memory:")
+est7 = Estado(":memory:")
+est7.upsert_lead("gc1", nome="Zeca", telefone="1199990000", curso="FEQ-0480")
+g7.add_evento("gc1", "FEQ-0480", "inicio_inscricao")
+_erros_g = []
+_parar_g = _threading.Event()
+
+
+def _leitor_g():
+    while not _parar_g.is_set():
+        try:
+            g7.checkouts_pendentes()
+            g7.verificacoes_pendentes()
+            g7.cursos()
+        except Exception as e:
+            _erros_g.append(e)
+
+
+def _escritor_g():
+    n = 0
+    while not _parar_g.is_set():
+        try:
+            g7.add_evento("gc1", "FEQ-0480", "recuperacao_enviada", ts=f"2026-07-18T10:00:{n%60:02d}")
+            n += 1
+        except Exception as e:
+            _erros_g.append(e)
+
+
+_threads_g = [_threading.Thread(target=_leitor_g) for _ in range(6)] + \
+             [_threading.Thread(target=_escritor_g) for _ in range(3)]
+for _t in _threads_g:
+    _t.start()
+_time.sleep(1)
+_parar_g.set()
+for _t in _threads_g:
+    _t.join()
+check(not _erros_g, f"Growth sob concorrência sem erro de SQLite (achado: {_erros_g[0] if _erros_g else None})")
+
 print(f"\n{ok} checks OK — growth")

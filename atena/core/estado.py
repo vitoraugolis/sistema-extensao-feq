@@ -121,11 +121,14 @@ class Estado:
             self._set(card_id, **campos)
 
     def get_lead(self, card_id):
-        r = self.conn.execute("SELECT * FROM leads WHERE card_id=?", (card_id,)).fetchone()
+        with self._lock:
+            r = self.conn.execute("SELECT * FROM leads WHERE card_id=?", (card_id,)).fetchone()
         return dict(r) if r else None
 
     def listar_leads(self):
-        return [dict(r) for r in self.conn.execute("SELECT * FROM leads ORDER BY atualizado DESC")]
+        with self._lock:
+            rows = self.conn.execute("SELECT * FROM leads ORDER BY atualizado DESC").fetchall()
+        return [dict(r) for r in rows]
 
     @staticmethod
     def cursos_interesse(lead):
@@ -173,12 +176,15 @@ class Estado:
             self.conn.commit()
 
     def get_usuario(self, usuario):
-        r = self.conn.execute("SELECT * FROM usuarios WHERE usuario=?", (usuario,)).fetchone()
+        with self._lock:
+            r = self.conn.execute("SELECT * FROM usuarios WHERE usuario=?", (usuario,)).fetchone()
         return dict(r) if r else None
 
     def listar_usuarios(self):
-        return [dict(r) for r in self.conn.execute(
-            "SELECT usuario,papel,ativo,criado FROM usuarios ORDER BY criado")]
+        with self._lock:
+            rows = self.conn.execute(
+                "SELECT usuario,papel,ativo,criado FROM usuarios ORDER BY criado").fetchall()
+        return [dict(r) for r in rows]
 
     def set_usuario_ativo(self, usuario, ativo):
         with self._lock:
@@ -187,7 +193,8 @@ class Estado:
 
     # ---------------------------------------------------------------- config
     def get_config(self, chave, default=None):
-        r = self.conn.execute("SELECT valor FROM config WHERE chave=?", (chave,)).fetchone()
+        with self._lock:
+            r = self.conn.execute("SELECT valor FROM config WHERE chave=?", (chave,)).fetchone()
         return r["valor"] if r else default
 
     def set_config(self, chave, valor):
@@ -205,11 +212,14 @@ class Estado:
             return cur.lastrowid
 
     def listar_duvidas(self, status="aberta"):
-        return [dict(r) for r in self.conn.execute(
-            "SELECT * FROM duvidas WHERE status=? ORDER BY id DESC", (status,))]
+        with self._lock:
+            rows = self.conn.execute(
+                "SELECT * FROM duvidas WHERE status=? ORDER BY id DESC", (status,)).fetchall()
+        return [dict(r) for r in rows]
 
     def get_duvida(self, did):
-        r = self.conn.execute("SELECT * FROM duvidas WHERE id=?", (did,)).fetchone()
+        with self._lock:
+            r = self.conn.execute("SELECT * FROM duvidas WHERE id=?", (did,)).fetchone()
         return dict(r) if r else None
 
     def responder_duvida(self, did, resposta, status="respondida"):
@@ -235,8 +245,9 @@ class Estado:
         deduplicar sem 'queimar' o id quando o processamento ainda pode falhar."""
         if not msg_id:
             return False
-        return self.conn.execute(
-            "SELECT 1 FROM msgs_vistas WHERE msg_id=?", (msg_id,)).fetchone() is not None
+        with self._lock:
+            r = self.conn.execute("SELECT 1 FROM msgs_vistas WHERE msg_id=?", (msg_id,)).fetchone()
+        return r is not None
 
     # ----------------------------------------------------------------- alertas
     def add_alerta(self, tipo, texto):
@@ -246,8 +257,10 @@ class Estado:
             self.conn.commit()
 
     def alertas_nao_notificados(self):
-        return [dict(r) for r in self.conn.execute(
-            "SELECT * FROM alertas WHERE notificado=0 ORDER BY id")]
+        with self._lock:
+            rows = self.conn.execute(
+                "SELECT * FROM alertas WHERE notificado=0 ORDER BY id").fetchall()
+        return [dict(r) for r in rows]
 
     def marcar_alerta_notificado(self, aid):
         with self._lock:
@@ -255,8 +268,10 @@ class Estado:
             self.conn.commit()
 
     def listar_alertas(self, limite=10):
-        return [dict(r) for r in self.conn.execute(
-            "SELECT * FROM alertas ORDER BY id DESC LIMIT ?", (limite,))]
+        with self._lock:
+            rows = self.conn.execute(
+                "SELECT * FROM alertas ORDER BY id DESC LIMIT ?", (limite,)).fetchall()
+        return [dict(r) for r in rows]
 
     # -------------------------------------------------------------- LGPD
     def anonimizar_antigos(self, dias=180):
@@ -284,8 +299,10 @@ class Estado:
             self.conn.commit()
 
     def listar_auditoria(self, limite=100):
-        return [dict(r) for r in self.conn.execute(
-            "SELECT * FROM auditoria ORDER BY id DESC LIMIT ?", (limite,))]
+        with self._lock:
+            rows = self.conn.execute(
+                "SELECT * FROM auditoria ORDER BY id DESC LIMIT ?", (limite,)).fetchall()
+        return [dict(r) for r in rows]
 
     # ------------------------------------------------------------ conversas
     def add_conversa(self, card_id, papel, texto, tipo="texto", media_id=None,
@@ -298,9 +315,11 @@ class Estado:
             self.conn.commit()
 
     def historico(self, card_id):
-        return [dict(r) for r in self.conn.execute(
-            "SELECT papel,texto,tipo,media_id,wamid,status,ts FROM conversas WHERE card_id=? ORDER BY id",
-            (card_id,))]
+        with self._lock:
+            rows = self.conn.execute(
+                "SELECT papel,texto,tipo,media_id,wamid,status,ts FROM conversas WHERE card_id=? ORDER BY id",
+                (card_id,)).fetchall()
+        return [dict(r) for r in rows]
 
     def atualizar_status_msg(self, wamid, status):
         """Webhook de status do WhatsApp -> atualiza o status da nossa mensagem enviada.
@@ -326,13 +345,15 @@ class Estado:
             self.conn.commit()
 
     def midia_mime(self, media_id):
-        r = self.conn.execute("SELECT mime FROM midias WHERE media_id=?", (media_id,)).fetchone()
+        with self._lock:
+            r = self.conn.execute("SELECT mime FROM midias WHERE media_id=?", (media_id,)).fetchone()
         return r["mime"] if r else None
 
     def ultima_lead_msg(self, card_id):
-        r = self.conn.execute(
-            "SELECT texto FROM conversas WHERE card_id=? AND papel='lead' ORDER BY id DESC LIMIT 1",
-            (card_id,)).fetchone()
+        with self._lock:
+            r = self.conn.execute(
+                "SELECT texto FROM conversas WHERE card_id=? AND papel='lead' ORDER BY id DESC LIMIT 1",
+                (card_id,)).fetchone()
         return r["texto"] if r else None
 
     # ------------------------------------------------------------- decisoes
@@ -347,22 +368,26 @@ class Estado:
             self.conn.commit()
 
     def decisao_pendente(self, card_id):
-        r = self.conn.execute(
-            "SELECT * FROM decisoes WHERE card_id=? AND status='proposta' ORDER BY id DESC LIMIT 1",
-            (card_id,)).fetchone()
+        with self._lock:
+            r = self.conn.execute(
+                "SELECT * FROM decisoes WHERE card_id=? AND status='proposta' ORDER BY id DESC LIMIT 1",
+                (card_id,)).fetchone()
         return dict(r) if r else None
 
     def coordenacao_represada(self, card_id):
         """Resposta de coordenação (dúvida respondida) represada por ter caído fora da
         janela de 24h. A mais ANTIGA pendente — entregue quando o lead reabrir a conversa."""
-        r = self.conn.execute(
-            "SELECT * FROM decisoes WHERE card_id=? AND agente='coordenacao' AND status='proposta' "
-            "ORDER BY id LIMIT 1", (card_id,)).fetchone()
+        with self._lock:
+            r = self.conn.execute(
+                "SELECT * FROM decisoes WHERE card_id=? AND agente='coordenacao' AND status='proposta' "
+                "ORDER BY id LIMIT 1", (card_id,)).fetchone()
         return dict(r) if r else None
 
     def listar_decisoes(self, card_id):
-        return [dict(r) for r in self.conn.execute(
-            "SELECT * FROM decisoes WHERE card_id=? ORDER BY id DESC", (card_id,))]
+        with self._lock:
+            rows = self.conn.execute(
+                "SELECT * FROM decisoes WHERE card_id=? ORDER BY id DESC", (card_id,)).fetchall()
+        return [dict(r) for r in rows]
 
     def set_decisao_status(self, decisao_id, status):
         with self._lock:
@@ -370,15 +395,18 @@ class Estado:
             self.conn.commit()
 
     def ultima_lead_ts(self, card_id):
-        r = self.conn.execute(
-            "SELECT ts FROM conversas WHERE card_id=? AND papel='lead' ORDER BY id DESC LIMIT 1",
-            (card_id,)).fetchone()
+        with self._lock:
+            r = self.conn.execute(
+                "SELECT ts FROM conversas WHERE card_id=? AND papel='lead' ORDER BY id DESC LIMIT 1",
+                (card_id,)).fetchone()
         return r["ts"] if r else None
 
     # -------------------------------------------------------------- métricas
     def stats_funil(self):
         out = {f: 0 for f in FASES}
-        for r in self.conn.execute("SELECT fase, COUNT(*) n FROM leads GROUP BY fase"):
+        with self._lock:
+            rows = self.conn.execute("SELECT fase, COUNT(*) n FROM leads GROUP BY fase").fetchall()
+        for r in rows:
             out[r["fase"]] = r["n"]
         return out
 
@@ -393,7 +421,8 @@ class Estado:
             self.conn.commit()
 
     def get_proposta(self, pid):
-        r = self.conn.execute("SELECT * FROM propostas WHERE id=?", (pid,)).fetchone()
+        with self._lock:
+            r = self.conn.execute("SELECT * FROM propostas WHERE id=?", (pid,)).fetchone()
         if not r:
             return None
         d = dict(r)
@@ -403,7 +432,8 @@ class Estado:
 
     def listar_propostas(self, status=None):
         q = "SELECT * FROM propostas" + (" WHERE status=?" if status else "") + " ORDER BY criado DESC"
-        rows = self.conn.execute(q, (status,) if status else ()).fetchall()
+        with self._lock:
+            rows = self.conn.execute(q, (status,) if status else ()).fetchall()
         return [self.get_proposta(r["id"]) for r in rows]
 
     def set_proposta_status(self, pid, status):
@@ -413,7 +443,9 @@ class Estado:
 
     # ------------------------------------------------------------------ seed
     def seed_demo(self):
-        if self.conn.execute("SELECT COUNT(*) c FROM leads").fetchone()["c"]:
+        with self._lock:
+            ja_tem = self.conn.execute("SELECT COUNT(*) c FROM leads").fetchone()["c"]
+        if ja_tem:
             return
         plano = [
             ("Lead", 10, "aguardando_resposta"), ("Prospect", 6, "qualificado"),

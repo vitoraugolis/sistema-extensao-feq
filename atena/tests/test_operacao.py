@@ -279,6 +279,53 @@ def test_faro_noop_sem_chave():
     f.mover("qualquer", "Prospect")                        # não explode
 
 
+def test_estado_thread_safe_sob_concorrencia():
+    """self.conn é UM sqlite3.Connection (check_same_thread=False) compartilhado
+    por todas as threads do waitress. Escritas já tinham self._lock; leituras sem
+    lock corrompem o cursor concorrentemente com uma escrita -> sqlite3.InterfaceError:
+    bad parameter or other API misuse (bug real de produção, 18/07/2026: a aba
+    Verificação "não fazia nada" porque /api/conversas quebrava no meio do
+    carregar() do JS, sem sequer chegar a re-renderizar a fila). Reproduzido aqui
+    com 8 leitoras + 4 escritoras por ~1s — sem lock nas leituras, isso falha em
+    dezenas de iterações (confirmado rodando contra o código pré-fix)."""
+    import threading
+    import time as _time
+    est = Estado(":memory:")
+    for i in range(20):
+        est.upsert_lead(f"c{i}", nome=f"Lead {i}", telefone=f"1199999{i:04d}", curso="FEQ-0480")
+    erros = []
+    parar = threading.Event()
+
+    def leitor():
+        while not parar.is_set():
+            try:
+                for l in est.listar_leads():
+                    est.historico(l["card_id"])
+                    est.decisao_pendente(l["card_id"])
+            except Exception as e:
+                erros.append(e)
+
+    def escritor():
+        n = 0
+        while not parar.is_set():
+            try:
+                est.add_conversa("c1", "lead", f"msg {n}")
+                est.set_lead("c2", fase="Prospect")
+                n += 1
+            except Exception as e:
+                erros.append(e)
+
+    threads = [threading.Thread(target=leitor) for _ in range(8)] + \
+              [threading.Thread(target=escritor) for _ in range(4)]
+    for t in threads:
+        t.start()
+    _time.sleep(1)
+    parar.set()
+    for t in threads:
+        t.join()
+    assert not erros, f"{len(erros)} erro(s) de concorrência no SQLite: {erros[0]!r}"
+
+
 if __name__ == "__main__":
     casos = [v for k, v in sorted(globals().items()) if k.startswith("test_") and callable(v)]
     falhas = 0
