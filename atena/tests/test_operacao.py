@@ -164,12 +164,15 @@ def test_prequalificado_pula_gate_academico():
     r = Ingestao(est, ONT).ingest(lead)
     saved = est.get_lead(r["card_id"])
     assert saved["escolaridade"] == "Superior Completo"      # persistido
+    # hoje fixo DENTRO da janela do FEQ-0333 (fecha 19/07/2026): sem isso o teste
+    # apodrece quando o calendário real passa do prazo (aconteceu em 20/07/2026).
+    hoje = datetime.date(2026, 7, 10)
     # 1ª resposta do lead: agente NÃO re-pergunta ensino superior -> já oferece o curso
-    dec = brain_deterministico(ONT, saved, "tenho interesse!", [])
+    dec = brain_deterministico(ONT, saved, "tenho interesse!", [], hoje=hoje)
     assert dec.proxima_acao == C.QUALIFICAR
     assert "ensino superior" not in (dec.mensagem_ao_lead or "").lower()
     # botão do template ("Receber o link para prosseguir") -> link de INSCRIÇÃO correto
-    dec2 = brain_deterministico(ONT, saved, "Receber o link para prosseguir", [])
+    dec2 = brain_deterministico(ONT, saved, "Receber o link para prosseguir", [], hoje=hoje)
     assert dec2.proxima_acao == C.QUALIFICAR
     assert "/inscricao/FEQ-0333/" in (dec2.mensagem_ao_lead or "")
 

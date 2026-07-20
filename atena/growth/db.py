@@ -35,9 +35,10 @@ CREATE TABLE IF NOT EXISTS lp_sessoes(
   modal_enviado INTEGER DEFAULT 0, card_id TEXT);
 """
 
-# ordem canônica das seções da LP (bridge-template data-secao) p/ o funil de leitura
-LP_SECOES = ["hero", "beneficios", "valor", "conteudo", "quem", "professor", "investimento",
-            "relacionados", "faq", "cta"]
+# ordem canônica das seções da LP (bridge-template data-secao) p/ o funil de leitura.
+# objetivos/habilidades/depoimentos são condicionais (só cursos com dado oficial).
+LP_SECOES = ["hero", "beneficios", "objetivos", "valor", "habilidades", "conteudo", "quem",
+            "professor", "depoimentos", "investimento", "inscricao", "relacionados", "faq", "cta"]
 
 # curso, turma, meta_real, meta_seg (+30%), url — as 4 turmas-alvo (spec 15 §1).
 # Destino é SEMPRE o formulário /curso/inscricao/ (spec 17 §2), não a página /dados/.

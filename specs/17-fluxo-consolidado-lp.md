@@ -57,6 +57,24 @@ Seções, na ordem (todas com `data-secao` para a telemetria):
 quem clica no CTA já se autoqualificou. O modal (Nome + WhatsApp + LGPD) é a única
 fricção, e o redirect à Extecamp nunca espera o backend (timeout 1,5 s, spec 16 §2).
 
+
+### 3b. Conteúdo rico importado das páginas oficiais preexistentes (20/07/2026)
+
+As páginas antigas de `cursos-extensao.feq.unicamp.br` são fonte LEGÍTIMA (material
+oficial já publicado pela FEQ) e seu conteúdo foi importado LITERALMENTE para a
+ontologia (`objetivosJson`, `habilidadesJson`, `programaDetalheJson`,
+`depoimentosJson`, `empresasJson`, `avaliacaoTexto`, `salarioRef`, `garantia7dias`,
+`plataformaAula` — strings JSON no grafo, objetos via `servico.curso()`), virando
+seções novas da LP no padrão MBA USP/Esalq: objetivos, habilidades em chips,
+programa em ACCORDION módulo→subtópicos, bios do corpo docente (dict
+`PROFESSOR_BIO`, transcrito), depoimentos reais, prova social de empresas,
+garantia de 7 dias (só onde publicada — FEQ-1000), salário de referência (com a
+ressalva original), passo a passo de inscrição da Extecamp e FAQ de
+certificação/MEC. Regras: seção sem dado oficial SOME (nunca inventa; a nav-âncora
+de Depoimentos idem); dado DESATUALIZADO da página antiga (planos de pagamento
+antigos do 0480, datas passadas do 0333) NÃO é importado — pagamento/datas/carga
+vêm sempre da Extecamp via ontologia, que é quem o Revisor ancora.
+
 ## 4. Publicação como página órfã no WordPress FEQ
 
 `cursos-extensao.feq.unicamp.br` roda WordPress. Estratégia (wp_deploy_bridge.py):

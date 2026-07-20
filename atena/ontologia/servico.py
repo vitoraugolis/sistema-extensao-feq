@@ -128,7 +128,29 @@ class Ontologia:
             "descontos": str(self.g.value(u, FEQ.descontos) or "") or None,
             "insight_venda": str(self.g.value(u, FEQ.insightVenda) or "") or None,
             "alerta": str(self.g.value(u, FEQ.alertaCatalogo) or "") or None,
+            # Conteúdo rico da LP (spec 17; fonte: páginas oficiais preexistentes da
+            # Extensão FEQ — importado literal, nunca redigido). Estruturas guardadas
+            # como JSON-string no grafo; aqui voltam a objetos Python.
+            "objetivos": self._json(u, FEQ.objetivosJson, []),
+            "habilidades": self._json(u, FEQ.habilidadesJson, []),
+            "programa_detalhe": self._json(u, FEQ.programaDetalheJson, []),
+            "depoimentos": self._json(u, FEQ.depoimentosJson, []),
+            "empresas": self._json(u, FEQ.empresasJson, []),
+            "avaliacao": str(self.g.value(u, FEQ.avaliacaoTexto) or "") or None,
+            "salario_ref": str(self.g.value(u, FEQ.salarioRef) or "") or None,
+            "garantia_7d": str(self.g.value(u, FEQ.garantia7dias) or "") == "true",
+            "plataforma": str(self.g.value(u, FEQ.plataformaAula) or "") or None,
         }
+
+    def _json(self, u, prop, default):
+        v = self.g.value(u, prop)
+        if v is None:
+            return default
+        try:
+            import json as _json
+            return _json.loads(str(v))
+        except ValueError:
+            return default
 
     def portfolio(self, hoje=None):
         """Visão resumida de TODOS os cursos — o que o agente sabe que existe."""

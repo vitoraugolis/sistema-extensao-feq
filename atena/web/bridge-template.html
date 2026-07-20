@@ -43,8 +43,10 @@
   <div class="max-w-4xl mx-auto px-6 flex gap-6 overflow-x-auto text-sm font-medium">
     <a href="#beneficios">Diferenciais</a>
     <a href="#programa">Programa</a>
-    <a href="#professor">Professor</a>
+    <a href="#professor">Professores</a>
+    {{NAV_DEPOIMENTOS}}
     <a href="#investimento">Investimento</a>
+    <a href="#inscricao">Inscrição</a>
     <a href="#faq">Dúvidas</a>
   </div>
 </nav>
@@ -74,6 +76,9 @@
   </div>
 </section>
 
+<!-- 2b. Objetivos do curso (texto oficial; some se o curso não tiver) -->
+{{SECAO_OBJETIVOS}}
+
 <!-- 3. Cards de valor -->
 <section data-secao="valor" class="secao-divisor max-w-4xl mx-auto px-6 py-16 grid sm:grid-cols-3 gap-4">
   <div class="bg-white/5 border border-white/10 rounded-2xl p-6">
@@ -90,13 +95,17 @@
   </div>
 </section>
 
-<!-- 4. Conteúdo programático -->
+<!-- 3b. Habilidades desenvolvidas (texto oficial; some se o curso não tiver) -->
+{{SECAO_HABILIDADES}}
+
+<!-- 4. Conteúdo programático (accordion módulo→subtópicos quando há detalhe oficial) -->
 <section id="programa" data-secao="conteudo" class="secao-divisor max-w-4xl mx-auto px-6 py-16">
   <h2 class="text-2xl font-bold mb-2">O que você vai estudar</h2>
-  <p class="text-sm text-slate-400 mb-6">Programa oficial da turma {{CURSO}}/{{TURMA}}.</p>
-  <ol class="space-y-2 list-none">
+  <p class="text-sm text-slate-400 mb-6">Programa oficial da turma {{CURSO}}/{{TURMA}} —
+    toque em um módulo para ver o conteúdo.</p>
+  <div class="space-y-2">
     {{CONTEUDO_HTML}}
-  </ol>
+  </div>
 </section>
 
 <!-- 5. Para quem é -->
@@ -105,6 +114,7 @@
     <h2 class="text-2xl font-bold mb-3">Para quem é este curso</h2>
     <p class="text-slate-300 text-sm">{{REQUISITO}}</p>
   </div>
+  {{EMPRESAS_HTML}}
 </section>
 
 <!-- 6. Professor -->
@@ -114,13 +124,16 @@
     <div>
       <p class="text-sm uppercase tracking-widest text-slate-400 mb-1">Professor responsável</p>
       <h2 class="text-xl font-semibold">{{PROFESSOR}}</h2>
-      <p class="mt-2 text-slate-300 text-sm">Docente da Faculdade de Engenharia Química da Unicamp,
-        responsável pelo curso junto à Extecamp (Escola de Extensão da Unicamp).</p>
+      <p class="mt-2 text-slate-300 text-sm">{{PROFESSOR_DESC}}</p>
       {{PROFESSOR_CREDENCIAL_HTML}}
     </div>
   </div>
+  {{PROFESSORES_BIO_HTML}}
   {{OUTROS_PROFESSORES_HTML}}
 </section>
+
+<!-- 6b. Depoimentos reais (transcritos das páginas oficiais; some se não houver) -->
+{{SECAO_DEPOIMENTOS}}
 
 <!-- 7. Investimento -->
 <section id="investimento" data-secao="investimento" class="secao-divisor max-w-4xl mx-auto px-6 py-16">
@@ -132,8 +145,25 @@
     </ul>
     <p class="mt-4 text-sm text-slate-400">Pagamento e emissão de boletos direto no sistema oficial
       da Unicamp (Extecamp). Inscrições até <strong class="text-slate-200">{{PRAZO}}</strong>.</p>
+    {{GARANTIA_HTML}}
+    {{SALARIO_HTML}}
     <button data-cta class="mt-6 bg-amber-400 hover:bg-amber-300 text-slate-900 text-lg font-bold px-8 py-4 rounded-xl">
       Inscreva-se →
+    </button>
+  </div>
+</section>
+
+<!-- 7b. Como se inscrever (5 passos oficiais da Extecamp) -->
+<section id="inscricao" data-secao="inscricao" class="secao-divisor max-w-4xl mx-auto px-6 py-16">
+  <h2 class="text-2xl font-bold mb-2">Como se inscrever</h2>
+  <p class="text-sm text-slate-400 mb-6">O processo acontece no sistema oficial da Unicamp
+    (Extecamp) — leva poucos minutos.</p>
+  <ol class="space-y-3 list-none">
+    {{PASSOS_HTML}}
+  </ol>
+  <div class="text-center">
+    <button data-cta class="mt-8 bg-amber-400 hover:bg-amber-300 text-slate-900 font-bold px-8 py-4 rounded-xl">
+      Começar minha inscrição →
     </button>
   </div>
 </section>
@@ -174,6 +204,7 @@
       <summary class="cursor-pointer font-semibold">Até quando posso me inscrever?</summary>
       <p class="mt-2 text-sm text-slate-300">As inscrições desta turma vão até {{PRAZO}}.</p>
     </details>
+    {{FAQ_EXTRA_HTML}}
     <details class="bg-white/5 border border-white/10 rounded-xl p-5">
       <summary class="cursor-pointer font-semibold">Ficou com alguma dúvida?</summary>
       <p class="mt-2 text-sm text-slate-300">Fale com a gente no WhatsApp pelo botão no canto da tela —

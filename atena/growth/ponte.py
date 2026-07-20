@@ -25,7 +25,9 @@ _WEB = pathlib.Path(__file__).resolve().parents[1] / "web"
 _EVENT_ID_RE = re.compile(r"^[A-Za-z0-9._-]{8,64}$")
 _RAW_TOKENS = {"URL_CURSO", "CURSO", "TURMA", "CONTEUDO_HTML", "INVESTIMENTO_ITENS", "WA_LINK",
               "FOTO_PROFESSOR_HTML", "PROFESSOR_CREDENCIAL_HTML", "CURSOS_RELACIONADOS_HTML",
-              "OUTROS_PROFESSORES_HTML"}
+              "OUTROS_PROFESSORES_HTML", "SECAO_OBJETIVOS", "SECAO_HABILIDADES",
+              "SECAO_DEPOIMENTOS", "EMPRESAS_HTML", "PROFESSORES_BIO_HTML", "GARANTIA_HTML",
+              "SALARIO_HTML", "PASSOS_HTML", "FAQ_EXTRA_HTML", "NAV_DEPOIMENTOS"}
 WA_NUMERO_DEFAULT = "551931672313"   # WABA da Extensão FEQ (+55 19 3167-2313)
 # Ativos reais já publicados pela própria FEQ (não fabricamos foto de ninguém):
 # logo oficial + hero do site institucional (feq.unicamp.br — laboratório/planta
@@ -76,13 +78,57 @@ PROFESSOR_LINK = {
     "Dirceu Noriler": {"tipo": "Lattes",
         "url": "https://buscatextual.cnpq.br/buscatextual/visualizacv.do?id=K4762481H3&idiomaExibicao=2"},
     "Eduardo de Britto Perez": {"tipo": "Lattes", "url": "http://lattes.cnpq.br/8235156876575101"},
-    "Guilherme Jose de Castilho": {"tipo": "Lattes", "url": "http://lattes.cnpq.br/6340353027133778"},
+    "Guilherme Jose de Castilho": {"tipo": "LinkedIn",
+        "url": "https://www.linkedin.com/in/guilherme-castilho-3820b81a3/"},
+    "Edneu Jatkoski (Petrobras)": {"tipo": "LinkedIn",
+        "url": "https://www.linkedin.com/in/edneu-jatkoski-34a3a630/"},
     "João Lameu da Silva Júnior": {"tipo": "Lattes", "url": "http://lattes.cnpq.br/7563505845567082"},
     "Leonardo Vasconcelos Fregolente": {"tipo": "Lattes", "url": "http://lattes.cnpq.br/0146291251418497"},
     "Mariana Conceicao da Costa": {"tipo": "Lattes", "url": "http://lattes.cnpq.br/6460520627911836"},
     "Raphael Soeiro Suppino": {"tipo": "Lattes", "url": "http://lattes.cnpq.br/1437214547688523"},
-    "Gustavo Doubek": {"tipo": "Lattes", "url": "http://lattes.cnpq.br/2409386156783785"},
+    # Lattes do Doubek: a página oficial do FEQ-0333 publica 6149769815435543
+    # (diverge do 2409386156783785 achado no site do PRH/FEQ) — vale a fonte do curso.
+    "Gustavo Doubek": {"tipo": "Lattes", "url": "http://lattes.cnpq.br/6149769815435543"},
     "Sallie Elizabeth Greenberg": {"tipo": "LinkedIn", "url": "https://www.linkedin.com/in/dr-sallie-greenberg-1955388/"},
+}
+# Bios TRANSCRITAS das páginas oficiais preexistentes da Extensão FEQ (cursos-extensao.
+# feq.unicamp.br) — nunca redigidas por nós. Nome sem entrada aqui = sem bio no card.
+PROFESSOR_BIO = {
+    "Flavio Vasconcelos da Silva": {
+        "cargo": "Professor Associado FEQ Unicamp",
+        "bio": "Livre-Docente em Controle de Processos pela Unicamp e Professor Associado da "
+               "Faculdade de Engenharia Química Unicamp. Atua em Controle de Processos, IA "
+               "(Controle Fuzzy e Redes Neurais), Instrumentação Industrial e Refrigeração Industrial."},
+    "Vitor Machado Viana Cruz": {
+        "cargo": "Doutor em Engenharia Química",
+        "bio": "Doutor e Pós-Doutorando pela FEQ Unicamp. Experiência em processos de recuperação "
+               "química e especialista em desenvolvimento de softwares para simulação de plantas "
+               "químicas com interfaces interativas."},
+    "Guilherme Jose de Castilho": {
+        "cargo": "Professor Associado FEQ Unicamp",
+        "bio": "Pós-doutor em Engenharia Química pela Unicamp e UBC-Canadá, Coordenador da Escola "
+               "de Extensão e Professor na FEQ. Especialista em Sistemas Particulados e "
+               "Fluidodinâmica, com foco em fluidização, leito fluidizado circulante e "
+               "processamento de sinais."},
+    "Edneu Jatkoski (Petrobras)": {
+        "cargo": "Coordenador de Inspeção — Petrobras (REPLAN)",
+        "bio": "Coordenador de Inspeção na Refinaria de Paulínia, com 40 anos de experiência. "
+               "Graduado em Engenharia Civil e MBA em Gestão Industrial. Instrutor em cursos de "
+               "formação da Petrobras e representante da empresa no CEPETRO (Unicamp)."},
+    "Claudio Vieira Neto": {
+        "cargo": "Especialista em Data Science",
+        "bio": "Engenheiro Químico e Black Belt com experiência em projetos de IA, NLP, otimização "
+               "e simulação. Atuou em iniciativas com impacto financeiro e operacional relevante e "
+               "liderou times ágeis em grandes empresas."},
+    "Luis Fernando Mercier Franco": {
+        "cargo": "Professor Associado FEQ Unicamp",
+        "bio": "Engenheiro Químico, Mestre e Doutor em Ciências pela Poli-USP; Livre-Docente pela "
+               "FEQ Unicamp. Atua em termodinâmica, mecânica estatística e simulação molecular."},
+    "Gustavo Doubek": {
+        "cargo": "Professor Associado FEQ Unicamp",
+        "bio": "Doutor em Engenharia de Materiais e Nuclear pela USP, com período de pesquisa em "
+               "Yale. Mais de 10 anos em pesquisa e ensino em células a combustível e baterias, "
+               "com foco em energia limpa e desenvolvimento de produtos."},
 }
 
 
@@ -181,6 +227,162 @@ def _outros_professores_html(nomes):
     )
 
 
+def _secao_objetivos_html(objetivos):
+    """Seção 'Objetivos do curso' (2 cards) — texto literal das páginas oficiais."""
+    if not objetivos:
+        return ""
+    cards = "\n    ".join(
+        '<div class="bg-white/5 border border-white/10 rounded-2xl p-6">'
+        f'<p class="font-semibold text-amber-400">{_esc(o["t"])}</p>'
+        f'<p class="mt-2 text-sm text-slate-300">{_esc(o["d"])}</p></div>'
+        for o in objetivos)
+    return ('<section data-secao="objetivos" class="secao-divisor max-w-4xl mx-auto px-6 py-16">\n'
+            '  <h2 class="text-2xl font-bold mb-6 text-center">Objetivos do curso</h2>\n'
+            f'  <div class="grid sm:grid-cols-2 gap-4">\n    {cards}\n  </div>\n</section>')
+
+
+def _secao_habilidades_html(habilidades):
+    """'O que você vai dominar' — chips com as habilidades publicadas."""
+    if not habilidades:
+        return ""
+    chips = "\n    ".join(
+        f'<span class="hab-chip">{_esc(h)}</span>' for h in habilidades)
+    return ('<section data-secao="habilidades" class="secao-divisor max-w-4xl mx-auto px-6 py-16">\n'
+            '  <h2 class="text-2xl font-bold mb-6 text-center">O que você vai dominar</h2>\n'
+            f'  <div class="flex flex-wrap gap-2 justify-center">\n    {chips}\n  </div>\n</section>')
+
+
+def _programa_html(c):
+    """Programa: accordion módulo→subtópicos quando temos o detalhe oficial;
+    senão, a lista numerada simples de sempre (nunca inventa subtópico)."""
+    det = c.get("programa_detalhe") or []
+    if not det:
+        return _conteudo_html(c.get("conteudo_programatico"))
+    itens = []
+    for i, m in enumerate(det):
+        subs = "".join(f'<li>{_esc(s)}</li>' for s in m.get("s") or [])
+        corpo = f'<ul class="prog-subs">{subs}</ul>' if subs else ""
+        itens.append(
+            '<details class="prog-mod">'
+            f'<summary><span class="text-amber-400 font-semibold mr-2">{i + 1:02d}</span>'
+            f'{_esc(m["t"])}</summary>{corpo}</details>')
+    return "\n    ".join(itens)
+
+
+def _secao_depoimentos_html(depoimentos):
+    """Depoimentos REAIS transcritos das páginas oficiais preexistentes."""
+    if not depoimentos:
+        return ""
+    cards = "\n    ".join(
+        '<figure class="depoimento">'
+        f'<blockquote>“{_esc(d["texto"])}”</blockquote>'
+        f'<figcaption><strong>{_esc(d["nome"])}</strong>'
+        f'<span class="muted-cap">{_esc(d.get("cargo") or "")}</span></figcaption></figure>'
+        for d in depoimentos)
+    return ('<section id="depoimentos" data-secao="depoimentos" '
+            'class="secao-divisor max-w-4xl mx-auto px-6 py-16">\n'
+            '  <h2 class="text-2xl font-bold mb-2 text-center">Quem fez, recomenda</h2>\n'
+            '  <p class="text-sm text-slate-400 mb-6 text-center">Depoimentos publicados por '
+            'ex-alunos da Extensão FEQ Unicamp.</p>\n'
+            f'  <div class="grid sm:grid-cols-2 gap-4 items-start">\n    {cards}\n  </div>\n</section>')
+
+
+def _secao_empresas_html(empresas):
+    """Prova social oficial: 'nossos alunos atuam em' (lista publicada pela FEQ)."""
+    if not empresas:
+        return ""
+    tags = "\n    ".join(f'<span class="empresa-tag">{_esc(e)}</span>' for e in empresas)
+    return ('<div class="mt-8 text-center">\n'
+            '  <p class="text-xs uppercase tracking-widest text-slate-400 mb-3">'
+            'Nossos alunos atuam em empresas como</p>\n'
+            f'  <div class="flex flex-wrap gap-2 justify-center">\n    {tags}\n  </div>\n</div>')
+
+
+def _professores_bio_html(c):
+    """Cards de bio dos DEMAIS professores com bio TRANSCRITA da página oficial
+    (o responsável já tem card próprio, com a bio via {{PROFESSOR_DESC}}).
+    Reusa foto e credencial já verificadas; sem bio -> sem card."""
+    cards = []
+    for nome in c.get("professores_adicionais") or []:
+        b = PROFESSOR_BIO.get((nome or "").strip())
+        if not b:
+            continue
+        foto = _foto_professor_html(nome)
+        cred = _professor_credencial_html(nome)
+        link = PROFESSOR_LINK.get((nome or "").strip())
+        rotulo = ""
+        if not cred and link:
+            rotulo = (f'<p class="mt-3 text-xs text-slate-400"><a href="{_esc(link["url"])}" '
+                      'target="_blank" rel="noopener" class="text-amber-400 hover:text-amber-300 '
+                      f'underline">{_esc(link["tipo"])}</a></p>')
+        cards.append(
+            '<div class="bg-white/5 border border-white/10 rounded-2xl p-6">'
+            f'<div class="flex items-center gap-4">{foto}<div>'
+            f'<p class="font-semibold text-slate-100">{_esc(nome)}</p>'
+            f'<p class="text-xs text-amber-400">{_esc(b["cargo"])}</p></div></div>'
+            f'<p class="mt-3 text-sm text-slate-300">{_esc(b["bio"])}</p>{cred or rotulo}</div>')
+    if not cards:
+        return ""
+    return '<div class="grid sm:grid-cols-2 gap-4 mt-6 items-start">\n    ' + "\n    ".join(cards) + "\n  </div>"
+
+
+def _garantia_html(c):
+    if not c.get("garantia_7d"):
+        return ""
+    return ('<p class="mt-4 garantia-selo">🛡️ Garantia de 7 dias — reembolso de 100% da '
+            'matrícula se você não gostar do curso na primeira semana.</p>')
+
+
+def _salario_html(c):
+    s = c.get("salario_ref")
+    if not s:
+        return ""
+    return ('<p class="mt-3 text-xs text-slate-400">Perspectiva profissional: salário de '
+            f'referência {_esc(s)}.</p>')
+
+
+def _passos_html(c):
+    """Como se inscrever — 5 passos publicados nas páginas oficiais (Extecamp)."""
+    taxa = _moeda((c.get("plano") or {}).get("taxa")) or "o valor publicado na Extecamp"
+    passos = [
+        "Preencha o formulário de inscrição no sistema oficial da Unicamp (Extecamp) e aguarde "
+        "o e-mail com as instruções de acesso ao portal do aluno e o termo de compromisso.",
+        "Baixe e preencha o termo de compromisso e envie os documentos na aba "
+        "“Documentos” do portal do aluno.",
+        f"Pague o boleto da taxa de inscrição ({taxa}).",
+        "Aguarde a validação da documentação e a confirmação de abertura da turma "
+        "(ao encerramento das inscrições).",
+        "Com a turma confirmada, a secretaria entra em contato por e-mail para o pagamento "
+        "e a efetivação da matrícula. Pronto — você é aluno da Extensão Unicamp!"]
+    itens = "\n    ".join(
+        f'<li class="passo"><span class="passo-n">{i + 1}</span><span>{p}</span></li>'
+        for i, p in enumerate(passos))
+    return itens
+
+
+def _faq_extra_html(c):
+    """FAQ extra ancorado: certificação/MEC (texto oficial), avaliação e plataforma."""
+    itens = []
+    aval = c.get("avaliacao")
+    if aval:
+        plat = c.get("plataforma")
+        extra = (f' As aulas ficam disponíveis na plataforma {_esc(plat)}.' if plat else "")
+        itens.append(("Como funcionam as avaliações e entregas?", _esc(aval) + extra))
+    itens.append((
+        "Esse curso é lato-sensu? É reconhecido pelo MEC?",
+        "A certificação é reconhecida pelo MEC e aclamada pelo mercado, mas o curso não se "
+        "enquadra como pós-graduação lato-sensu: é um curso de "
+        + _esc((c.get("tipo") or "formação").lower())
+        + " e a Unicamp certifica diretamente todos os formados no tema abordado. Na prática, "
+        "a ementa é constantemente atualizada com as tendências do mercado e o corpo docente "
+        "inclui profissionais com ampla experiência na indústria."))
+    return "\n    ".join(
+        '<details class="bg-white/5 border border-white/10 rounded-xl p-5">'
+        f'<summary class="cursor-pointer font-semibold">{p}</summary>'
+        f'<p class="mt-2 text-sm text-slate-300">{r}</p></details>'
+        for p, r in itens)
+
+
 def _cursos_relacionados_html(g, ont, curso_atual):
     """Cards de cross-sell pros outros cursos-alvo (spec 17) — nunca lista o
     próprio curso da página. Só usa cursos_metas + ontologia (mesma fonte que
@@ -254,12 +456,27 @@ def render_tokens(meta_row, c):
         "PLANO": plano_curto,
         "PLANO_DETALHE": plano_det,
         "PROFESSOR": c.get("professor") or "Corpo docente FEQ/Unicamp",
+        "PROFESSOR_DESC": (PROFESSOR_BIO.get((c.get("professor") or "").strip()) or {}).get("bio")
+                          or "Docente da Faculdade de Engenharia Química da Unicamp, responsável "
+                             "pelo curso junto à Extecamp (Escola de Extensão da Unicamp).",
         "REQUISITO": requisito,
-        "CONTEUDO_HTML": _conteudo_html(c.get("conteudo_programatico")),
+        "CONTEUDO_HTML": _programa_html(c),
         "INVESTIMENTO_ITENS": _investimento_itens(c),
         "FOTO_PROFESSOR_HTML": _foto_professor_html(c.get("professor")),
         "PROFESSOR_CREDENCIAL_HTML": _professor_credencial_html(c.get("professor")),
         "OUTROS_PROFESSORES_HTML": _outros_professores_html(c.get("professores_adicionais")),
+        # Conteúdo rico das páginas oficiais preexistentes (seções somem se sem dado):
+        "SECAO_OBJETIVOS": _secao_objetivos_html(c.get("objetivos")),
+        "SECAO_HABILIDADES": _secao_habilidades_html(c.get("habilidades")),
+        "SECAO_DEPOIMENTOS": _secao_depoimentos_html(c.get("depoimentos")),
+        "NAV_DEPOIMENTOS": ('<a href="#depoimentos">Depoimentos</a>'
+                            if c.get("depoimentos") else ""),
+        "EMPRESAS_HTML": _secao_empresas_html(c.get("empresas")),
+        "PROFESSORES_BIO_HTML": _professores_bio_html(c),
+        "GARANTIA_HTML": _garantia_html(c),
+        "SALARIO_HTML": _salario_html(c),
+        "PASSOS_HTML": _passos_html(c),
+        "FAQ_EXTRA_HTML": _faq_extra_html(c),
     }
 
 

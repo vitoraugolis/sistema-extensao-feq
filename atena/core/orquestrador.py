@@ -51,8 +51,9 @@ MSG_GATE_2 = ("Desculpe insistir! 🙏 É que essa informação define os próxi
               "você já concluiu o ensino superior?")
 
 
-def brain_deterministico(ont, lead, mensagem_lead, historico=None):
-    """Cérebro mínimo, offline. Substituível por um cérebro LLM (mesmo contrato)."""
+def brain_deterministico(ont, lead, mensagem_lead, historico=None, hoje=None):
+    """Cérebro mínimo, offline. Substituível por um cérebro LLM (mesmo contrato).
+    hoje: injetável p/ teste (a captabilidade depende do calendário real)."""
     cod = lead["curso"]
     if G.detectar_optout(mensagem_lead):
         return C.DecisaoAgente(C.OPTOUT, "lead pediu opt-out",
@@ -60,7 +61,7 @@ def brain_deterministico(ont, lead, mensagem_lead, historico=None):
     if G.gatilho_sensivel(mensagem_lead):
         return C.DecisaoAgente(C.ESCALAR, "gatilho sensível",
                                escalonamento_motivo="desconto/reclamação/intenção de fechar")
-    cap = ont.captavel(cod)
+    cap = ont.captavel(cod, hoje)
     if not cap.get("captavel"):
         return C.DecisaoAgente(C.ESCALAR, f"curso {cod} não captável ({cap.get('status')})",
                                escalonamento_motivo=f"captabilidade: {cap.get('status')}")

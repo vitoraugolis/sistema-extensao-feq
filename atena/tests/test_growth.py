@@ -317,12 +317,14 @@ check(ponte.url_inscricao(meta, {"url_extecamp": "https://ins.extecamp.unicamp.b
 
 # --- telemetria de sessão + analytics ---------------------------------------------
 s1 = {"sessao_id": "sess-1", "curso": "FEQ-0480", "duracao": 40, "max_scroll": 90,
-      "ultima_secao": "investimento", "secoes": {"hero": 8, "beneficios": 5, "valor": 6,
-                                                 "conteudo": 12, "quem": 4, "professor": 3,
+      "ultima_secao": "investimento", "secoes": {"hero": 8, "beneficios": 5, "objetivos": 4,
+                                                 "valor": 6, "habilidades": 3, "conteudo": 12,
+                                                 "quem": 4, "professor": 3, "depoimentos": 3,
                                                  "investimento": 7},
       "cta_cliques": 1, "modal_aberto": 1, "modal_enviado": 1}
 s2 = {"sessao_id": "sess-2", "curso": "FEQ-0480", "duracao": 9, "max_scroll": 30,
-      "ultima_secao": "valor", "secoes": {"hero": 5, "beneficios": 3, "valor": 4}}
+      "ultima_secao": "valor", "secoes": {"hero": 5, "beneficios": 3, "objetivos": 2,
+                                          "valor": 4, "habilidades": 2}}
 g5.upsert_lp_sessao(s1); g5.upsert_lp_sessao(s2)
 g5.upsert_lp_sessao({**s1, "modal_aberto": 0, "modal_enviado": 0, "duracao": 55})
 a = g5.lp_analytics(curso="FEQ-0480")
@@ -433,6 +435,46 @@ check("Aulas online ao vivo + gravadas" in lp_real
       "LP renderizada com ontologia real: cards 2 e 3 no formato novo")
 check("Demais professores do curso" in lp_real and "lattes.cnpq.br/0419561926689242" in lp_real,
       "LP renderizada com ontologia real: seção de outros professores presente")
+
+# --- conteúdo rico importado das páginas oficiais preexistentes (spec 17) ----------
+check('data-secao="objetivos"' in lp_real and "Tornar os profissionais diferenciados" in lp_real,
+      "0480: objetivos oficiais na LP")
+check('class="hab-chip"' in lp_real and "Machine Learning e Deep Learning" in lp_real,
+      "0480: habilidades oficiais em chips")
+check('class="prog-mod"' in lp_real and "Processo de Decisão de Markov (MDP)" in lp_real,
+      "0480: programa em accordion com subtópicos oficiais")
+check('id="depoimentos"' in lp_real and "Luiz Octavio" in lp_real and "Juliana Panizza" in lp_real,
+      "0480: depoimentos REAIS transcritos da página oficial")
+check('href="#depoimentos"' in lp_real, "0480: nav-âncora ganha o atalho Depoimentos")
+check("Nossos alunos atuam em empresas como" in lp_real and "Braskem" in lp_real,
+      "0480: prova social oficial de empresas")
+check('id="inscricao"' in lp_real and 'class="passo-n"' in lp_real and "termo de compromisso" in lp_real,
+      "0480: passo a passo oficial de inscrição")
+check("lato-sensu" in lp_real and "reconhecida pelo MEC" in lp_real,
+      "0480: FAQ de certificação/MEC (texto oficial)")
+check("R$ 14.000,00" in lp_real and "Perspectiva profissional" in lp_real,
+      "0480: salário de referência publicado (com a ressalva original)")
+check("Livre-Docente em Controle de Processos" in lp_real,
+      "0480: bio oficial do professor responsável no card")
+check("914,20" not in lp_real and "1.097,05" not in lp_real,
+      "0480: plano de pagamento DESATUALIZADO da página antiga NÃO é importado (Extecamp vence)")
+check("Garantia de 7 dias" not in lp_real, "0480: sem garantia inventada (só o FEQ-1000 a publica)")
+lp_1000 = ponte.render(g5, _ont_real, "FEQ-1000")
+check("Garantia de 7 dias" in lp_1000 and "Edson Papassídero" in lp_1000,
+      "1000: garantia oficial de 7 dias + depoimento próprio")
+check("linkedin.com/in/edneu-jatkoski" in lp_1000 and "Refinaria de Paulínia" in lp_1000,
+      "1000: bio e LinkedIn do Jatkoski (fonte: página oficial do curso)")
+lp_0580b = ponte.render(g5, _ont_real, "FEQ-0580")
+check('id="depoimentos"' not in lp_0580b and 'href="#depoimentos"' not in lp_0580b,
+      "0580: sem depoimentos publicados -> seção e âncora somem (nunca inventa)")
+check('class="prog-mod"' not in lp_0580b and "<li" in lp_0580b,
+      "0580: sem detalhe oficial de programa -> lista numerada de sempre (sem accordion vazio)")
+check('data-secao="objetivos"' in lp_0580b, "0580: objetivos oficiais presentes")
+lp_0333b = ponte.render(g5, _ont_real, "FEQ-0333")
+check("lattes.cnpq.br/6149769815435543" in lp_0333b,
+      "0333: Lattes do Doubek corrigido pro publicado na página oficial do curso")
+check('class="prog-mod"' in lp_0333b and "Diferença entre CCS e CCUS" in lp_0333b,
+      "0333: programa detalhado oficial em accordion")
 _c1000 = _ont_real.curso("FEQ-1000")
 check("pela manhã (até 12h)" in _c1000["formato_aulas_detalhe"]
       and "exercícios e cases" in _c1000["formato_aulas_detalhe"],
@@ -470,7 +512,7 @@ check('href="https://www.linkedin.com/in/claudio-vieira-neto"' in op580,
 # arquivo .html estático — só na saída de ponte.render() — e ficavam fora da
 # auditoria antes desta linha.)
 _html = ((pathlib.Path(__file__).resolve().parents[1] / "web" / "bridge-template.html").read_text()
-         + lp2 + lp_real + op + lp_0580)
+         + lp2 + lp_real + op + lp_0580 + lp_1000 + lp_0333b)
 _css = (pathlib.Path(__file__).resolve().parents[1] / "web" / "bridge.css").read_text()
 _usadas = set()
 for _m in re.finditer(r'class="([^"]*)"', _html):
