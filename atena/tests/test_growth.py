@@ -433,7 +433,7 @@ check("Aulas online ao vivo + gravadas" in lp_real
       and "19x de R$ 866,09" in lp_real
       and "taxa de inscrição de R$ 69,00" in lp_real,
       "LP renderizada com ontologia real: cards 2 e 3 no formato novo")
-check("Demais professores do curso" in lp_real and "lattes.cnpq.br/0419561926689242" in lp_real,
+check("Mais professores do curso" in lp_real and "lattes.cnpq.br/0419561926689242" in lp_real,
       "LP renderizada com ontologia real: seção de outros professores presente")
 
 # --- conteúdo rico importado das páginas oficiais preexistentes (spec 17) ----------
@@ -456,6 +456,16 @@ check("R$ 14.000,00" in lp_real and "Perspectiva profissional" in lp_real,
       "0480: salário de referência publicado (com a ressalva original)")
 check("Livre-Docente em Controle de Processos" in lp_real,
       "0480: bio oficial do professor responsável no card")
+# --- fotos dos docentes em destaque (fonte: páginas oficiais) + rótulo -------------
+check("vitor_machado-e1721925782819.jpg" in lp_real,
+      "0480: Vitor Machado em destaque com foto da página oficial")
+check('class="avatar-iniciais"' in lp_real and "Douglas Alves Goulart" in lp_real,
+      "0480: Douglas em destaque (sem foto publicada) -> avatar de iniciais, nunca inventa foto")
+check("Mais professores do curso" in lp_real and "Demais professores" not in lp_real,
+      "rótulo trocado para 'Mais professores do curso'")
+check('class="depo-avatar"' in lp_real and 'class="depo-aspa"' in lp_real
+      and "&ldquo;" not in lp_real,
+      "depoimentos redesenhados (avatar + aspa unicode, sem entidade que o WP mangla)")
 check("914,20" not in lp_real and "1.097,05" not in lp_real,
       "0480: plano de pagamento DESATUALIZADO da página antiga NÃO é importado (Extecamp vence)")
 check("Garantia de 7 dias" not in lp_real, "0480: sem garantia inventada (só o FEQ-1000 a publica)")
@@ -464,6 +474,10 @@ check("Garantia de 7 dias" in lp_1000 and "Edson Papassídero" in lp_1000,
       "1000: garantia oficial de 7 dias + depoimento próprio")
 check("linkedin.com/in/edneu-jatkoski" in lp_1000 and "Refinaria de Paulínia" in lp_1000,
       "1000: bio e LinkedIn do Jatkoski (fonte: página oficial do curso)")
+check("guilherme-300x300-1.png" in lp_1000 and "edneu.png" in lp_1000,
+      "1000: Castilho e Jatkoski em destaque com foto oficial")
+check(lp_1000.count("2025/09/D-Flavio-Vasconcelos") == 1,
+      "1000: Flavio em destaque com foto (só 1 card; responsável é o Osvaldir)")
 lp_0580b = ponte.render(g5, _ont_real, "FEQ-0580")
 check('id="depoimentos"' not in lp_0580b and 'href="#depoimentos"' not in lp_0580b,
       "0580: sem depoimentos publicados -> seção e âncora somem (nunca inventa)")

@@ -44,6 +44,29 @@ PROFESSOR_FOTOS = {
         "https://www.feq.unicamp.br/wp-content/uploads/2025/09/Luis-Fernando-Mercier-Franco.png",
     "Osvaldir Pereira Taranto":
         "https://www.feq.unicamp.br/wp-content/uploads/2025/09/Osvaldir-Pereira-Taranto33333-300x300.png",
+    # Fotos publicadas nas PÁGINAS OFICIAIS preexistentes dos cursos (mesma regra:
+    # material já publicado pela FEQ; nunca fabricamos foto de pessoa real):
+    "Vitor Machado Viana Cruz":
+        "https://cursos-extensao.feq.unicamp.br/wp-content/uploads/2024/07/vitor_machado-e1721925782819.jpg",
+    "Guilherme Jose de Castilho":
+        "https://cursos-extensao.feq.unicamp.br/wp-content/uploads/2024/07/guilherme-300x300-1.png",
+    "Edneu Jatkoski (Petrobras)":
+        "https://cursos-extensao.feq.unicamp.br/wp-content/uploads/2024/07/edneu.png",
+    "Claudio Vieira Neto":
+        "https://cursos-extensao.feq.unicamp.br/wp-content/uploads/2025/04/1681221613629.jpg",
+    "Gustavo Doubek":
+        "https://cursos-extensao.feq.unicamp.br/wp-content/uploads/2026/02/Gustavo-Doubek.jpg",
+}
+# Docentes em DESTAQUE por curso (cards com foto), além do responsável — que já tem
+# card próprio. FEQ-0480: escolha do usuário (20/07/2026); demais: os nomes que as
+# LPs preexistentes destacavam. Douglas não tem foto/bio publicada -> card só com
+# nome+link (avatar de iniciais; nunca inventamos foto).
+PROFESSOR_DESTAQUE = {
+    "FEQ-0480": ["Vitor Machado Viana Cruz", "Douglas Alves Goulart"],
+    "FEQ-1000": ["Guilherme Jose de Castilho", "Edneu Jatkoski (Petrobras)",
+                 "Flavio Vasconcelos da Silva"],
+    "FEQ-0580": ["Claudio Vieira Neto"],
+    "FEQ-0333": ["Gustavo Doubek"],
 }
 # Credencial real (diretório de docentes feq.unicamp.br/funcionario/*): departamento
 # oficial + CV Lattes (currículo acadêmico público-padrão no Brasil) — nada de bio
@@ -219,7 +242,7 @@ def _outros_professores_html(nomes):
             itens.append(f'<span>{_esc(nome)}</span>')
     return (
         '<div class="mt-6 pt-6 border-t border-white/10">\n'
-        '      <p class="text-xs uppercase tracking-widest text-slate-400 mb-3">Demais professores do curso</p>\n'
+        '      <p class="text-xs uppercase tracking-widest text-slate-400 mb-3">Mais professores do curso</p>\n'
         '      <div class="flex flex-wrap gap-x-4 gap-y-2 text-sm text-slate-300">\n'
         '        ' + '\n        '.join(itens) + '\n'
         '      </div>\n'
@@ -275,9 +298,13 @@ def _secao_depoimentos_html(depoimentos):
         return ""
     cards = "\n    ".join(
         '<figure class="depoimento">'
-        f'<blockquote>“{_esc(d["texto"])}”</blockquote>'
-        f'<figcaption><strong>{_esc(d["nome"])}</strong>'
-        f'<span class="muted-cap">{_esc(d.get("cargo") or "")}</span></figcaption></figure>'
+        '<span class="depo-aspa" aria-hidden="true">“</span>'
+        f'<blockquote>{_esc(d["texto"])}</blockquote>'
+        '<figcaption>'
+        f'<span class="depo-avatar" aria-hidden="true">{_esc(_iniciais(d["nome"]))}</span>'
+        f'<span class="depo-quem"><strong>{_esc(d["nome"])}</strong>'
+        f'<span class="muted-cap">{_esc(d.get("cargo") or "")}</span></span>'
+        '</figcaption></figure>'
         for d in depoimentos)
     return ('<section id="depoimentos" data-secao="depoimentos" '
             'class="secao-divisor max-w-4xl mx-auto px-6 py-16">\n'
@@ -298,29 +325,37 @@ def _secao_empresas_html(empresas):
             f'  <div class="flex flex-wrap gap-2 justify-center">\n    {tags}\n  </div>\n</div>')
 
 
+def _iniciais(nome):
+    partes = [p for p in (nome or "").split() if p and p[0].isupper()]
+    return "".join(p[0] for p in partes[:2]) or "?"
+
+
 def _professores_bio_html(c):
-    """Cards de bio dos DEMAIS professores com bio TRANSCRITA da página oficial
-    (o responsável já tem card próprio, com a bio via {{PROFESSOR_DESC}}).
-    Reusa foto e credencial já verificadas; sem bio -> sem card."""
+    """Cards de DESTAQUE do corpo docente (PROFESSOR_DESTAQUE por curso), com foto
+    publicada em página oficial — o responsável já tem card próprio, com a bio via
+    {{PROFESSOR_DESC}}. Sem foto publicada -> avatar de iniciais (nunca inventa);
+    bio/cargo/link só quando existem nas fontes oficiais."""
     cards = []
-    for nome in c.get("professores_adicionais") or []:
-        b = PROFESSOR_BIO.get((nome or "").strip())
-        if not b:
-            continue
-        foto = _foto_professor_html(nome)
+    for nome in PROFESSOR_DESTAQUE.get(c.get("codigo") or "", []):
+        if nome == c.get("professor"):
+            continue   # responsável já tem o card grande acima
+        b = PROFESSOR_BIO.get(nome) or {}
+        foto = _foto_professor_html(nome) or f'<span class="avatar-iniciais">{_esc(_iniciais(nome))}</span>'
         cred = _professor_credencial_html(nome)
-        link = PROFESSOR_LINK.get((nome or "").strip())
+        link = PROFESSOR_LINK.get(nome)
         rotulo = ""
         if not cred and link:
             rotulo = (f'<p class="mt-3 text-xs text-slate-400"><a href="{_esc(link["url"])}" '
                       'target="_blank" rel="noopener" class="text-amber-400 hover:text-amber-300 '
                       f'underline">{_esc(link["tipo"])}</a></p>')
+        bio = f'<p class="mt-3 text-sm text-slate-300">{_esc(b["bio"])}</p>' if b.get("bio") else ""
+        cargo = (f'<p class="text-xs text-amber-400">{_esc(b["cargo"])}</p>' if b.get("cargo")
+                 else '<p class="text-xs text-slate-400">Professor do curso</p>')
         cards.append(
             '<div class="bg-white/5 border border-white/10 rounded-2xl p-6">'
             f'<div class="flex items-center gap-4">{foto}<div>'
             f'<p class="font-semibold text-slate-100">{_esc(nome)}</p>'
-            f'<p class="text-xs text-amber-400">{_esc(b["cargo"])}</p></div></div>'
-            f'<p class="mt-3 text-sm text-slate-300">{_esc(b["bio"])}</p>{cred or rotulo}</div>')
+            f'{cargo}</div></div>{bio}{cred or rotulo}</div>')
     if not cards:
         return ""
     return '<div class="grid sm:grid-cols-2 gap-4 mt-6 items-start">\n    ' + "\n    ".join(cards) + "\n  </div>"
