@@ -169,6 +169,14 @@ class Orquestrador:
             "video": "[o lead enviou um vídeo]", "document": "[o lead enviou um documento]",
             "sticker": "[o lead enviou uma figurinha]"}.get(tipo, mensagem_lead)
         dec = self.brain(lead, entrada, historico)
+        # Trava final de opt-out: só o LEAD pode se descadastrar, com as próprias
+        # palavras. Qualquer cérebro (LLM ou futuro) que devolva OPTOUT sem isso é
+        # rebaixado — a ação é irreversível e silencia o lead para sempre.
+        if dec.proxima_acao == C.OPTOUT and not G.detectar_optout(mensagem_lead):
+            self.est.log_acao("orquestrador",
+                              f"opt-out do cérebro IGNORADO (lead não pediu): {dec.motivo!r}", card_id)
+            dec = C.DecisaoAgente(C.CONTINUAR, dec.motivo, mensagem_ao_lead=dec.mensagem_ao_lead,
+                                  dados=dec.dados)
         # anti-loop: repetir a MESMA mensagem é sinal de agente perdido -> humano assume
         ultima_ag = next((h["texto"] for h in reversed(historico) if h.get("papel") == "agente"), None)
         if dec.mensagem_ao_lead and dec.mensagem_ao_lead == ultima_ag:

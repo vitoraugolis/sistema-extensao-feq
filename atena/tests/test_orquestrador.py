@@ -176,6 +176,27 @@ def test_funil_conta_fases():
     assert s["Prospect"] >= 1 and s["Matriculado"] >= 1
 
 
+def test_optout_do_cerebro_sem_o_lead_pedir_e_ignorado():
+    """INCIDENTE 21/07/2026: o LLM devolveu 'encerrar_optout' com motivo "Link
+    enviado para inscrição" logo depois do lead clicar "Receber link para
+    prosseguir" — confundiu ENCERRAR o atendimento com descadastro e silenciou
+    para sempre o lead de MAIOR intenção. Opt-out só vale com as palavras do lead."""
+    est, orq = _novo()
+    orq.brain = lambda lead, msg, hist=None: C.DecisaoAgente(
+        C.OPTOUT, "Link enviado para inscrição no curso.",
+        mensagem_ao_lead="Claro! Aqui está o link de inscrição.")
+    orq.processar_mensagem("c1", "Receber link para prosseguir")
+    assert est.get_lead("c1")["optout"] == 0          # NÃO descadastrou
+    assert est.get_lead("c1")["estado_conversa"] != "encerrado"
+
+
+def test_optout_de_verdade_continua_valendo():
+    """O caminho legítimo (LGPD) não pode ser enfraquecido pela trava acima."""
+    est, orq = _novo()
+    orq.processar_mensagem("c1", "não quero mais receber, pode me tirar da lista")
+    assert est.get_lead("c1")["optout"] == 1
+
+
 if __name__ == "__main__":
     casos = [v for k, v in sorted(globals().items()) if k.startswith("test_") and callable(v)]
     falhas = 0

@@ -272,6 +272,16 @@ def cerebro_llm(ont, lead, mensagem_lead, historico=None):
             msg = (data.get("mensagem_ao_lead") or "").strip()
             if data["proxima_acao"] in (C.CONTINUAR, C.QUALIFICAR, C.DESCARTAR) and len(msg) < 10:
                 raise ValueError(f"mensagem degenerada: {msg!r}")
+            # OPT-OUT NUNCA é juízo do LLM (21/07/2026): o modelo devolveu
+            # 'encerrar_optout' com motivo "Link enviado para inscrição" — confundiu
+            # ENCERRAR o atendimento com o lead pedir descadastro, e silenciou de vez
+            # um lead de máxima intenção (tinha clicado "Receber link para prosseguir").
+            # Opt-out é irreversível e de peso legal (LGPD): só vale se as PALAVRAS DO
+            # LEAD pedirem, o que já é detectado deterministicamente no topo desta função.
+            if data["proxima_acao"] == C.OPTOUT and not G.detectar_optout(mensagem_lead):
+                print(f"[cerebro] LLM pediu opt-out sem o lead pedir — rebaixado p/ continuar "
+                      f"(motivo do LLM: {data.get('motivo')!r})", flush=True)
+                data["proxima_acao"] = C.CONTINUAR
             return C.DecisaoAgente(
                 proxima_acao=data["proxima_acao"], motivo=data.get("motivo", ""),
                 mensagem_ao_lead=data.get("mensagem_ao_lead"),
