@@ -68,6 +68,20 @@ PROFESSOR_FOTOS = {
         "https://cursos-extensao.feq.unicamp.br/wp-content/uploads/2026/02/Gustavo-Doubek.jpg",
     "Douglas Alves Goulart":
         "https://cursos-extensao.feq.unicamp.br/wp-content/uploads/2026/07/douglas-alves-goulart.jpg",
+    # Docentes dos cursos incluídos em 21/07/2026 (fotos das páginas oficiais dos
+    # cursos; Ronierik veio do diretório institucional feq.unicamp.br/funcionario/).
+    "Leonardo Vasconcelos Fregolente":
+        "https://cursos-extensao.feq.unicamp.br/wp-content/uploads/2024/01/leonardo.png",
+    "Fabio Marcelo Brogna":
+        "https://cursos-extensao.feq.unicamp.br/wp-content/uploads/2024/01/fabio-marcelo.jpeg",
+    "Angela Hayashi":
+        "https://cursos-extensao.feq.unicamp.br/wp-content/uploads/2024/02/image_2024-02-02_172849557-e1706905838346.png",
+    "Savio Souza Venancio Vianna":
+        "https://cursos-extensao.feq.unicamp.br/wp-content/uploads/2024/08/savio_vianna.jpg",
+    "Eduardo Perez":
+        "https://cursos-extensao.feq.unicamp.br/wp-content/uploads/2024/11/1c3aae43-bc40-46c1-aa8b-22778addf511.jpg",
+    "Ronierik Pioli Vieira":
+        "https://www.feq.unicamp.br/wp-content/uploads/2025/09/Ronierik-Pioli-Vieira.png",
 }
 # Docentes em DESTAQUE por curso (cards com foto), além do responsável — que já tem
 # card próprio. FEQ-0480: escolha do usuário (20/07/2026); demais: os nomes que as

@@ -329,6 +329,43 @@ def test_estado_thread_safe_sob_concorrencia():
     assert not erros, f"{len(erros)} erro(s) de concorrência no SQLite: {erros[0]!r}"
 
 
+
+def _wa_payload(tel, texto, mid):
+    return {"entry": [{"changes": [{"value": {"messages": [
+        {"id": mid, "from": tel, "text": {"body": texto}}]}}]}]}
+
+
+def test_botao_whatsapp_da_lp_e_atendido_pelo_agente():
+    """Lead que clica no botão de WhatsApp da LP cai como número DESCONHECIDO.
+    Antes virava stub 'aguardando_revisao' e ninguém respondia. Agora o curso sai
+    do texto do botão ('Vim da página do curso FEQ-XXXX') e o agente atende."""
+    os.environ.pop("WHATSAPP_TOKEN", None)
+    est = Estado(":memory:")
+    wa = WhatsApp(est, Orquestrador(est, ONT))
+    out = wa.receber(_wa_payload("5519911110001",
+                                 "Olá! Vim da página do curso FEQ-0480 e quero saber mais.", "wm1"))
+    lead = est.get_lead("wa-5519911110001")
+    assert lead["curso"] == "FEQ-0480"              # curso veio do texto, não inventado
+    assert lead["estado_conversa"] != "aguardando_revisao"
+    assert lead["optin_fonte"] == "whatsapp_lp"    # ele nos escreveu: opt-in + janela 24h
+    assert out[0].get("decisao")                    # o agente RESPONDEU
+
+
+def test_whatsapp_sem_curso_entra_em_descoberta():
+    """Sem curso na mensagem, o agente pergunta qual é — nunca inventa nem escala."""
+    os.environ.pop("WHATSAPP_TOKEN", None)
+    est = Estado(":memory:")
+    wa = WhatsApp(est, Orquestrador(est, ONT))
+    out = wa.receber(_wa_payload("5519911110002", "Oi, boa tarde! Queria informações.", "wm2"))
+    lead = est.get_lead("wa-5519911110002")
+    assert lead["curso"] == ""                      # não inventou curso
+    msg = (out[0].get("decisao") or {}).get("mensagem_ao_lead", "")
+    assert "qual curso" in msg.lower()
+    # e ao dizer o curso na 2ª mensagem, o card passa a apontar pra ele
+    wa.receber(_wa_payload("5519911110002", "quero saber do FEQ-1000", "wm3"))
+    assert est.get_lead("wa-5519911110002")["curso"] == "FEQ-1000"
+
+
 if __name__ == "__main__":
     casos = [v for k, v in sorted(globals().items()) if k.startswith("test_") and callable(v)]
     falhas = 0

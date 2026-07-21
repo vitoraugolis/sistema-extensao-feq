@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
 """Testes do orquestrador + estado (offline, SQLite :memory:)."""
 import sys
+import datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from atena.ontologia.servico import Ontologia
 from atena.core.estado import Estado
-from atena.core.orquestrador import Orquestrador
+from atena.core.orquestrador import Orquestrador, brain_deterministico
+from atena.core import contratos as C
 
 ONT = Ontologia()
 
@@ -99,14 +101,52 @@ def test_afirmacao_pos_gate_qualifica():
 
 
 def test_gate_nao_repete_a_mesma_frase():
-    from atena.core.orquestrador import MSG_GATE, MSG_GATE_2, brain_deterministico
+    from atena.core.orquestrador import _msg_gate, brain_deterministico
     est, _ = _novo()
     lead = est.get_lead("c1")
     d1 = brain_deterministico(ONT, lead, "quero saber mais", historico=[])
-    assert d1.mensagem_ao_lead == MSG_GATE
+    assert d1.mensagem_ao_lead == _msg_gate(ONT, "FEQ-0480")
     d2 = brain_deterministico(ONT, lead, "legal",
-                              historico=[{"papel": "agente", "texto": MSG_GATE}])
-    assert d2.mensagem_ao_lead == MSG_GATE_2          # variou, não papagaiou
+                              historico=[{"papel": "agente", "texto": d1.mensagem_ao_lead}])
+    assert d2.mensagem_ao_lead == _msg_gate(ONT, "FEQ-0480", insistindo=True)
+    assert d2.mensagem_ao_lead != d1.mensagem_ao_lead          # variou, não papagaiou
+
+
+def test_gate_pergunta_o_nivel_DO_CURSO():
+    """FEQ-0299/0670 pedem só ensino médio: perguntar 'concluiu o ensino superior?'
+    faria o lead elegível se autoexcluir (e seria informação falsa)."""
+    from atena.core.orquestrador import _msg_gate
+    assert "ensino médio" in _msg_gate(ONT, "FEQ-0299")
+    assert "ensino superior" not in _msg_gate(ONT, "FEQ-0299")
+    assert "ensino superior" in _msg_gate(ONT, "FEQ-0480")
+
+
+def test_lead_com_medio_e_elegivel_no_curso_de_medio():
+    """O gate não pode descartar quem tem exatamente o nível exigido pelo curso."""
+    est, _ = _novo()
+    est.set_lead("c1", curso="FEQ-0299", escolaridade="Ensino Médio Completo")
+    d = brain_deterministico(ONT, est.get_lead("c1"), "tenho interesse",
+                             historico=[], hoje=datetime.date(2026, 7, 21))
+    assert d.proxima_acao != C.DESCARTAR
+
+
+def test_sem_curso_pergunta_qual_em_vez_de_escalar():
+    """Lead do botão de WhatsApp da LP sem curso: agente descobre, não escala."""
+    est, _ = _novo()
+    est.set_lead("c1", curso="")
+    d = brain_deterministico(ONT, est.get_lead("c1"), "oi, quero informações", historico=[])
+    assert d.proxima_acao == C.CONTINUAR
+    assert "qual curso" in (d.mensagem_ao_lead or "").lower()
+
+
+def test_sem_curso_mas_citou_codigo_adota_o_curso():
+    est, _ = _novo()
+    est.set_lead("c1", curso="")
+    d = brain_deterministico(ONT, est.get_lead("c1"),
+                             "Olá! Vim da página do curso FEQ-1000 e quero saber mais.",
+                             historico=[], hoje=datetime.date(2026, 7, 21))
+    assert d.dados.get("curso") == "FEQ-1000"      # persiste no card
+    assert "qual curso" not in (d.mensagem_ao_lead or "").lower()
 
 
 def test_pedido_de_link_envia_link():

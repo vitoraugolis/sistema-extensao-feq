@@ -9,11 +9,17 @@ dev; em produção, fora de 24h exige template (TODO marcado).
 """
 import os
 import sys
+import datetime
 import pathlib
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2]))
 
 from atena.core import guardrails as G
+from atena.agentes.ingestao import curso_de_texto
+
+
+def _agora_iso():
+    return datetime.datetime.now().isoformat(timespec="seconds")
 
 _GRAPH = "https://graph.facebook.com/v19.0"
 _MEDIA_DIR = pathlib.Path(__file__).resolve().parents[1] / "data" / "media"
@@ -95,13 +101,22 @@ class WhatsApp:
                     if media_id:
                         self._baixar_midia(media_id, mime)
                     card_id = self.est.lead_por_telefone(tel)
-                    if not card_id:  # número desconhecido -> stub p/ revisão (não inventa curso)
+                    if not card_id:
+                        # Número desconhecido = quase sempre o botão de WhatsApp das LPs.
+                        # O agente ATENDE (antes o card ficava parado esperando humano):
+                        # o curso sai do texto quando a mensagem o cita — o link do botão
+                        # manda "Vim da página do curso FEQ-XXXX" — e, sem isso, o cérebro
+                        # entra em modo descoberta e pergunta. Nunca inventamos o curso.
                         card_id = f"wa-{tel}"
-                        self.est.upsert_lead(card_id, nome="", telefone=tel, curso="",
-                                             fase="Lead", estado_conversa="aguardando_revisao")
-                        self.est.add_conversa(card_id, "lead", texto, tipo=tipo, media_id=media_id)
-                        out.append({"card_id": card_id, "acao": "revisao_numero_desconhecido"})
-                        continue
+                        curso = curso_de_texto(texto)
+                        self.est.upsert_lead(
+                            card_id, nome="", telefone=tel, curso=curso,
+                            cursos_interesse=curso, fase="Lead",
+                            estado_conversa="qualificacao",
+                            # o lead nos escreveu primeiro: é opt-in e abre a janela de 24h
+                            optin_ts=_agora_iso(), optin_fonte="whatsapp_lp")
+                        self.est.log_acao("whatsapp", f"lead novo pelo WhatsApp (curso: {curso or 'a descobrir'})",
+                                          card_id)
                     out.append({"card_id": card_id,
                                 **self.orq.processar_mensagem(card_id, texto, tipo=tipo, media_id=media_id)})
                 for s in v.get("statuses", []):        # status das NOSSAS mensagens enviadas

@@ -16,20 +16,29 @@ class Bibliotecario:
     def __init__(self, ont):
         self.ont = ont
 
-    def contexto(self, curso, escolaridade=None, mensagem=None):
-        info = self.ont.curso(curso)
-        if not info:
-            return {"curso": curso, "existe": False}
-        cap = self.ont.captavel(curso)
-        eleg = self.ont.elegivel(escolaridade, curso) if escolaridade else None
-
-        citados = []
-        vistos = {info["codigo"]}
+    def _citados(self, mensagem, vistos):
+        out = []
         for m in CODE_RE.findall(mensagem or ""):
             c = self.ont.curso(f"FEQ-{m}")
             if c and c["codigo"] not in vistos:
                 vistos.add(c["codigo"])
-                citados.append({"curso": c, "captavel": self.ont.captavel(c["codigo"])})
+                out.append({"curso": c, "captavel": self.ont.captavel(c["codigo"])})
+        return out
+
+    def contexto(self, curso, escolaridade=None, mensagem=None):
+        info = self.ont.curso(curso)
+        if not info:
+            # SEM curso definido (ex.: lead que chegou pelo botão de WhatsApp da LP
+            # sem dizer o curso) NÃO é beco sem saída: o agente atende em modo
+            # DESCOBERTA — com o portfólio inteiro — para perguntar/orientar qual
+            # curso interessa. Antes isso virava escalonamento silencioso.
+            return {"curso": None, "existe": False, "descoberta": True,
+                    "captavel": {}, "elegivel": None,
+                    "portfolio": self.ont.portfolio(),
+                    "cursos_citados": self._citados(mensagem, set())}
+        cap = self.ont.captavel(curso)
+        eleg = self.ont.elegivel(escolaridade, curso) if escolaridade else None
+        citados = self._citados(mensagem, {info["codigo"]})
 
         return {
             "existe": True,

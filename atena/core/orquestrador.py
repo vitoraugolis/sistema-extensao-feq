@@ -44,16 +44,38 @@ def _inferir_escolaridade(texto):
 AFIRMA_RE = re.compile(
     r"^\s*(sim|s[,.!\s]|claro|tenho|possuo|com certeza|isso|j[áa]\b|conclu[íi]"
     r"|pode\b|manda|envia|beleza|ok\b|quero|por favor)", re.I)
-MSG_GATE = ("Que ótimo seu interesse! 😊 Para eu te orientar da melhor forma, só preciso "
-            "confirmar uma coisa: você já concluiu o ensino superior? "
-            "É o pré-requisito dos nossos cursos.")
-MSG_GATE_2 = ("Desculpe insistir! 🙏 É que essa informação define os próximos passos: "
-              "você já concluiu o ensino superior?")
+# O requisito NÃO é o mesmo em todo o catálogo (FEQ-0299 e FEQ-0670 pedem só ensino
+# médio): perguntar "concluiu o ensino superior?" para esses faria o lead elegível
+# se autoexcluir. O texto sai do nivelMinimo do curso.
+_NIVEL_PERGUNTA = {"medio": "o ensino médio", "superiorIncompleto": "ou está cursando o ensino superior",
+                   "superiorCompleto": "o ensino superior", "pos": "uma pós-graduação"}
+
+
+def _msg_gate(ont, cod, insistindo=False):
+    nivel = ((ont.curso(cod) or {}).get("requisito")) or "superiorCompleto"
+    alvo = _NIVEL_PERGUNTA.get(nivel, "o ensino superior")
+    if insistindo:
+        return ("Desculpe insistir! 🙏 É que essa informação define os próximos passos: "
+                f"você já concluiu {alvo}?")
+    return ("Que ótimo seu interesse! 😊 Para eu te orientar da melhor forma, só preciso "
+            f"confirmar uma coisa: você já concluiu {alvo}? É o pré-requisito deste curso.")
 
 
 def brain_deterministico(ont, lead, mensagem_lead, historico=None, hoje=None):
     """Cérebro mínimo, offline. Substituível por um cérebro LLM (mesmo contrato).
     hoje: injetável p/ teste (a captabilidade depende do calendário real)."""
+    dec = _brain_deterministico(ont, lead, mensagem_lead, historico, hoje)
+    # Curso descoberto na mensagem (lead sem curso no card) tem de PERSISTIR, senão
+    # a próxima mensagem volta à estaca zero.
+    if dec.dados.get("curso") is None and not lead.get("curso"):
+        cod = next((f"FEQ-{m}" for m in re.findall(r"FEQ[-\s]?(\d{3,4})", mensagem_lead or "", re.I)
+                    if ont.curso(f"FEQ-{m}")), None)
+        if cod:
+            dec.dados["curso"] = cod
+    return dec
+
+
+def _brain_deterministico(ont, lead, mensagem_lead, historico=None, hoje=None):
     cod = lead["curso"]
     if G.detectar_optout(mensagem_lead):
         return C.DecisaoAgente(C.OPTOUT, "lead pediu opt-out",
@@ -61,20 +83,45 @@ def brain_deterministico(ont, lead, mensagem_lead, historico=None, hoje=None):
     if G.gatilho_sensivel(mensagem_lead):
         return C.DecisaoAgente(C.ESCALAR, "gatilho sensível",
                                escalonamento_motivo="desconto/reclamação/intenção de fechar")
+    # Sem curso definido (lead do botão de WhatsApp da LP que não citou curso):
+    # DESCOBERTA — pergunta qual curso em vez de escalar. Se a mensagem citar um
+    # código válido, adota-o e segue o fluxo normal.
+    if not cod or not ont.curso(cod):
+        citado = next((f"FEQ-{m}" for m in re.findall(r"FEQ[-\s]?(\d{3,4})", mensagem_lead or "", re.I)
+                       if ont.curso(f"FEQ-{m}")), None)
+        if citado:
+            cod = citado
+        else:
+            abertos = [c for c in ont.portfolio() if c.get("inscricao") == "aberta"][:3]
+            lista = "; ".join(f"{c['codigo']} ({c['nome']})" for c in abertos)
+            msg = ("Oi! Que bom falar com você 😊 Sou o Vinícius, da Extensão FEQ Unicamp. "
+                   "Sobre qual curso você quer informações? "
+                   + (f"Alguns com inscrições abertas agora: {lista}. " if lista else "")
+                   + "Se estiver em dúvida, me conta sua formação e o que você quer "
+                     "melhorar que eu te indico o mais adequado!")
+            return C.DecisaoAgente(C.CONTINUAR, "lead sem curso definido — descoberta",
+                                   mensagem_ao_lead=msg)
     cap = ont.captavel(cod, hoje)
     if not cap.get("captavel"):
         return C.DecisaoAgente(C.ESCALAR, f"curso {cod} não captável ({cap.get('status')})",
                                escalonamento_motivo=f"captabilidade: {cap.get('status')}")
     esc = _inferir_escolaridade(mensagem_lead) or lead.get("escolaridade")
-    # memória mínima: "sim/tenho" logo após a pergunta do gate = superior confirmado
+    # memória mínima: "sim/tenho" logo após a pergunta do gate confirma o nível QUE
+    # FOI PERGUNTADO (varia por curso — não assumir superior).
     ultima_agente = next((h["texto"] for h in reversed(historico or []) if h.get("papel") == "agente"), "")
-    if not esc and "ensino superior" in ultima_agente.lower() and AFIRMA_RE.search(mensagem_lead or ""):
-        esc = "Superior Completo"
+    nivel_curso = ((ont.curso(cod) or {}).get("requisito")) or "superiorCompleto"
+    if not esc and AFIRMA_RE.search(mensagem_lead or "") and (
+            "ensino superior" in ultima_agente.lower() or "ensino médio" in ultima_agente.lower()
+            or "pós-graduação" in ultima_agente.lower()):
+        esc = {"medio": "Ensino Médio Completo", "superiorIncompleto": "Superior Incompleto",
+               "superiorCompleto": "Superior Completo", "pos": "Pós-graduação"}[nivel_curso]
     if esc:
         eleg = ont.elegivel(esc, cod)
         if eleg is False:
+            exigido = _NIVEL_PERGUNTA.get(nivel_curso, "o ensino superior")
             return C.DecisaoAgente(C.DESCARTAR, "inelegível (gate acadêmico)",
-                                   mensagem_ao_lead="Obrigado pelo interesse! Este curso exige ensino superior completo, então não seria possível agora. Posso te avisar sobre opções futuras?",
+                                   mensagem_ao_lead=f"Obrigado pelo interesse! Este curso exige {exigido} concluído, "
+                                                    "então não seria possível agora. Posso te avisar sobre opções futuras?",
                                    dados={"escolaridade": esc})
         if eleg is True:
             c = ont.curso(cod)
@@ -95,8 +142,9 @@ def brain_deterministico(ont, lead, mensagem_lead, historico=None, hoje=None):
             return C.DecisaoAgente(C.QUALIFICAR, "elegível + interesse",
                                    mensagem_ao_lead=msg, dados={"escolaridade": esc})
     # anti-repetição: se a última mensagem do agente já foi o gate, varia a frase
-    msg_gate = MSG_GATE_2 if "ensino superior" in ultima_agente.lower() else MSG_GATE
-    return C.DecisaoAgente(C.CONTINUAR, "coletando escolaridade", mensagem_ao_lead=msg_gate)
+    ja_perguntou = "pré-requisito deste curso" in ultima_agente or "já concluiu" in ultima_agente
+    return C.DecisaoAgente(C.CONTINUAR, "coletando escolaridade",
+                           mensagem_ao_lead=_msg_gate(ont, cod, insistindo=ja_perguntou))
 
 
 class Orquestrador:

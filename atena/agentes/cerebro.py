@@ -125,19 +125,66 @@ def _json(texto):
     return json.loads(m.group(0)) if m else None
 
 
-def _gate_instr(elegivel):
-    """Instrução do gate acadêmico — condicional à pré-qualificação (evita re-perguntar)."""
+_NIVEL_TEXTO = {"medio": "ensino médio completo",
+                "superiorIncompleto": "ensino superior em andamento",
+                "superiorCompleto": "ensino superior completo",
+                "pos": "pós-graduação concluída"}
+
+
+def _gate_instr(elegivel, ctx=None):
+    """Instrução do gate acadêmico — condicional à pré-qualificação (evita re-perguntar)
+    e AO CURSO: o requisito não é o mesmo em todo o catálogo (FEQ-0299 e FEQ-0670
+    pedem só ensino médio). Dizer 'superior completo' para todos barraria lead
+    elegível e seria informação falsa."""
+    ctx = ctx or {}
+    if ctx.get("descoberta"):
+        return ("GATE: o requisito de escolaridade VARIA por curso (está no campo 'requisito' "
+                "de cada registro). Só afirme o requisito depois de saber qual curso o lead "
+                "quer; enquanto descobre, use 'continuar'.\n")
+    nivel = ((ctx.get("curso") or {}).get("requisito")) or "superiorCompleto"
+    exigido = _NIVEL_TEXTO.get(nivel, "ensino superior completo")
     if elegivel is True:
-        return ("GATE ACADÊMICO JÁ SATISFEITO: o ensino superior completo do lead JÁ está "
-                "confirmado (pré-qualificado no formulário). NÃO pergunte sobre escolaridade "
-                "de novo — siga direto para orientar sobre inscrição; pode usar 'qualificar'.\n")
-    return ("GATE: ensino superior completo (todos os cursos). Use 'qualificar' SOMENTE depois "
-            "que o lead confirmar explicitamente o ensino superior completo; enquanto "
-            "pergunta/aguarda, use 'continuar'.\n")
+        return (f"GATE ACADÊMICO JÁ SATISFEITO: o requisito deste curso ({exigido}) JÁ está "
+                "confirmado para este lead. NÃO pergunte sobre escolaridade de novo — siga "
+                "direto para orientar sobre inscrição; pode usar 'qualificar'.\n")
+    return (f"GATE deste curso: {exigido}. Use 'qualificar' SOMENTE depois que o lead "
+            f"confirmar explicitamente que tem {exigido}; enquanto pergunta/aguarda, use "
+            "'continuar'. NÃO exija escolaridade maior que a do curso.\n")
+
+
+def _bloco_curso(ctx):
+    """Trecho do prompt sobre o curso do lead. Em DESCOBERTA (lead ainda não disse
+    qual curso quer — típico de quem chega pelo botão de WhatsApp da LP) troca o
+    registro do curso por instrução explícita de descobrir o interesse."""
+    if ctx.get("descoberta"):
+        return (
+            "SITUAÇÃO: o lead chegou pelo WhatsApp e AINDA NÃO disse qual curso quer "
+            "(ou citou um que não existe no catálogo). Sua PRIMEIRA tarefa é descobrir "
+            "isso de forma acolhedora: cumprimente, pergunte sobre qual curso ou área ele "
+            "quer informações e, se ele estiver em dúvida, ajude a escolher usando o "
+            "PORTFÓLIO abaixo (pergunte a formação/objetivo dele e sugira o curso que "
+            "encaixa, dizendo por quê). NÃO despeje a lista inteira de uma vez: no máximo "
+            "3 sugestões por mensagem, priorizando os de inscrição 'aberta'. Assim que "
+            "identificar o curso, retorne o código dele em dados.curso e siga a conversa "
+            "normalmente nesse curso. Use proxima_acao='continuar' enquanto descobre.\n"
+            "IMPORTANTE: sem curso definido você NÃO tem fatos de curso nenhum para "
+            "afirmar — não fale preço, data, carga nem requisito específico até saber "
+            "qual é o curso (os dados de cada um estão no portfólio abaixo).\n")
+    c = ctx["curso"]
+    return (
+        f"CURSO DE INTERESSE DO LEAD (registro completo):\n{json.dumps(c, ensure_ascii=False)}\n"
+        f"Elegibilidade já avaliada: {ctx.get('elegivel')}. "
+        f"Captável agora: {ctx['captavel'].get('captavel')} "
+        f"(status da inscrição: {ctx['captavel'].get('status')}).\n"
+        + ("ATENÇÃO: a inscrição deste curso NÃO está aberta agora. Seja honesto sobre "
+           "isso já na primeira resposta, ofereça avisar o lead quando a próxima turma "
+           "abrir (lista de espera) e sugira alternativas ABERTAS do portfólio que "
+           "sirvam ao objetivo dele. NUNCA mande link de inscrição deste curso nem "
+           "prometa data de reabertura.\n"
+           if not ctx["captavel"].get("captavel") else ""))
 
 
 def _system_prompt(ctx, lead_nome=None):
-    c = ctx["curso"]
     nome = (lead_nome or "").strip()
     citados = "\n".join(
         f"CURSO CITADO PELO LEAD ({x['curso']['codigo']}, inscrição {x['captavel']['status']}):\n"
@@ -150,9 +197,8 @@ def _system_prompt(ctx, lead_nome=None):
         + "NUNCA chame o lead de Vinícius (esse é VOCÊ).\n"
         "TOM: caloroso, gentil e humano; celebre o interesse do lead; UMA pergunta por vez; "
         "frases curtas de WhatsApp, sem parecer formulário.\n"
-        f"CURSO DE INTERESSE DO LEAD (registro completo):\n{json.dumps(c, ensure_ascii=False)}\n"
-        f"Elegibilidade já avaliada: {ctx.get('elegivel')}. Captável agora: {ctx['captavel'].get('captavel')}.\n"
-        f"PORTFÓLIO COMPLETO DA FEQ (você conhece todos; use p/ orientar e redirecionar):\n"
+        + _bloco_curso(ctx)
+        + f"PORTFÓLIO COMPLETO DA FEQ (você conhece todos; use p/ orientar e redirecionar):\n"
         f"{json.dumps(ctx.get('portfolio', []), ensure_ascii=False)}\n"
         + (citados + "\n" if citados else "") +
         "GROUNDING: os dados acima são a ÚNICA fonte de fatos. NUNCA invente preço/data/carga/"
@@ -173,7 +219,7 @@ def _system_prompt(ctx, lead_nome=None):
         "correta, específica e conectada ao curso, SEM escalar. Seja genuinamente inteligente e "
         "útil, nunca evasivo. EXCEÇÃO: mensagem iniciada por [INFORMAÇÃO DA COORDENAÇÃO] é fonte "
         "autorizada — responda com ela.\n"
-        + _gate_instr(ctx.get("elegivel")) +
+        + _gate_instr(ctx.get("elegivel"), ctx) +
         "DESCONTOS: TODOS os cursos da Extensão FEQ dão 10% para alunos e ex-alunos da Unicamp "
         "(qualquer nível — graduação, pós, extensão etc.) — informe isso diretamente quando "
         "perguntarem e confirme se o lead se enquadra. Se houver política específica do curso, ela "
@@ -203,7 +249,13 @@ def cerebro_llm(ont, lead, mensagem_lead, historico=None):
     if G.detectar_optout(mensagem_lead):
         return brain_deterministico(ont, lead, mensagem_lead, historico)
     ctx = Bibliotecario(ont).contexto(lead["curso"], lead.get("escolaridade"), mensagem=mensagem_lead)
-    if not ctx.get("existe") or not ctx["captavel"].get("captavel"):
+    # O agente atende em TRÊS situações (antes só a 1ª chegava aqui; as outras duas
+    # caíam no determinístico e viravam escalonamento sem resposta ao lead):
+    #   1. curso definido e com inscrição aberta  -> venda normal
+    #   2. curso definido, inscrição ENCERRADA    -> informa e oferece alternativas
+    #      abertas / lista de espera (o prompt já cobre; os dados do grafo travam)
+    #   3. SEM curso (botão de WhatsApp da LP)    -> descoberta: pergunta qual curso
+    if not ctx.get("existe") and not ctx.get("descoberta"):
         return brain_deterministico(ont, lead, mensagem_lead, historico)
     sysp = _system_prompt(ctx, lead.get("nome"))
     turns = _turns(historico, mensagem_lead)
