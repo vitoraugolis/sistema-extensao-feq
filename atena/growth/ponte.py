@@ -56,6 +56,8 @@ PROFESSOR_FOTOS = {
         "https://cursos-extensao.feq.unicamp.br/wp-content/uploads/2025/04/1681221613629.jpg",
     "Gustavo Doubek":
         "https://cursos-extensao.feq.unicamp.br/wp-content/uploads/2026/02/Gustavo-Doubek.jpg",
+    "Douglas Alves Goulart":
+        "https://cursos-extensao.feq.unicamp.br/wp-content/uploads/2026/07/douglas-alves-goulart.jpg",
 }
 # Docentes em DESTAQUE por curso (cards com foto), além do responsável — que já tem
 # card próprio. FEQ-0480: escolha do usuário (20/07/2026); demais: os nomes que as
@@ -143,6 +145,13 @@ PROFESSOR_BIO = {
         "bio": "Engenheiro Químico e Black Belt com experiência em projetos de IA, NLP, otimização "
                "e simulação. Atuou em iniciativas com impacto financeiro e operacional relevante e "
                "liderou times ágeis em grandes empresas."},
+    "Douglas Alves Goulart": {
+        "cargo": "Cientista de Dados",
+        "bio": "Cientista de dados com experiência em mercado financeiro, marketing, logística e "
+               "Indústria 4.0, focado em soluções orientadas a dados para decisões data-driven. "
+               "Domina Machine Learning, Computer Vision, Reinforcement Learning e Cloud Computing "
+               "(AWS e GCP), com Python (TensorFlow, PyTorch, scikit-learn, XGBoost, Pandas) "
+               "aplicado a controle e automação de processos."},
     "Luis Fernando Mercier Franco": {
         "cargo": "Professor Associado FEQ Unicamp",
         "bio": "Engenheiro Químico, Mestre e Doutor em Ciências pela Poli-USP; Livre-Docente pela "
@@ -299,7 +308,7 @@ def _secao_depoimentos_html(depoimentos):
     cards = "\n    ".join(
         '<figure class="depoimento">'
         '<span class="depo-aspa" aria-hidden="true">“</span>'
-        f'<blockquote>{_esc(d["texto"])}</blockquote>'
+        f'<p class="depo-texto">{_esc(d["texto"])}</p>'
         '<figcaption>'
         f'<span class="depo-avatar" aria-hidden="true">{_esc(_iniciais(d["nome"]))}</span>'
         f'<span class="depo-quem"><strong>{_esc(d["nome"])}</strong>'

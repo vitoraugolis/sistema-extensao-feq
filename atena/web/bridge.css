@@ -339,9 +339,17 @@ h1, h2, h3, p { margin: 0; }
   position: absolute; top: 0.35rem; left: 1.1rem; font-size: 3rem; line-height: 1;
   color: rgb(251 191 36 / 0.55); font-family: Georgia, "Times New Roman", serif; font-weight: 700;
 }
-.depoimento blockquote {
-  margin: 0; font-size: 0.95rem; line-height: 1.6; color: #f1f5f9; font-style: normal;
+/* .depo-texto (um paragrafo, NÃO a tag de citação do HTML): o tema Aperture
+   estiliza aquela tag com FUNDO claro + aspa decorativa própria — nosso texto
+   quase-branco sumia sobre ele. Uma classe que o tema não conhece é imune;
+   ainda resetamos fundo/borda com !important por garantia contra regras
+   genéricas de <p> do tema. */
+.depoimento .depo-texto {
+  margin: 0 !important; padding: 0 !important; background: none !important;
+  border: none !important; box-shadow: none !important; text-indent: 0 !important;
+  font-size: 0.95rem; line-height: 1.6; color: #f1f5f9 !important; font-style: normal;
 }
+.depoimento .depo-texto::before, .depoimento .depo-texto::after { content: none !important; }
 .depoimento figcaption {
   margin-top: 1.1rem; padding-top: 0.9rem; border-top: 1px solid rgb(255 255 255 / 0.12);
   display: flex; align-items: center; gap: 0.75rem;

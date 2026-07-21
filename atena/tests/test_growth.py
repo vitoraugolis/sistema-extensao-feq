@@ -459,13 +459,16 @@ check("Livre-Docente em Controle de Processos" in lp_real,
 # --- fotos dos docentes em destaque (fonte: páginas oficiais) + rótulo -------------
 check("vitor_machado-e1721925782819.jpg" in lp_real,
       "0480: Vitor Machado em destaque com foto da página oficial")
-check('class="avatar-iniciais"' in lp_real and "Douglas Alves Goulart" in lp_real,
-      "0480: Douglas em destaque (sem foto publicada) -> avatar de iniciais, nunca inventa foto")
+check("douglas-alves-goulart.jpg" in lp_real and "Cientista de Dados" in lp_real
+      and "data-driven" in lp_real,
+      "0480: Douglas em destaque com foto + bio readequada do LinkedIn")
 check("Mais professores do curso" in lp_real and "Demais professores" not in lp_real,
       "rótulo trocado para 'Mais professores do curso'")
 check('class="depo-avatar"' in lp_real and 'class="depo-aspa"' in lp_real
       and "&ldquo;" not in lp_real,
       "depoimentos redesenhados (avatar + aspa unicode, sem entidade que o WP mangla)")
+check('class="depo-texto"' in lp_real and "<blockquote" not in lp_real,
+      "depoimento usa .depo-texto, não <blockquote> (o tema WP pinta blockquote de branco)")
 check("914,20" not in lp_real and "1.097,05" not in lp_real,
       "0480: plano de pagamento DESATUALIZADO da página antiga NÃO é importado (Extecamp vence)")
 check("Garantia de 7 dias" not in lp_real, "0480: sem garantia inventada (só o FEQ-1000 a publica)")
