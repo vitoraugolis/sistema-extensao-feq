@@ -25,9 +25,17 @@ def check(c, msg):
 
 
 class FakeOnt:
-    def captavel(self, curso): return {"captavel": True}
+    def captavel(self, curso, hoje=None): return {"captavel": True}
     def curso(self, curso):
         return {"codigo": curso, "nome": "Curso X", "inscricoes_fim": "2026-08-16"}
+
+
+class _OntCaptabilidade(FakeOnt):
+    """Igual ao FakeOnt, mas com o FEQ-0499 FECHADO — para exercitar o modo lista
+    de espera e a priorização do cross-sell."""
+    def captavel(self, curso, hoje=None):
+        return {"captavel": curso != "FEQ-0499", "status":
+                "encerrada" if curso == "FEQ-0499" else "aberta"}
 
 
 class FakeWA:
@@ -50,10 +58,14 @@ check(pacing.calcular(33, 33, datetime.date(2026, 8, 16), 0, HOJE)["status"] == 
       "meta batida -> concluido")
 check(pacing.calcular(91, 10, None, 1, HOJE)["status"] == "sem_prazo", "sem prazo -> sem_prazo")
 
-# --- seed das 4 turmas + inscritos/velocidade -----------------------------------
+# --- seed das turmas + inscritos/velocidade -------------------------------------
+# LP para TODO o portfólio (20/07/2026), incluindo curso sem turma aberta (0499,
+# em modo lista de espera). Os 4 primeiros seguem sendo as turmas-alvo da campanha.
 g = Growth(":memory:")
-check({c["curso"] for c in g.cursos()} == {"FEQ-0480", "FEQ-0580", "FEQ-0333", "FEQ-1000"},
-      "seed das 4 turmas-alvo")
+check({c["curso"] for c in g.cursos()} == {"FEQ-0480", "FEQ-0580", "FEQ-0333", "FEQ-1000",
+                                           "FEQ-0360", "FEQ-0331", "FEQ-0299", "FEQ-0670",
+                                           "FEQ-0499"},
+      "seed cobre os 9 cursos com LP (4 turmas-alvo + demais do portfólio)")
 check([c for c in g.cursos() if c["curso"] == "FEQ-1000"][0]["meta_seg"] == 91,
       "meta de segurança = meta real +30% (FEQ-1000: 91)")
 
@@ -195,7 +207,7 @@ check(not ferramentas.executar("pausar_ad", {"ad_id": "ad1", "motivo": "  "}, g4
 check(not ferramentas.executar("hackear_tudo", {}, g4, ads)["ok"], "ferramenta desconhecida recusada")
 g4.add_desempenho({"dia": HOJE.isoformat(), "objeto_id": "as9", "nome": "X",
                    "campanha": "FEQ-0480 v1", "curso": "FEQ-0480", "gasto": 780.0, "leads": 10})
-r = ferramentas.executar("custo_por_matricula", {"dias": 7}, g4, ads)
+r = ferramentas.executar("custo_por_matricula", {"dias": 7}, g4, ads, agora=AGORA)
 check(r["cursos"]["FEQ-0480"]["custo_por_matricula"] == 780.0
       and r["cursos"]["FEQ-0480"]["roas"] == 5.0,
       "custo por matrícula (780/1) e ROAS (3900/780) corretos")
@@ -273,10 +285,10 @@ r = ponte.processar({"nome": "Alias", "whatsapp": "19966660001", "curso_id": "fe
 check(r["ok"] and r["redirect"].endswith("FEQ-0580/001"),
       "payload {whatsapp, curso_id} do bridge-logic é aceito")
 
-# --- deploy WP: renderiza as 4 e, sem credenciais, não publica -------------------
+# --- deploy WP: renderiza todas e, sem credenciais, não publica ------------------
 pgs = wpd.renderizar(g5, FakeOnt(), g5.cursos(), tempfile.mkdtemp())
-check(len(pgs) == 4 and all(pathlib.Path(p["arquivo"]).exists() for p in pgs),
-      "deploy renderiza as 4 LPs em disco")
+check(len(pgs) == 9 and all(pathlib.Path(p["arquivo"]).exists() for p in pgs),
+      "deploy renderiza as 9 LPs do portfólio em disco")
 check(all(x["status"] == "dry_run" for x in wpd.publicar(pgs)),
       "sem credenciais WP o deploy é dry-run (não publica nada)")
 
@@ -306,8 +318,10 @@ check(wpd.publicar_obrigado()["status"] == "dry_run",
 
 # ================= fluxo consolidado (spec 17): inscricao, telemetria, cadência ===
 # --- destino é o formulário /curso/inscricao/ ------------------------------------
-check(all("/curso/inscricao/" in c["url"] for c in g5.cursos()),
+check(all("/curso/inscricao/" in c["url"] for c in g5.cursos() if c["url"]),
       "seed aponta para o formulário /curso/inscricao/")
+check([c["url"] for c in g5.cursos() if c["curso"] == "FEQ-0499"] == [""],
+      "curso sem turma aberta (0499) fica SEM url de inscrição — LP vira lista de espera")
 meta = {"curso": "FEQ-0480", "turma": "009",
         "url": "https://ins.extecamp.unicamp.br/curso/dados/FEQ-0480/009"}
 check(ponte.url_inscricao(meta, None).endswith("/curso/inscricao/FEQ-0480/009"),
@@ -396,7 +410,12 @@ check(ponte._professor_credencial_html("Alguém Não Cadastrado") == "",
 
 rel = ponte._cursos_relacionados_html(g5, FakeOnt(), "FEQ-0480")
 check(rel.count('<a href="/inscricao-') == 3 and "FEQ-0480" not in rel,
-      "cursos relacionados: os outros 3, nunca o próprio curso da página")
+      "cursos relacionados: no máx. 3 cards, nunca o próprio curso da página")
+# com o portfólio inteiro no ar, o cross-sell prioriza quem está com inscrição ABERTA
+_ont_cap = _OntCaptabilidade()
+rel_ab = ponte._cursos_relacionados_html(g5, _ont_cap, "FEQ-0480")
+check("inscricao-feq-0499-001" not in rel_ab,
+      "cross-sell não sugere curso FECHADO havendo abertos suficientes")
 check("inscricao-feq-0580-001" in rel, "link usa o mesmo padrão de slug do deploy WP")
 
 lp2 = ponte.render(g5, FakeOnt(), "FEQ-0480")
@@ -492,6 +511,61 @@ check("lattes.cnpq.br/6149769815435543" in lp_0333b,
       "0333: Lattes do Doubek corrigido pro publicado na página oficial do curso")
 check('class="prog-mod"' in lp_0333b and "Diferença entre CCS e CCUS" in lp_0333b,
       "0333: programa detalhado oficial em accordion")
+
+# --- LP de TODO o portfólio + modo LISTA DE ESPERA (spec 17 §2b) -------------------
+for _cod in ("FEQ-0360", "FEQ-0331", "FEQ-0299", "FEQ-0670", "FEQ-0499"):
+    _lp = ponte.render(g5, _ont_real, _cod)
+    check(_lp and "{{" not in _lp, f"{_cod}: LP renderiza sem token sobrando")
+_lp0299 = ponte.render(g5, _ont_real, "FEQ-0299")
+check("Ronierik Pioli Vieira" in _lp0299 and "CrystalWalk" in _lp0299,
+      "0299 (novo): professor e programa oficiais na LP")
+check("ensino médio" in _lp0299.lower(),
+      "0299: requisito de ensino MÉDIO (não superior) vem da ontologia")
+_lp0670 = ponte.render(g5, _ont_real, "FEQ-0670")
+check("GROMACS" in _lp0670 and "Luiz Guilherme Lomônaco" in _lp0670,
+      "0670 (novo): programa e corpo docente oficiais")
+_lp0360 = ponte.render(g5, _ont_real, "FEQ-0360")
+check("Fabio Marcelo Brogna" in _lp0360 and "HAZOP" in _lp0360
+      and "15.883" in _lp0360,
+      "0360: docentes, programa e salário de referência oficiais")
+
+# curso SEM turma aberta -> lista de espera (nada de inscrição prometida)
+_lp0499 = ponte.render(g5, _ont_real, "FEQ-0499")
+check("Quero ser avisado" in _lp0499 and "Inscreva-se" not in _lp0499,
+      "0499 (fechado): CTA vira 'Quero ser avisado', sem prometer inscrição")
+check("lista de espera" in _lp0499.lower() and 'id="inscricao"' not in _lp0499,
+      "0499: some a seção 'Como se inscrever' (não há inscrição aberta)")
+check('href="#inscricao"' not in _lp0499, "0499: nav-âncora sem atalho de Inscrição")
+_b64 = re.search(r'atob\("([^"]+)"\)', _lp0499).group(1)
+_cfg = base64.b64decode(_b64).decode()
+check('"aberto": false' in _cfg and '"destino": ""' in _cfg,
+      "0499: window.BRIDGE marca aberto=false e destino vazio (JS não redireciona)")
+check("confirmarEspera" in _cfg and "espera-ok" in _cfg,
+      "0499: JS confirma a lista de espera na própria página")
+check("Valores da última turma" in _lp0499,
+      "0499: investimento fica informativo, sem prometer preço da próxima turma")
+# ...e o curso ABERTO segue com o fluxo de inscrição intacto
+_b64a = re.search(r'atob\("([^"]+)"\)', lp_real).group(1)
+_cfga = base64.b64decode(_b64a).decode()
+check('"aberto": true' in _cfga and "/curso/inscricao/FEQ-0480/009" in _cfga,
+      "0480 (aberto): destino da Extecamp preservado, aberto=true")
+check('id="inscricao"' in lp_real and "Inscreva-se →" in lp_real,
+      "0480 (aberto): seção de inscrição e CTA normais")
+
+# lead de lista de espera NÃO pode virar checkout: senão cairia na aba Verificação
+# (pedindo pro operador conferir uma inscrição inexistente) e na régua de recuperação.
+g8, est8, wa8 = Growth(":memory:"), Estado(":memory:"), FakeWA()
+r = ponte.processar({"nome": "Espera", "whatsapp": "19955559999", "curso_id": "FEQ-0499",
+                     "event_id": "espera-aaaa-bbbb-cccc-dddddddddddd"},
+                    est8, g8, ads, Ingestao(est8, _ont_real), ont=_ont_real)
+check(r["ok"], "lead de curso fechado é capturado (lista de espera)")
+_tipos = [e["tipo"] for e in g8.eventos(card_id=r["card_id"])]
+check(_tipos == ["lista_espera"],
+      "curso fechado grava 'lista_espera', não 'inicio_inscricao'")
+check(g8.checkouts_pendentes() == [] and g8.verificacoes_pendentes() == [],
+      "lead de espera fica FORA da régua de recuperação e da fila de Verificação")
+check(funil.recuperar(g8, est8, _ont_real, wa8, agora=AGORA + datetime.timedelta(days=3))["enviados"] == [],
+      "régua não manda template de inscrição p/ quem está na lista de espera")
 _c1000 = _ont_real.curso("FEQ-1000")
 check("pela manhã (até 12h)" in _c1000["formato_aulas_detalhe"]
       and "exercícios e cases" in _c1000["formato_aulas_detalhe"],

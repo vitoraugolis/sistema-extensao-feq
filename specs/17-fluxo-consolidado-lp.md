@@ -58,6 +58,35 @@ quem clica no CTA já se autoqualificou. O modal (Nome + WhatsApp + LGPD) é a �
 fricção, e o redirect à Extecamp nunca espera o backend (timeout 1,5 s, spec 16 §2).
 
 
+
+### 2b. LP para TODO o portfólio + modo LISTA DE ESPERA (20/07/2026)
+
+Toda turma do catálogo tem LP, inclusive **sem inscrição aberta**. `ponte.render()`
+consulta `ont.captavel()` e propaga `aberto` para os tokens e para `window.BRIDGE`:
+
+| | Turma aberta | Sem turma (lista de espera) |
+|---|---|---|
+| CTA | "Inscreva-se →" | "Quero ser avisado →" |
+| Hero | "Inscrições abertas até X · turma Y" | "Inscrições encerradas no momento — entre na lista de espera" |
+| Modal | contato → **Extecamp** | contato → **confirma na própria página** (`confirmarEspera`) |
+| Seção "Como se inscrever" | presente | some (e o atalho na nav-âncora também) |
+| Investimento | "Inscrições abertas até X" | "Valores da última turma · sem inscrições abertas", com a ressalva de reajuste |
+| Evento de funil | `inicio_inscricao` (CAPI InitiateCheckout) | **`lista_espera`** (CAPI Lead) |
+
+O tipo de evento distinto é o que impede o efeito em cadeia: um lead de espera com
+`inicio_inscricao` cairia na aba **Verificação** (pedindo ao operador conferir na
+Extecamp uma inscrição que não existe) e na **régua de recuperação de checkout**.
+Com `lista_espera` ele fica fora das duas, apenas capturado no CRM
+(`aguardando_revisao`, pois o gate de captabilidade não engaja curso fechado).
+
+**Requisito por nível**: o texto vem de `_REQUISITO_TEXTO[nivelMinimo]` — havia um
+bug que afirmava "ensino superior completo" para qualquer curso com requisito, o
+que é FALSO no FEQ-0299 e FEQ-0670 (pedem ensino médio).
+
+**Cross-sell**: com 9 LPs no ar, `_cursos_relacionados_html` limita a 3 cards e
+prioriza cursos ABERTOS (sort estável preserva a ordem do `cursos_metas`, que
+começa pelas turmas-alvo da campanha).
+
 ### 3b. Conteúdo rico importado das páginas oficiais preexistentes (20/07/2026)
 
 As páginas antigas de `cursos-extensao.feq.unicamp.br` são fonte LEGÍTIMA (material

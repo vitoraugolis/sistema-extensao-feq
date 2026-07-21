@@ -168,11 +168,24 @@
       if (redirecionou) return;
       redirecionou = true;
       enviarTele();
+      // Curso SEM turma aberta (lista de espera): não há inscrição pra onde mandar.
+      // Confirma na própria página — o lead já foi gravado pelo POST acima.
+      if (!CFG.aberto || !CFG.destino) { confirmarEspera(); return; }
       // Passa por /thank-you-page-lp/ (interstício com o noscript do GTM) antes do
       // destino real: é a URL que a conversão de Lead do Google Ads/GTM observa
       // (o gatilho exige o path começando com /thank-you-page — um prefixo como
       // "lp-thank-you-page" não disparou o Lead, confirmado pelo usuário).
       window.location.href = "/thank-you-page-lp/?to=" + encodeURIComponent(CFG.destino);
+    }
+    function confirmarEspera() {
+      var caixa = document.querySelector("#modal .modal-caixa") || form.parentNode;
+      caixa.innerHTML =
+        '<div class="espera-ok">' +
+        '<p class="espera-check">✓</p>' +
+        '<p class="espera-tit">Pronto, você está na lista!</p>' +
+        '<p class="espera-sub">Assim que a próxima turma deste curso for confirmada, ' +
+        'a gente te avisa no WhatsApp. Se quiser falar com a equipe agora, é só usar ' +
+        'o botão do WhatsApp aqui na página.</p></div>';
     }
     // keepalive: o POST sobrevive à navegação se o redirect vier antes da resposta
     fetch(CFG.webhook, {

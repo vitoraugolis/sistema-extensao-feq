@@ -49,11 +49,13 @@ FERRAMENTAS = [
 ]
 
 
-def custo_por_matricula(g, dias=30):
+def custo_por_matricula(g, dias=30, agora=None):
+    """agora injetável (mesmo padrão de pacing/funil): sem ele a janela de `dias`
+    corre pelo relógio real e um teste com data fixa apodrece sozinho."""
     out = {}
     for c in g.cursos():
         curso = c["curso"]
-        gasto = sum(r["gasto"] for r in g.desempenho(dias=dias) if r["curso"] == curso)
+        gasto = sum(r["gasto"] for r in g.desempenho(dias=dias, agora=agora) if r["curso"] == curso)
         mats = [e for e in g.eventos(tipo="matricula_confirmada") if e["curso"] == curso]
         valor = sum(e["valor"] or 0 for e in mats)
         out[curso] = {"gasto": round(gasto, 2), "matriculas": len(mats),
@@ -100,7 +102,7 @@ def pausar_ad(g, ads, ad_id, motivo):
     return {"ok": ok, "aplicado": ok}
 
 
-def executar(nome, args, g, ads, est=None):
+def executar(nome, args, g, ads, est=None, agora=None):
     """Roteia um tool_use do LLM. Erro vira {ok: False} — nunca exceção ao agente."""
     args = args or {}
     try:
@@ -109,7 +111,8 @@ def executar(nome, args, g, ads, est=None):
         if nome == "ritmo_cursos":
             return {"ok": True, "ritmos": _ritmo(g)}
         if nome == "custo_por_matricula":
-            return {"ok": True, "cursos": custo_por_matricula(g, int(args.get("dias") or 30))}
+            return {"ok": True,
+                    "cursos": custo_por_matricula(g, int(args.get("dias") or 30), agora=agora)}
         if nome == "analise_lp":
             return {"ok": True, **g.lp_analytics(args.get("curso") or None,
                                                  int(args.get("dias") or 30))}

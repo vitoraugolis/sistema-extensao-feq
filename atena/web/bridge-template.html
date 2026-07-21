@@ -29,9 +29,9 @@
     <p class="mt-8 text-amber-400 text-sm font-semibold uppercase tracking-widest mb-3">{{TIPO_CURSO}} · {{MODALIDADE}}</p>
     <h1 class="text-3xl sm:text-5xl font-bold leading-tight">{{NOME_CURSO}}</h1>
     <p class="mt-5 text-lg text-slate-200 max-w-2xl mx-auto">{{OBJETIVO}}</p>
-    <p class="mt-3 text-sm text-slate-300">Inscrições abertas até <strong class="text-white">{{PRAZO}}</strong> · turma {{TURMA}}</p>
+    <p class="mt-3 text-sm text-slate-300">{{PRAZO_LINHA}}</p>
   <button data-cta class="mt-8 bg-amber-400 hover:bg-amber-300 text-slate-900 text-lg font-bold px-8 py-4 rounded-xl shadow-lg shadow-amber-400/20">
-    Inscreva-se →
+    {{CTA_LABEL}}
   </button>
   </div>
 </section>
@@ -46,7 +46,7 @@
     <a href="#professor">Professores</a>
     {{NAV_DEPOIMENTOS}}
     <a href="#investimento">Investimento</a>
-    <a href="#inscricao">Inscrição</a>
+    {{NAV_INSCRICAO}}
     <a href="#faq">Dúvidas</a>
   </div>
 </nav>
@@ -138,35 +138,22 @@
 <!-- 7. Investimento -->
 <section id="investimento" data-secao="investimento" class="secao-divisor max-w-4xl mx-auto px-6 py-16">
   <div class="bg-gradient-to-br from-amber-400/15 to-white/5 border border-amber-400/30 rounded-2xl p-8 text-center">
-    <p class="text-xs uppercase tracking-widest text-amber-400 mb-2">Inscrições abertas até {{PRAZO}}</p>
+    <p class="text-xs uppercase tracking-widest text-amber-400 mb-2">{{INVEST_TARJA}}</p>
     <h2 class="text-2xl font-bold">Investimento</h2>
     <ul class="mt-4 space-y-2 text-slate-200 checklist">
       {{INVESTIMENTO_ITENS}}
     </ul>
-    <p class="mt-4 text-sm text-slate-400">Pagamento e emissão de boletos direto no sistema oficial
-      da Unicamp (Extecamp). Inscrições até <strong class="text-slate-200">{{PRAZO}}</strong>.</p>
+    <p class="mt-4 text-sm text-slate-400">{{INVEST_RODAPE}}</p>
     {{GARANTIA_HTML}}
     {{SALARIO_HTML}}
     <button data-cta class="mt-6 bg-amber-400 hover:bg-amber-300 text-slate-900 text-lg font-bold px-8 py-4 rounded-xl">
-      Inscreva-se →
+      {{CTA_LABEL}}
     </button>
   </div>
 </section>
 
-<!-- 7b. Como se inscrever (5 passos oficiais da Extecamp) -->
-<section id="inscricao" data-secao="inscricao" class="secao-divisor max-w-4xl mx-auto px-6 py-16">
-  <h2 class="text-2xl font-bold mb-2">Como se inscrever</h2>
-  <p class="text-sm text-slate-400 mb-6">O processo acontece no sistema oficial da Unicamp
-    (Extecamp) — leva poucos minutos.</p>
-  <ol class="space-y-3 list-none">
-    {{PASSOS_HTML}}
-  </ol>
-  <div class="text-center">
-    <button data-cta class="mt-8 bg-amber-400 hover:bg-amber-300 text-slate-900 font-bold px-8 py-4 rounded-xl">
-      Começar minha inscrição →
-    </button>
-  </div>
-</section>
+<!-- 7b. Como se inscrever (5 passos oficiais da Extecamp) — some sem turma aberta -->
+{{SECAO_INSCRICAO}}
 
 <!-- 8. Cursos relacionados (cross-sell — só os outros 3 cursos-alvo reais) -->
 <section data-secao="relacionados" class="secao-divisor max-w-4xl mx-auto px-6 py-16">
@@ -184,13 +171,7 @@
       <summary class="cursor-pointer font-semibold">Quem pode se inscrever?</summary>
       <p class="mt-2 text-sm text-slate-300">{{REQUISITO}}</p>
     </details>
-    <details class="bg-white/5 border border-white/10 rounded-xl p-5">
-      <summary class="cursor-pointer font-semibold">Como funciona a inscrição?</summary>
-      <p class="mt-2 text-sm text-slate-300">Ao clicar em Inscreva-se, você informa um contato rápido
-        e segue direto para o formulário oficial da Extecamp (sistema da Unicamp), onde a inscrição da
-        turma {{CURSO}}/{{TURMA}} é concluída — com taxa de inscrição, envio de documentos e boletos
-        gerados por lá.</p>
-    </details>
+    {{FAQ_COMO_INSCREVER}}
     <details class="bg-white/5 border border-white/10 rounded-xl p-5">
       <summary class="cursor-pointer font-semibold">Qual é o formato das aulas?</summary>
       <p class="mt-2 text-sm text-slate-300">{{MODALIDADE}}. Aulas: {{HORARIO}}.</p>
@@ -202,7 +183,7 @@
     </details>
     <details class="bg-white/5 border border-white/10 rounded-xl p-5">
       <summary class="cursor-pointer font-semibold">Até quando posso me inscrever?</summary>
-      <p class="mt-2 text-sm text-slate-300">As inscrições desta turma vão até {{PRAZO}}.</p>
+      <p class="mt-2 text-sm text-slate-300">{{FAQ_PRAZO}}</p>
     </details>
     {{FAQ_EXTRA_HTML}}
     <details class="bg-white/5 border border-white/10 rounded-xl p-5">
@@ -215,10 +196,10 @@
 
 <!-- 10. CTA final -->
 <section data-secao="cta" class="secao-divisor max-w-4xl mx-auto px-6 py-16 text-center">
-  <h2 class="text-2xl sm:text-3xl font-bold">Garanta sua vaga na turma {{TURMA}}</h2>
-  <p class="mt-2 text-slate-300">Inscrições até {{PRAZO}} no sistema oficial da Unicamp.</p>
+  <h2 class="text-2xl sm:text-3xl font-bold">{{CTA_FINAL_TITULO}}</h2>
+  <p class="mt-2 text-slate-300">{{CTA_FINAL_SUB}}</p>
   <button data-cta class="mt-6 bg-amber-400 hover:bg-amber-300 text-slate-900 text-lg font-bold px-8 py-4 rounded-xl">
-    Inscreva-se →
+    {{CTA_LABEL}}
   </button>
 </section>
 
@@ -233,7 +214,7 @@
   <div class="max-w-4xl mx-auto px-4 flex items-center justify-between gap-4">
     <span class="text-sm font-medium truncate">{{NOME_CURSO}}</span>
     <button data-cta class="bg-amber-400 hover:bg-amber-300 text-slate-900 font-bold px-5 py-2.5 rounded-lg whitespace-nowrap">
-      Inscreva-se →
+      {{CTA_LABEL}}
     </button>
   </div>
 </div>
@@ -248,11 +229,10 @@
 <!-- Modal (two-step opt-in) -->
 <div id="modal" class="fixed inset-0 z-50 hidden items-center justify-center p-4">
   <div id="overlay" class="absolute inset-0 bg-black/70"></div>
-  <div class="relative bg-slate-900 border border-white/15 rounded-2xl p-7 w-full max-w-md shadow-2xl">
+  <div class="modal-caixa relative bg-slate-900 border border-white/15 rounded-2xl p-7 w-full max-w-md shadow-2xl">
     <button id="fechar" type="button" aria-label="Fechar"
             class="absolute top-3 right-4 text-slate-400 hover:text-white text-2xl leading-none">&times;</button>
-    <h3 class="text-lg font-semibold">Para iniciar sua inscrição no sistema da Unicamp,
-      informe seu contato rápido:</h3>
+    <h3 class="text-lg font-semibold">{{MODAL_TITULO}}</h3>
     <form id="bridge-form" class="mt-5 space-y-4" novalidate>
       <div>
         <label for="nome" class="block text-sm text-slate-300 mb-1">Nome</label>
@@ -274,7 +254,7 @@
       <p id="erro-optin" class="hidden text-xs text-red-400">Para continuar, autorize o contato (LGPD).</p>
       <button id="continuar" type="submit"
               class="w-full bg-amber-400 hover:bg-amber-300 disabled:opacity-60 text-slate-900 font-bold py-4 rounded-xl">
-        Continuar para Extecamp →
+        {{MODAL_BOTAO}}
       </button>
     </form>
   </div>

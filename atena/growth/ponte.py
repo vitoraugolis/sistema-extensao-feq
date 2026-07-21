@@ -27,8 +27,18 @@ _RAW_TOKENS = {"URL_CURSO", "CURSO", "TURMA", "CONTEUDO_HTML", "INVESTIMENTO_ITE
               "FOTO_PROFESSOR_HTML", "PROFESSOR_CREDENCIAL_HTML", "CURSOS_RELACIONADOS_HTML",
               "OUTROS_PROFESSORES_HTML", "SECAO_OBJETIVOS", "SECAO_HABILIDADES",
               "SECAO_DEPOIMENTOS", "EMPRESAS_HTML", "PROFESSORES_BIO_HTML", "GARANTIA_HTML",
-              "SALARIO_HTML", "PASSOS_HTML", "FAQ_EXTRA_HTML", "NAV_DEPOIMENTOS"}
+              "SALARIO_HTML", "PASSOS_HTML", "FAQ_EXTRA_HTML", "NAV_DEPOIMENTOS",
+              "PRAZO_LINHA", "SECAO_INSCRICAO", "NAV_INSCRICAO", "FAQ_COMO_INSCREVER"}
 WA_NUMERO_DEFAULT = "551931672313"   # WABA da Extensão FEQ (+55 19 3167-2313)
+# Texto do requisito POR NÍVEL da ontologia (feq:nivelMinimo). Sem isto a LP dizia
+# "ensino superior completo" para todo curso com requisito — falso nos cursos que
+# pedem só ensino médio (FEQ-0299, FEQ-0670).
+_REQUISITO_TEXTO = {
+    "medio": "É necessário ensino médio completo.",
+    "superiorIncompleto": "É necessário ensino superior em andamento (ou concluído).",
+    "superiorCompleto": "É necessário ensino superior completo (graduação concluída em qualquer área).",
+    "pos": "É necessária pós-graduação concluída.",
+}
 # Ativos reais já publicados pela própria FEQ (não fabricamos foto de ninguém):
 # logo oficial + hero do site institucional (feq.unicamp.br — laboratório/planta
 # de processos, temático; a home de cursos usava um stock genérico) + fotos
@@ -69,6 +79,9 @@ PROFESSOR_DESTAQUE = {
                  "Flavio Vasconcelos da Silva"],
     "FEQ-0580": ["Claudio Vieira Neto"],
     "FEQ-0333": ["Gustavo Doubek"],
+    "FEQ-0360": ["Fabio Marcelo Brogna", "Angela Hayashi"],
+    "FEQ-0499": ["Eduardo Perez"],
+    "FEQ-0670": ["André de Freitas Gonçalves", "Luiz Guilherme Lomônaco"],
 }
 # Credencial real (diretório de docentes feq.unicamp.br/funcionario/*): departamento
 # oficial + CV Lattes (currículo acadêmico público-padrão no Brasil) — nada de bio
@@ -145,6 +158,41 @@ PROFESSOR_BIO = {
         "bio": "Engenheiro Químico e Black Belt com experiência em projetos de IA, NLP, otimização "
                "e simulação. Atuou em iniciativas com impacto financeiro e operacional relevante e "
                "liderou times ágeis em grandes empresas."},
+    "Leonardo Vasconcelos Fregolente": {
+        "cargo": "Professor Associado FEQ Unicamp",
+        "bio": "Professor Associado da FEQ Unicamp. Atuou 11 anos como engenheiro de "
+               "processamento na Petrobras, em áreas técnicas e de gestão operacional, e "
+               "coordena pesquisas em parceria com a indústria."},
+    "Fabio Marcelo Brogna": {
+        "cargo": "Engenheiro de Processamento Sênior — Petrobras",
+        "bio": "Especialista em confiabilidade, análise de causa básica, riscos e segurança de "
+               "processos, com experiência em otimização de processos industriais."},
+    "Angela Hayashi": {
+        "cargo": "Engenheira e Doutora em Processos Ambientais",
+        "bio": "23 anos de experiência em gestão de riscos operacionais e segurança de processos. "
+               "Auditora Líder (ABNT NBR ISO)."},
+    "Eduardo Perez": {
+        "cargo": "Engenheiro Sênior de Tecnologia de Manufatura Avançada — 3M",
+        "bio": "29 anos de experiência em processos e métodos de revestimento, com atuação em "
+               "eficiência energética de processos de manufatura."},
+    "Ronierik Pioli Vieira": {
+        "cargo": "Professor Associado e Coordenador de Graduação FEQ Unicamp",
+        "bio": "Graduação, mestrado e doutorado em Engenharia Química, com pesquisas em "
+               "polimerização. Pós-doutorado em funcionalização de biopolímeros no Centro de "
+               "Química Macromolecular da Ghent University (Bélgica)."},
+    "André de Freitas Gonçalves": {
+        "cargo": "Professor Pesquisador Colaborador",
+        "bio": "Engenheiro Químico, Mestre pela UFMG e Doutor em Engenharia Química pela Unicamp. "
+               "Pesquisador em termodinâmica de fluidos confinados e simulação molecular."},
+    "Luiz Guilherme Lomônaco": {
+        "cargo": "Professor Pesquisador Colaborador",
+        "bio": "Engenheiro Químico, Doutor em Engenharia Química pela Unicamp, especialista em "
+               "simulação de dinâmica molecular aplicada a sistemas biológicos."},
+    "Savio Souza Venancio Vianna": {
+        "cargo": "Professor Associado FEQ Unicamp",
+        "bio": "Engenheiro Químico pela Escola de Química da UFRJ e Mestre pela COPPE/UFRJ, com "
+               "PhD em Explosões pela Universidade de Cambridge. Pesquisa modelagem computacional "
+               "de escoamentos reativos e não reativos."},
     "Douglas Alves Goulart": {
         "cargo": "Cientista de Dados",
         "bio": "Cientista de dados com experiência em mercado financeiro, marketing, logística e "
@@ -404,6 +452,24 @@ def _passos_html(c):
     return itens
 
 
+def _secao_inscricao_html(c, aberto):
+    """'Como se inscrever' (5 passos oficiais da Extecamp) — só com turma aberta.
+    Sem turma, prometer um passo a passo de inscrição seria falso; a captação
+    acontece pelo modal de lista de espera."""
+    if not aberto:
+        return ""
+    return (
+        '<section id="inscricao" data-secao="inscricao" class="secao-divisor max-w-4xl mx-auto px-6 py-16">\n'
+        '  <h2 class="text-2xl font-bold mb-2">Como se inscrever</h2>\n'
+        '  <p class="text-sm text-slate-400 mb-6">O processo acontece no sistema oficial da '
+        'Unicamp (Extecamp) — leva poucos minutos.</p>\n'
+        f'  <ol class="space-y-3 list-none">\n    {_passos_html(c)}\n  </ol>\n'
+        '  <div class="text-center">\n'
+        '    <button data-cta class="mt-8 bg-amber-400 hover:bg-amber-300 text-slate-900 '
+        'font-bold px-8 py-4 rounded-xl">Começar minha inscrição →</button>\n'
+        '  </div>\n</section>')
+
+
 def _faq_extra_html(c):
     """FAQ extra ancorado: certificação/MEC (texto oficial), avaliação e plataforma."""
     itens = []
@@ -427,14 +493,23 @@ def _faq_extra_html(c):
         for p, r in itens)
 
 
-def _cursos_relacionados_html(g, ont, curso_atual):
-    """Cards de cross-sell pros outros cursos-alvo (spec 17) — nunca lista o
-    próprio curso da página. Só usa cursos_metas + ontologia (mesma fonte que
-    todo o resto da LP), sem inventar nada."""
+def _cursos_relacionados_html(g, ont, curso_atual, limite=3, hoje=None):
+    """Cards de cross-sell (spec 17) — nunca lista o próprio curso da página.
+    Com o portfólio inteiro no ar (9 LPs), mostrar todos viraria um paredão: fica
+    no `limite`, priorizando quem está com INSCRIÇÃO ABERTA (mandar o lead pra um
+    curso fechado é pior que não sugerir nada). Só usa cursos_metas + ontologia."""
+    outros = [m for m in g.cursos() if m["curso"] != curso_atual]
+
+    def _aberto(cod):
+        try:
+            return bool(ont.captavel(cod, hoje).get("captavel"))
+        except Exception:
+            return True
+    # sort ESTÁVEL só por aberto/fechado: dentro de cada grupo preserva a ordem do
+    # cursos_metas, que começa pelas turmas-alvo da campanha (prioridade comercial).
+    outros.sort(key=lambda m: not _aberto(m["curso"]))
     itens = []
-    for m in g.cursos():
-        if m["curso"] == curso_atual:
-            continue
+    for m in outros[:limite]:
         try:
             c = ont.curso(m["curso"]) or {}
         except Exception:
@@ -454,10 +529,13 @@ def _cursos_relacionados_html(g, ont, curso_atual):
     return "\n    ".join(itens)
 
 
-def render_tokens(meta_row, c):
+def render_tokens(meta_row, c, aberto=True):
     """Tokens da LP a partir do cursos_metas + ontologia (c = ont.curso(...) ou {}).
     Regra anti-alucinação: todo fato vem da ontologia; sem âncora -> texto neutro
-    apontando para a página oficial da Extecamp."""
+    apontando para a página oficial da Extecamp.
+    aberto=False: a página vira LISTA DE ESPERA — mesmos fatos do curso, mas os
+    CTAs/modal captam contato ("avise-me quando reabrir") em vez de prometer uma
+    inscrição que não existe hoje."""
     c = c or {}
     horario = c.get("horario") or ""
     plano = c.get("plano") or {}
@@ -476,8 +554,11 @@ def render_tokens(meta_row, c):
         "Sábados" if "sábado" in horario.lower() else (horario.split()[0].capitalize() if horario else "Flexível"))
     formato_detalhe = c.get("formato_aulas_detalhe") or (
         f"{horario} — pensado para quem trabalha." if horario else "Consulte a Extecamp.")
-    requisito = ("É necessário ensino superior completo (graduação concluída em qualquer área)."
-                 if c.get("requisito") else "Consulte os requisitos na página oficial da Extecamp.")
+    # O nível vem da ontologia — NUNCA assumir "superior completo": há cursos que
+    # pedem só ensino médio (FEQ-0299, FEQ-0670) e afirmar o contrário barraria
+    # lead elegível e seria informação falsa na página.
+    requisito = _REQUISITO_TEXTO.get(c.get("requisito") or "",
+                                     "Consulte os requisitos na página oficial da Extecamp.")
     if c.get("publico_alvo"):
         requisito += " Público-alvo: " + c["publico_alvo"]
     wa = re.sub(r"\D", "", os.environ.get("GROWTH_WA_NUMERO", WA_NUMERO_DEFAULT))
@@ -521,24 +602,77 @@ def render_tokens(meta_row, c):
         "SALARIO_HTML": _salario_html(c),
         "PASSOS_HTML": _passos_html(c),
         "FAQ_EXTRA_HTML": _faq_extra_html(c),
+        # --- inscrição aberta × lista de espera (spec 17 §2b) ---------------------
+        "CTA_LABEL": "Inscreva-se →" if aberto else "Quero ser avisado →",
+        "PRAZO_LINHA": (
+            f"Inscrições abertas até <strong class=\"text-white\">{_ddmm(c.get('inscricoes_fim')) or 'a data publicada na Extecamp'}</strong> · turma {meta_row['turma']}"
+            if aberto else
+            "Inscrições <strong class=\"text-white\">encerradas no momento</strong> — entre na "
+            "lista de espera e avisamos assim que a próxima turma abrir."),
+        "MODAL_TITULO": ("Para iniciar sua inscrição no sistema da Unicamp, informe seu contato rápido:"
+                         if aberto else
+                         "Entre na lista de espera deste curso. Assim que a próxima turma abrir, "
+                         "a gente te avisa pelo WhatsApp:"),
+        "MODAL_BOTAO": "Continuar para Extecamp →" if aberto else "Entrar na lista de espera",
+        "CTA_FINAL_TITULO": (f"Garanta sua vaga na turma {meta_row['turma']}" if aberto
+                             else "Fique sabendo em primeira mão"),
+        "CTA_FINAL_SUB": (
+            f"Inscrições até {_ddmm(c.get('inscricoes_fim')) or 'a data publicada'} no sistema oficial da Unicamp."
+            if aberto else
+            "Sem turma aberta agora. Deixe seu contato e avisamos assim que as inscrições reabrirem."),
+        # A seção "Como se inscrever" (passos da Extecamp) só faz sentido com turma aberta.
+        "SECAO_INSCRICAO": _secao_inscricao_html(c, aberto),
+        "NAV_INSCRICAO": '<a href="#inscricao">Inscrição</a>' if aberto else "",
+        "INVEST_TARJA": (f"Inscrições abertas até {_ddmm(c.get('inscricoes_fim'))}" if aberto
+                         else "Valores da última turma · sem inscrições abertas"),
+        "INVEST_RODAPE": (
+            "Pagamento e emissão de boletos direto no sistema oficial da Unicamp (Extecamp)."
+            if aberto else
+            "Valores praticados na última turma, para você se planejar — podem ser reajustados "
+            "quando a próxima abrir. Entre na lista de espera para receber as condições oficiais."),
+        "FAQ_COMO_INSCREVER": (
+            '<details class="bg-white/5 border border-white/10 rounded-xl p-5">'
+            '<summary class="cursor-pointer font-semibold">Como funciona a inscrição?</summary>'
+            '<p class="mt-2 text-sm text-slate-300">Ao clicar em Inscreva-se, você informa um '
+            'contato rápido e segue direto para o formulário oficial da Extecamp (sistema da '
+            f'Unicamp), onde a inscrição da turma {meta_row["curso"]}/{meta_row["turma"]} é '
+            'concluída — com taxa de inscrição, envio de documentos e boletos gerados por lá.'
+            '</p></details>'
+            if aberto else
+            '<details class="bg-white/5 border border-white/10 rounded-xl p-5">'
+            '<summary class="cursor-pointer font-semibold">Como entro na lista de espera?</summary>'
+            '<p class="mt-2 text-sm text-slate-300">Basta deixar nome e WhatsApp no botão desta '
+            'página. Assim que a próxima turma for confirmada na Extecamp, avisamos você com as '
+            'datas e o link oficial de inscrição — sem compromisso e sem custo.</p></details>'),
+        "FAQ_PRAZO": (
+            f"As inscrições desta turma vão até {_ddmm(c.get('inscricoes_fim')) or 'a data publicada na Extecamp'}."
+            if aberto else
+            "Não há turma com inscrições abertas neste momento. Deixe seu contato na lista de "
+            "espera que avisamos assim que a próxima for confirmada."),
     }
 
 
-def _bridge_bootstrap(tokens, webhook_url, pixel_id):
+def _bridge_bootstrap(tokens, webhook_url, pixel_id, aberto=True):
     """window.BRIDGE + bridge-logic.js, em UM bloco base64 (spec 17 / bug WP
     convert_chars): o WordPress normaliza "&" bruto -> "&#038;" em todo o
     post_content, mesmo dentro de <script>, quebrando o "&&" do JS. Base64
     usa só [A-Za-z0-9+/=] — imune a essa e a qualquer outra normalização de
-    texto (aspas retas->curvas, travessões, reticências)."""
+    texto (aspas retas->curvas, travessões, reticências).
+    aberto=False (sem turma na Extecamp): destino vazio — o JS confirma a
+    entrada na lista de espera em vez de redirecionar (spec 17 §2b)."""
     config_js = "window.BRIDGE=" + json.dumps({
-        "curso": tokens["CURSO"], "destino": tokens["URL_CURSO"],
+        "curso": tokens["CURSO"],
+        "destino": tokens["URL_CURSO"] if aberto else "",
+        "aberto": bool(aberto),
         "webhook": webhook_url, "pixel": pixel_id}) + ";"
     completo = config_js + (_WEB / "bridge-logic.js").read_text()
     return base64.b64encode(completo.encode()).decode()
 
 
-def render(g, ont, curso, webhook_url="/webhook/ponte"):
-    """HTML final da LP (template + JS + tokens). Curso desconhecido -> None."""
+def render(g, ont, curso, webhook_url="/webhook/ponte", hoje=None):
+    """HTML final da LP (template + JS + tokens). Curso desconhecido -> None.
+    Curso SEM turma aberta na Extecamp -> LP em modo lista de espera (spec 17 §2b):
+    mesma página, mas o CTA capta o contato em vez de mandar pra inscrição."""
     alvo = next((m for m in g.cursos() if m["curso"] == curso), None)
     if not alvo:
         return None
@@ -546,7 +680,11 @@ def render(g, ont, curso, webhook_url="/webhook/ponte"):
         c = ont.curso(curso)
     except Exception:
         c = None
-    tokens = render_tokens(alvo, c)
+    try:
+        aberto = bool(ont.captavel(curso, hoje).get("captavel"))
+    except Exception:
+        aberto = True    # sem ontologia (ex.: FakeOnt nos testes): comporta como aberto
+    tokens = render_tokens(alvo, c, aberto=aberto)
     pagina = (_WEB / "bridge-template.html").read_text()
     for k, v in tokens.items():
         pagina = pagina.replace("{{%s}}" % k, str(v) if k in _RAW_TOKENS else _esc(v))
@@ -559,7 +697,7 @@ def render(g, ont, curso, webhook_url="/webhook/ponte"):
             .replace("{{WEBHOOK_URL}}", webhook_url)
             .replace("{{LOGO_URL}}", logo)
             .replace("{{BRIDGE_CSS}}", css)
-            .replace("{{BRIDGE_B64}}", _bridge_bootstrap(tokens, webhook_url, pixel_id)))
+            .replace("{{BRIDGE_B64}}", _bridge_bootstrap(tokens, webhook_url, pixel_id, aberto)))
 
 
 def _pagina_obrigado_bootstrap():
@@ -647,7 +785,16 @@ def processar(dados, est, g, ads, ing, ont=None):
     if not r.get("ok"):
         return {"ok": False, "motivo": r.get("motivo", "ingestão falhou")}
     contexto = {k: dados.get(k) for k in ("fbp", "fbc", "ip", "ua", "url") if dados.get(k)}
-    funil.registrar(g, ads, est, r["card_id"], "inicio_inscricao",
+    # Curso SEM turma aberta: o lead entrou na LISTA DE ESPERA, não num checkout.
+    # Registrar 'inicio_inscricao' aqui seria errado em cadeia — jogaria o lead na
+    # aba Verificação pedindo pro operador conferir na Extecamp uma inscrição que
+    # não existe, e o poria na régua de recuperação de checkout abandonado.
+    try:
+        aberto = bool(ont.captavel(curso).get("captavel")) if ont else True
+    except Exception:
+        aberto = True
+    funil.registrar(g, ads, est, r["card_id"],
+                    "inicio_inscricao" if aberto else "lista_espera",
                     curso=curso, event_id=eid, contexto=contexto)
     if dados.get("sessao_id"):           # liga a telemetria da sessão ao lead (spec 17 §5)
         g.vincular_sessao(str(dados["sessao_id"])[:64], r["card_id"])

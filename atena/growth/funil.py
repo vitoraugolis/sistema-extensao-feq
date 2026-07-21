@@ -15,6 +15,10 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2]))
 
 EVENTO_CAPI = {"inicio_inscricao": "InitiateCheckout",
                "boleto_gerado": "InitiateCheckout",
+               # lista de espera (curso sem turma aberta, spec 17 §2b): é um Lead
+               # de verdade pra Meta, mas NÃO é checkout — não entra na régua de
+               # recuperação nem na fila de Verificação da Central.
+               "lista_espera": "Lead",
                "inscricao_confirmada": "CompleteRegistration",
                "matricula_confirmada": "Purchase"}   # offline, com valor real (spec 16)
 RECUPERAR_APOS_H = {"inicio_inscricao": 2,   # ponte: 2h sem converter -> "posso ajudar?" (spec 17 §7)
