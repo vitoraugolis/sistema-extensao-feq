@@ -163,6 +163,14 @@ class Orquestrador:
         historico = self.est.historico(card_id)   # antes de gravar a msg atual
         self.est.add_conversa(card_id, "lead", mensagem_lead, tipo=tipo, media_id=media_id)
 
+        # Modo manual (por conversa): o humano conduz. Registramos a mensagem do lead
+        # (o operador precisa vê-la) mas NÃO acionamos o cérebro nem geramos proposta.
+        # Um alerta avisa que há entrada aguardando resposta manual.
+        if (lead.get("modo") or "auto") == "manual":
+            self.est.set_lead(card_id, estado_conversa="manual_humano")
+            self.est.add_alerta("manual", f"Lead {card_id} em modo manual: nova mensagem aguardando resposta humana")
+            return {"modo_manual": True}
+
         # mídia sem legenda: o cérebro não "ouve"/"vê" -> recebe um rótulo p/ não misfire
         entrada = mensagem_lead or {
             "audio": "[o lead enviou um áudio]", "image": "[o lead enviou uma imagem]",

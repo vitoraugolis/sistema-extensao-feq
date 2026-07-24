@@ -85,7 +85,8 @@ class Estado:
                     "ALTER TABLE conversas ADD COLUMN tipo TEXT DEFAULT 'texto'",
                     "ALTER TABLE conversas ADD COLUMN media_id TEXT",
                     "ALTER TABLE conversas ADD COLUMN wamid TEXT",     # id do WhatsApp p/ status
-                    "ALTER TABLE conversas ADD COLUMN status TEXT"):   # enviado/entregue/lido/falhou
+                    "ALTER TABLE conversas ADD COLUMN status TEXT",    # enviado/entregue/lido/falhou
+                    "ALTER TABLE leads ADD COLUMN modo TEXT DEFAULT 'auto'"):  # auto=agente responde; manual=humano conduz
             try:
                 self.conn.execute(mig)
             except sqlite3.OperationalError:

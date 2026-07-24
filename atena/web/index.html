@@ -96,6 +96,8 @@ input:focus,select:focus,textarea:focus{outline:none;box-shadow:3px 3px 0 var(--
 .conv-composer textarea{resize:none;max-height:110px;}
 .conv-blocked{font-size:12px;font-weight:500;color:var(--ink);background:var(--rosa);border:2px solid var(--b);
  border-radius:9px;padding:7px 10px;margin:0 11px 9px;}
+.conv-manual-nota{font-size:11.5px;font-weight:600;color:#fff;background:var(--guara);border-top:2px solid var(--b);
+ padding:6px 12px;display:flex;align-items:center;gap:6px;}
 .conv-back{display:none;align-items:center;justify-content:center;width:30px;height:30px;flex-shrink:0;border-radius:8px;
  border:2px solid var(--b);background:#fff;cursor:pointer;margin-right:2px;font-size:15px;color:var(--ink);box-shadow:2px 2px 0 var(--b);}
 @media (max-width:900px){
@@ -441,6 +443,11 @@ async function moverFase(id, fase){
   if(r.erro){ marcarErro(id, r); return; }
   CONV_ERRO = null; aposAcao();
 }
+async function setModo(id, modo){
+  const r = await api('/api/conversas/'+id+'/modo',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({modo})});
+  if(r.erro){ marcarErro(id, r); return; }
+  aposAcao();
+}
 async function reativarLead(id){
   const r = await api('/api/leads/'+id+'/reativar',{method:'POST'});
   if(r.envio && !r.envio.ok){ marcarErro(id, {}, 'não reativado — '+(r.envio.motivo||'')); return; }
@@ -507,7 +514,7 @@ function statusGlyph(t){   // ✓ enviado · ✓✓ entregue · ✓✓ azul lido
 function renderThread(d){
   // A "moldura" (cabeçalho + campo de escrita) é montada 1x por conversa; o polling só
   // atualiza as MENSAGENS. Assim o <textarea> nunca é recriado -> foco/cursor não se perdem.
-  const chromeKey = d.id + '|' + (d.optout ? 1 : 0);   // opt-out troca a moldura (some o composer)
+  const chromeKey = d.id + '|' + (d.optout ? 1 : 0) + '|' + (d.modo||'auto');   // opt-out/modo trocam a moldura
   if(CONV_CHROME_ID !== chromeKey){ renderChrome(d); CONV_CHROME_ID = chromeKey; }
   renderMensagens(d);
 }
@@ -521,6 +528,7 @@ function renderChrome(d){
         <div><div style="font-weight:500;font-size:13.5px;">${escapeHtml(d.lead||d.id)}</div>
         <div class="muted"><span id="convCurso">${d.curso}</span> · <span id="convEstado">${d.estado}</span>${d.optout?' · <span style="color:var(--bad);">opt-out</span>':''}</div></div>
         <div style="margin-left:auto;display:flex;gap:6px;align-items:center;">
+          <button class="btn ${d.modo==='manual'?'btn-p':'btn-g'}" style="padding:6px 10px;" title="${d.modo==='manual'?'Modo manual: o agente NÃO responde — clique para voltar ao automático':'Modo automático: o agente propõe respostas — clique para assumir a conversa manualmente'}" onclick="setModo('${d.id}','${d.modo==='manual'?'auto':'manual'}')"><i class="ti ti-${d.modo==='manual'?'hand-stop':'robot'}"></i> ${d.modo==='manual'?'Manual':'Auto'}</button>
           <select id="convFaseSel" title="mover fase" style="width:auto;padding:5px 8px;font-size:12px;" onchange="moverFase('${d.id}',this.value)">
             ${['Lead','Prospect','Inscrito','Matriculado','Em espera','Perdido'].map(f=>`<option ${f===d.fase?'selected':''}>${f}</option>`).join('')}
           </select>
@@ -533,7 +541,8 @@ function renderChrome(d){
     <div id="convErro"></div>
     ${d.optout
       ? '<div class="conv-blocked" style="margin:0 11px 11px;"><i class="ti ti-ban"></i> Lead em opt-out — não é possível enviar mensagens.</div>'
-      : `<div class="conv-composer">
+      : `${d.modo==='manual'?'<div class="conv-manual-nota"><i class="ti ti-hand-stop"></i> Modo manual — o agente não responde nesta conversa. Você conduz pelo campo abaixo.</div>':''}
+         <div class="conv-composer">
            <textarea id="convInput" rows="1" placeholder="Digite uma mensagem…" onkeydown="convKeydown(event)"></textarea>
            <button class="btn btn-p" onclick="convEnviar()" title="Enviar (Enter)"><i class="ti ti-send"></i></button>
          </div>`}`;

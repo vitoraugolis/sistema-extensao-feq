@@ -164,7 +164,7 @@ def conversas():
         ult = hist[-1] if hist else None
         out.append({"id": l["card_id"], "lead": l["nome"], "iniciais": _iniciais(l["nome"]),
                     "curso": l["curso"], "estado": l["estado_conversa"], "ha": _ha(l["atualizado"]),
-                    "optout": bool(l.get("optout")),
+                    "optout": bool(l.get("optout")), "modo": l.get("modo") or "auto",
                     "preview": _preview(ult)[:80],
                     "preview_de_lead": bool(ult and ult["papel"] == "lead"),
                     "aguardando": bool(ult and ult["papel"] == "lead"),   # último turno foi do lead
@@ -183,8 +183,21 @@ def conversa_detalhe(card_id):
                     "curso": lead["curso"], "cursos": EST.cursos_interesse(lead),
                     "estado": lead["estado_conversa"], "fase": lead["fase"],
                     "telefone": lead["telefone"], "optout": bool(lead.get("optout")),
+                    "modo": lead.get("modo") or "auto",
                     "thread": EST.historico(card_id),
                     "proposta": prop["mensagem"] if prop else None})
+
+
+@app.route("/api/conversas/<card_id>/modo", methods=["POST"])
+def conversa_modo(card_id):
+    """Chave auto/manual por conversa. Manual: o agente para de gerar respostas;
+    o operador conduz pelo compositor. Auto: o agente volta a propor respostas."""
+    if not EST.get_lead(card_id):
+        return jsonify({"erro": "lead inexistente"}), 404
+    modo = "manual" if (request.get_json(silent=True) or {}).get("modo") == "manual" else "auto"
+    EST.set_lead(card_id, modo=modo)
+    EST.log_acao(session.get("usuario", "operador"), f"modo={modo}", card_id)
+    return jsonify({"ok": True, "modo": modo})
 
 
 FASES = ("Lead", "Prospect", "Inscrito", "Matriculado", "Em espera", "Perdido")

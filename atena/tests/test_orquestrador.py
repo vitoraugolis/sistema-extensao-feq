@@ -53,6 +53,19 @@ def test_gatilho_sensivel_escala():
     assert est.get_lead("c1")["estado_conversa"] == "escalado_humano"
 
 
+def test_modo_manual_nao_gera_resposta():
+    est, orq = _novo(escolaridade="Superior Completo")
+    est.set_lead("c1", modo="manual")
+    r = orq.processar_mensagem("c1", "tenho superior, quero saber o preço")
+    assert r == {"modo_manual": True}                 # cérebro não rodou
+    assert est.decisao_pendente("c1") is None          # nenhuma proposta gerada
+    assert any(h["papel"] == "lead" for h in est.historico("c1"))  # msg do lead registrada
+    # voltar a auto: agente responde normalmente
+    est.set_lead("c1", modo="auto")
+    r2 = orq.processar_mensagem("c1", "tenho superior, quero saber o preço")
+    assert r2.get("decisao") and est.decisao_pendente("c1") is not None
+
+
 def test_persistencia_conversa_e_decisao():
     est, orq = _novo()
     orq.processar_mensagem("c1", "tenho superior, quero saber o preço")
