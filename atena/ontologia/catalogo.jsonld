@@ -205,9 +205,9 @@
       "codigo": "FEQ-1000",
       "nome": "Engenharia de Processos Químicos",
       "modalidade": "A distância (Online — Google Meet + Moodle)",
-      "horarioAula": "sábados 9h-16h30",
-      "formatoAulasResumo": "Aulas online ao vivo aos sábados",
-      "formatoAulasDetalhe": "Aulas online ao vivo aos sábados pela manhã (até 12h); a tarde é dedicada à aplicação de exercícios e cases.",
+      "horarioAula": "aulas teóricas ao vivo aos sábados, das 9h às 12h",
+      "formatoAulasResumo": "Teoria ao vivo aos sábados de manhã (9h-12h); tarde assíncrona",
+      "formatoAulasDetalhe": "As aulas teóricas ao vivo acontecem aos sábados pela manhã, das 9h às 12h. A tarde é dedicada à resolução de cases e exercícios, que NÃO exigem presença síncrona — o aluno faz no seu ritmo. O formato é pensado para que até quem tem uma rotina bastante corrida consiga acompanhar.",
       "professorResponsavel": "Osvaldir Pereira Taranto",
       "professoresAdicionais": [
         "Dirceu Noriler",

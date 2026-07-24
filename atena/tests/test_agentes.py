@@ -71,6 +71,9 @@ def test_whatsapp_assinatura_e_envio():
     wa = WhatsApp(est, Orquestrador(est, ONT))
     r = wa.enviar("5519999990001", "oi", agora=AGORA)
     assert r["ok"] and r["status"] in ("dry_run", "enfileirado")  # nunca envia sem token
+    from atena.transporte.whatsapp import fmt_whatsapp
+    assert fmt_whatsapp("**Engenharia** de Processos") == "*Engenharia* de Processos"  # WA usa 1 asterisco
+    assert fmt_whatsapp("*ok* já certo") == "*ok* já certo"
 
 
 def test_whatsapp_receber_encaminha():

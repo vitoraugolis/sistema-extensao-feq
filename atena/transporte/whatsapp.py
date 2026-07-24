@@ -8,6 +8,7 @@ ponytail: janela de 24h não rastreada por timestamp ainda -> envia texto livre 
 dev; em produção, fora de 24h exige template (TODO marcado).
 """
 import os
+import re
 import sys
 import datetime
 import pathlib
@@ -25,6 +26,12 @@ _GRAPH = "https://graph.facebook.com/v19.0"
 _MEDIA_DIR = pathlib.Path(__file__).resolve().parents[1] / "data" / "media"
 _TIPOS_MIDIA = ("image", "audio", "video", "document", "sticker")
 _STATUS_PT = {"sent": "enviado", "delivered": "entregue", "read": "lido", "failed": "falhou"}
+
+
+def fmt_whatsapp(texto):
+    """Negrito markdown (**x**) -> negrito WhatsApp (*x*). Belt para o LLM que escapar
+    a instrução do prompt; o WhatsApp renderiza ** literal e polui a leitura."""
+    return re.sub(r"\*\*+", "*", texto or "")
 
 
 def _wamid(j):
@@ -136,6 +143,7 @@ class WhatsApp:
     def enviar(self, telefone, texto, forcar=False, agora=None):
         if not texto:
             return {"ok": False, "motivo": "sem texto"}
+        texto = fmt_whatsapp(texto)
         # guardrails de destinatário: opt-out e janela de 24h (texto livre só dentro dela)
         card_id = self.est.lead_por_telefone(telefone) if self.est else None
         if card_id:

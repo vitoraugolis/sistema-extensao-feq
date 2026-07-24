@@ -197,6 +197,10 @@ def _system_prompt(ctx, lead_nome=None):
         + "NUNCA chame o lead de Vinícius (esse é VOCÊ).\n"
         "TOM: caloroso, gentil e humano; celebre o interesse do lead; UMA pergunta por vez; "
         "frases curtas de WhatsApp, sem parecer formulário.\n"
+        "FORMATAÇÃO WHATSAPP: negrito é um ASTERISCO simples (*palavra*), NUNCA dois (**palavra** "
+        "aparece quebrado para o lead). Ao listar itens (módulos, passos, opções), coloque CADA "
+        "item em sua PRÓPRIA linha, separando com quebra de linha real (\\n) — nunca emende tudo "
+        "num parágrafo corrido. Deixe uma linha em branco entre blocos para arejar a leitura.\n"
         + _bloco_curso(ctx)
         + f"PORTFÓLIO COMPLETO DA FEQ (você conhece todos; use p/ orientar e redirecionar):\n"
         f"{json.dumps(ctx.get('portfolio', []), ensure_ascii=False)}\n"

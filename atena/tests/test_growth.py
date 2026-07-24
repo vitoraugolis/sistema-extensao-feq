@@ -581,9 +581,11 @@ check(g8.checkouts_pendentes() == [] and g8.verificacoes_pendentes() == [],
 check(funil.recuperar(g8, est8, _ont_real, wa8, agora=AGORA + datetime.timedelta(days=3))["enviados"] == [],
       "régua não manda template de inscrição p/ quem está na lista de espera")
 _c1000 = _ont_real.curso("FEQ-1000")
-check("pela manhã (até 12h)" in _c1000["formato_aulas_detalhe"]
-      and "exercícios e cases" in _c1000["formato_aulas_detalhe"],
-      "FEQ-1000: manhã ao vivo + tarde de exercícios/cases (texto real dado pelo usuário)")
+check("sábados pela manhã, das 9h às 12h" in _c1000["formato_aulas_detalhe"]
+      and "cases e exercícios" in _c1000["formato_aulas_detalhe"]
+      and "NÃO exigem presença síncrona" in _c1000["formato_aulas_detalhe"]
+      and "rotina bastante corrida" in _c1000["formato_aulas_detalhe"],
+      "FEQ-1000: teoria ao vivo 9h-12h sáb + tarde assíncrona p/ rotina corrida (texto do usuário)")
 check(len(_c1000["professores_adicionais"]) == 11 and "Sérgio D Amore Filho" in _c1000["professores_adicionais"],
       "FEQ-1000: lista de professores adicionais completa")
 _c0333 = _ont_real.curso("FEQ-0333")
