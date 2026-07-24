@@ -28,7 +28,8 @@ _RAW_TOKENS = {"URL_CURSO", "CURSO", "TURMA", "CONTEUDO_HTML", "INVESTIMENTO_ITE
               "OUTROS_PROFESSORES_HTML", "SECAO_OBJETIVOS", "SECAO_HABILIDADES",
               "SECAO_DEPOIMENTOS", "EMPRESAS_HTML", "PROFESSORES_BIO_HTML", "GARANTIA_HTML",
               "SALARIO_HTML", "PASSOS_HTML", "FAQ_EXTRA_HTML", "NAV_DEPOIMENTOS",
-              "PRAZO_LINHA", "SECAO_INSCRICAO", "NAV_INSCRICAO", "FAQ_COMO_INSCREVER"}
+              "PRAZO_LINHA", "SECAO_INSCRICAO", "NAV_INSCRICAO", "FAQ_COMO_INSCREVER",
+              "PERIODO_OFERECIMENTO"}
 WA_NUMERO_DEFAULT = "551931672313"   # WABA da Extensão FEQ (+55 19 3167-2313)
 # Texto do requisito POR NÍVEL da ontologia (feq:nivelMinimo). Sem isto a LP dizia
 # "ensino superior completo" para todo curso com requisito — falso nos cursos que
@@ -447,6 +448,27 @@ def _salario_html(c):
             f'referência {_esc(s)}.</p>')
 
 
+def _periodo_html(c, aberto=True):
+    """Faixa com o PERÍODO DE OFERECIMENTO (início e fim das aulas) — dado oficial
+    da Extecamp, guardado na ontologia (janelaOferecimento). Some se o curso não
+    tiver as datas. Curso sem turma aberta: rotula como 'última turma' para não dar
+    a entender que essas datas valem para quem entra na lista de espera agora."""
+    ini, fim = _ddmm(c.get("aulas_inicio")), _ddmm(c.get("aulas_fim"))
+    if not (ini and fim):
+        return ""
+    rotulo = "Período do curso" if aberto else "Período da última turma"
+    return (
+        '<section data-secao="periodo" class="secao-divisor max-w-4xl mx-auto px-6 py-10">\n'
+        '  <div class="periodo-faixa">\n'
+        '    <span class="periodo-icone" aria-hidden="true">📅</span>\n'
+        '    <div>\n'
+        f'      <p class="periodo-rotulo">{rotulo}</p>\n'
+        f'      <p class="periodo-datas">As aulas acontecem de <strong>{ini}</strong> '
+        f'a <strong>{fim}</strong>.</p>\n'
+        '    </div>\n'
+        '  </div>\n</section>')
+
+
 def _passos_html(c):
     """Como se inscrever — 5 passos publicados nas páginas oficiais (Extecamp)."""
     taxa = _moeda((c.get("plano") or {}).get("taxa")) or "o valor publicado na Extecamp"
@@ -615,6 +637,7 @@ def render_tokens(meta_row, c, aberto=True):
         "GARANTIA_HTML": _garantia_html(c),
         "SALARIO_HTML": _salario_html(c),
         "PASSOS_HTML": _passos_html(c),
+        "PERIODO_OFERECIMENTO": _periodo_html(c, aberto),
         "FAQ_EXTRA_HTML": _faq_extra_html(c),
         # --- inscrição aberta × lista de espera (spec 17 §2b) ---------------------
         "CTA_LABEL": "Inscreva-se →" if aberto else "Quero ser avisado →",

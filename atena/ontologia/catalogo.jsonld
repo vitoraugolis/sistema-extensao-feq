@@ -533,6 +533,7 @@
       },
       "janelaInscricao": {
         "@type": "feq:JanelaTemporal",
+        "inicio": "2026-06-08",
         "fim": "2026-08-07"
       },
       "planoPagamento": {
@@ -552,7 +553,12 @@
       "avaliacaoTexto": "Curso 100% a distância, com aulas online ao vivo e atividades práticas aplicadas.",
       "programaDetalheJson": "[{\"t\": \"Fundamentos da Estrutura dos Materiais\", \"s\": [\"Estrutura atômica e organização dos elementos\", \"Ligações químicas e influência nas propriedades\", \"Organização periódica dos elementos\"]}, {\"t\": \"Estruturas Cristalinas em Metais\", \"s\": [\"CCC, CFC e HC\", \"Celas unitárias e empacotamento atômico\", \"Defeitos estruturais em metais\"]}, {\"t\": \"Estruturas Cristalinas em Cerâmicas\", \"s\": [\"Organização cristalina e empacotamento\", \"Defeitos em cerâmicas\", \"Software educacional CrystalWalk\"]}, {\"t\": \"Análise da Cristalinidade das Estruturas\", \"s\": [\"Interpretação da Lei de Bragg\", \"Análise da cristalinidade em metais e cerâmicas\"]}, {\"t\": \"Introdução aos Polímeros\", \"s\": [\"Estrutura e classificação dos polímeros\", \"Estrutura molecular × propriedades\"]}, {\"t\": \"Atividades Práticas e Aplicadas\", \"s\": [\"Análise de imagens de microscopia\", \"Interpretação de espectros de difração\", \"Vídeos demonstrativos e exercícios\"]}]",
       "insightVenda": "Curso curto e introdutório; requisito só ensino médio. Bom porta de entrada.",
-      "wasDerivedFrom": "feq:fonteNotion"
+      "wasDerivedFrom": "feq:fonteNotion",
+      "janelaOferecimento": {
+        "@type": "feq:JanelaTemporal",
+        "inicio": "2026-08-24",
+        "fim": "2026-08-28"
+      }
     },
     {
       "@id": "feq:FEQ-0670",
@@ -578,6 +584,7 @@
       },
       "janelaInscricao": {
         "@type": "feq:JanelaTemporal",
+        "inicio": "2026-04-20",
         "fim": "2027-01-01"
       },
       "planoPagamento": {
@@ -596,7 +603,12 @@
       "avaliacaoTexto": "Curso 100% online com laboratórios práticos de simulação e projeto aplicado.",
       "programaDetalheJson": "[{\"t\": \"Introdução à Simulação Molecular\", \"s\": []}, {\"t\": \"GROMACS\", \"s\": []}, {\"t\": \"LAMMPS\", \"s\": []}, {\"t\": \"RASPA\", \"s\": []}, {\"t\": \"Python para Pré e Pós-processamento\", \"s\": []}, {\"t\": \"Desenvolvimento de Campos de Força (Quântica) + IA\", \"s\": []}]",
       "insightVenda": "Nicho técnico avançado; público de pesquisa e P&D. Requisito só ensino médio.",
-      "wasDerivedFrom": "feq:fonteNotion"
+      "wasDerivedFrom": "feq:fonteNotion",
+      "janelaOferecimento": {
+        "@type": "feq:JanelaTemporal",
+        "inicio": "2027-02-01",
+        "fim": "2027-06-01"
+      }
     }
   ]
 }

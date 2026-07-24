@@ -390,6 +390,18 @@ h1, h2, h3, p { margin: 0; }
 }
 .espera-tit { font-size: 1.125rem; font-weight: 700; color: #f1f5f9; margin: 0 0 0.5rem; }
 .espera-sub { font-size: 0.875rem; line-height: 1.55; color: #cbd5e1; margin: 0; }
+/* Faixa do período de oferecimento (datas de início/fim das aulas — Extecamp) */
+.periodo-faixa {
+  display: flex; align-items: center; gap: 1rem;
+  background: rgb(251 191 36 / 0.08); border: 1px solid rgb(251 191 36 / 0.3);
+  border-radius: 1rem; padding: 1.1rem 1.5rem;
+}
+.periodo-icone { font-size: 1.75rem; line-height: 1; flex-shrink: 0; }
+.periodo-rotulo {
+  margin: 0; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.08em;
+  text-transform: uppercase; color: #fbbf24;
+}
+.periodo-datas { margin: 0.15rem 0 0; font-size: 0.95rem; color: #f1f5f9; }
 .passo { display: flex; gap: 0.875rem; align-items: flex-start; font-size: 0.875rem; color: #cbd5e1; }
 .passo-n {
   flex-shrink: 0; width: 1.75rem; height: 1.75rem; border-radius: 999px;

@@ -455,6 +455,20 @@ check("Aulas online ao vivo + gravadas" in lp_real
 check("Mais professores do curso" in lp_real and "lattes.cnpq.br/0419561926689242" in lp_real,
       "LP renderizada com ontologia real: seção de outros professores presente")
 
+# --- período de oferecimento (datas de início/fim das aulas, fonte Extecamp) -------
+check('data-secao="periodo"' in lp_real and "14/09/2026" in lp_real and "15/03/2028" in lp_real
+      and "Período do curso" in lp_real,
+      "0480 (aberto): faixa com o período de oferecimento (início e fim) da Extecamp")
+_lp_espera = ponte.render(g5, _ont_real, "FEQ-0499")
+check("Período da última turma" in _lp_espera,
+      "curso em lista de espera: período rotulado como 'última turma' (não engana o lead)")
+_lp_0670 = ponte.render(g5, _ont_real, "FEQ-0670")
+check("01/02/2027" in _lp_0670 and "01/06/2027" in _lp_0670,
+      "0670 (datas buscadas na Extecamp nesta sessão) aparecem na LP")
+# curso sem as datas na ontologia -> a faixa some (nunca inventa)
+check(ponte._periodo_html({"aulas_inicio": None, "aulas_fim": None}) == "",
+      "curso sem período no grafo -> faixa de datas some")
+
 # --- conteúdo rico importado das páginas oficiais preexistentes (spec 17) ----------
 check('data-secao="objetivos"' in lp_real and "Tornar os profissionais diferenciados" in lp_real,
       "0480: objetivos oficiais na LP")
