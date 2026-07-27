@@ -234,6 +234,19 @@ def test_extrair_mensagem_cobre_botao_e_midia():
     assert tipo == "image" and leg == "olha isto" and mid == "IMG1"
 
 
+def test_templates_rol_e_envio_dry_run():
+    os.environ.pop("WHATSAPP_TOKEN", None)
+    os.environ.pop("WHATSAPP_WABA_ID", None)
+    from atena.transporte.whatsapp import TEMPLATES_ROL
+    est = Estado(":memory:")
+    wa = WhatsApp(est, Orquestrador(est, ONT))
+    assert wa.templates_status() is None                      # sem token/WABA -> não verifica ao vivo
+    assert any(t["nome"] == "feq_abertura_curso" and len(t["params"]) == 2 for t in TEMPLATES_ROL)
+    assert any(t["nome"] == "feq_reengajamento" and len(t["params"]) == 3 for t in TEMPLATES_ROL)
+    r = wa.enviar_template("5519999990001", "feq_abertura_curso", params=["Ana", "Eng. Química (FEQ-0480)"])
+    assert r["ok"] and r["status"] == "dry_run" and r["template"] == "feq_abertura_curso"
+
+
 def test_receber_midia_guarda_tipo_e_media_id():
     est = Estado(":memory:")
     est.upsert_lead("c1", nome="X", telefone="+55 19 90000-0002", curso="FEQ-0480",

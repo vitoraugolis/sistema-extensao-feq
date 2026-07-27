@@ -42,7 +42,7 @@ from atena.agentes.ingestao import Ingestao, normalizar_meta, fetch_meta_lead
 from atena.agentes import nutricao, reconciliacao
 from atena.agentes.curador import Curador
 from atena.agentes.cerebro import cerebro_factory, modelo_atual, testar_modelo, PROVEDORES, chave_do
-from atena.transporte.whatsapp import WhatsApp
+from atena.transporte.whatsapp import WhatsApp, TEMPLATES_ROL as WhatsApp_TEMPLATES
 from atena.growth.db import Growth
 from atena.growth.meta_ads import MetaAds
 from atena.growth import ponte
@@ -477,6 +477,66 @@ def conversa_enviar(card_id):
         if prop:   # humano respondeu por fora -> a proposta do agente fica obsoleta
             EST.set_decisao_status(prop["id"], "recusada")
         EST.log_acao(session.get("usuario", "humano"), "enviar_livre", card_id)
+    return jsonify({"envio": r})
+
+
+def _valor_param(k, lead):
+    """Prefill ancorado (nome/curso/prazo) — o operador confere e edita antes de enviar."""
+    info = ONTO.ont.curso(lead.get("curso", "")) or {}
+    if k == "nome":
+        return (lead.get("nome") or "").split()[0] if lead.get("nome") else "olá"
+    if k == "curso":
+        return f"{info.get('nome', lead.get('curso',''))} ({lead.get('curso','')})"
+    if k == "prazo":
+        return "/".join(reversed((info.get("inscricoes_fim") or "").split("-")))
+    return ""
+
+
+def _rol_para_lead(lead):
+    """Rol de templates prefillado p/ ESTE lead, filtrado pelos aprovados na Meta.
+    Sem verificação ao vivo (dev/sem token), devolve tudo marcado 'não verificado'."""
+    status = WA.templates_status()          # {nome: status} ou None
+    out = []
+    for t in WhatsApp_TEMPLATES:
+        st = status.get(t["nome"]) if status is not None else None
+        if status is not None and st != "APPROVED":
+            continue                        # ao vivo: só os que a Meta confirma aprovados
+        out.append({"nome": t["nome"], "titulo": t["titulo"], "descricao": t["descricao"],
+                    "verificado": status is not None,
+                    "params": [{"k": p["k"], "rotulo": p["rotulo"], "valor": _valor_param(p["k"], lead)}
+                               for p in t["params"]]})
+    return out
+
+
+@app.route("/api/conversas/<card_id>/templates")
+def conversa_templates(card_id):
+    lead = EST.get_lead(card_id)
+    if not lead:
+        return jsonify({"erro": "lead inexistente"}), 404
+    return jsonify(_rol_para_lead(lead))
+
+
+@app.route("/api/conversas/<card_id>/template", methods=["POST"])
+def conversa_enviar_template(card_id):
+    """Operador dispara um template aprovado (rol da Meta) para a conversa. Útil para
+    reabrir fora da janela de 24h, onde texto livre não sai. Opt-out é respeitado no envio."""
+    lead = EST.get_lead(card_id)
+    if not lead:
+        return jsonify({"erro": "lead inexistente"}), 404
+    b = request.get_json(silent=True) or {}
+    tpl = next((t for t in WhatsApp_TEMPLATES if t["nome"] == b.get("template")), None)
+    if not tpl:
+        return jsonify({"erro": "template fora do rol aprovado"}), 400
+    params = [str(p) for p in (b.get("params") or [])]
+    if len(params) != len(tpl["params"]):
+        return jsonify({"erro": f"{tpl['nome']} espera {len(tpl['params'])} variável(is)"}), 400
+    r = WA.enviar_template(lead["telefone"], tpl["nome"], idioma=tpl["idioma"], params=params or None)
+    if r.get("ok"):
+        rotulo = f"[template {tpl['nome']}]" + (f" {' · '.join(params)}" if params else "")
+        EST.add_conversa(card_id, "agente", rotulo, wamid=r.get("wamid"), status="enviado")
+        if lead.get("estado_conversa") in ("aguardando_1o_contato", "escalado_humano", "manual_humano"):
+            EST.set_lead(card_id, estado_conversa="aguardando_resposta")
+        EST.log_acao(session.get("usuario", "operador"), f"template {tpl['nome']}", card_id)
     return jsonify({"envio": r})
 
 

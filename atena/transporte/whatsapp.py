@@ -38,6 +38,29 @@ def _wamid(j):
     return ((j or {}).get("messages") or [{}])[0].get("id")
 
 
+# Rol de templates aprovados (pt_BR) — nomes e schema de variáveis ancorados no código
+# que JÁ os envia em produção (nutricao.py, app.py). O status real (APPROVED/PENDING/…)
+# vem da Meta em templates_status(); a UI só oferece os que a Meta confirma aprovados.
+TEMPLATES_ROL = [
+    {"nome": "feq_abertura_curso", "idioma": "pt_BR", "titulo": "Abertura de curso",
+     "descricao": "Primeiro contato apresentando o curso ao lead.",
+     "params": [{"k": "nome", "rotulo": "Nome"}, {"k": "curso", "rotulo": "Curso"}]},
+    {"nome": "feq_lead", "idioma": "pt_BR", "titulo": "Abertura com botões",
+     "descricao": "Abertura com botões de ação (link de inscrição / tirar dúvidas).",
+     "params": [{"k": "nome", "rotulo": "Nome"}, {"k": "curso", "rotulo": "Curso"}]},
+    {"nome": "feq_reengajamento", "idioma": "pt_BR", "titulo": "Reengajamento",
+     "descricao": "Retoma um lead frio fora da janela de 24h.",
+     "params": [{"k": "nome", "rotulo": "Nome"}, {"k": "curso", "rotulo": "Curso"},
+                {"k": "prazo", "rotulo": "Prazo de inscrição"}]},
+    {"nome": "feq_lembrete_inscricao", "idioma": "pt_BR", "titulo": "Lembrete de inscrição",
+     "descricao": "Lembra o prazo de inscrição do curso.",
+     "params": [{"k": "nome", "rotulo": "Nome"}, {"k": "curso", "rotulo": "Curso"},
+                {"k": "prazo", "rotulo": "Prazo de inscrição"}]},
+    {"nome": "retomar_atendimento", "idioma": "pt_BR", "titulo": "Retomar atendimento",
+     "descricao": "Convida o lead a reabrir a conversa (sem variáveis).", "params": []},
+]
+
+
 def extrair_mensagem(m):
     """Normaliza um message do webhook -> (tipo, texto/legenda, media_id, mime).
     Cobre texto, cliques de botão (quick-reply de template) e mídias."""
@@ -62,6 +85,8 @@ class WhatsApp:
         self.orq = orquestrador
         self.token = os.environ.get("WHATSAPP_TOKEN")
         self.phone_id = os.environ.get("PHONE_NUMBER_ID", "")
+        self.waba_id = os.environ.get("WHATSAPP_WABA_ID", "")
+        self._tpl_cache = None
 
     def handshake(self, args):
         if args.get("hub.verify_token") == os.environ.get("META_VERIFY_TOKEN", "troque-este-token"):
@@ -171,6 +196,28 @@ class WhatsApp:
         return {"ok": r.status_code == 200, "status": r.status_code,
                 "wamid": _wamid(j) if r.status_code == 200 else None,
                 "motivo": None if r.status_code == 200 else str(j.get("error", {}).get("message", ""))[:120]}
+
+    def templates_status(self, forcar=False):
+        """{nome: status} dos templates na Meta (APPROVED/PENDING/REJECTED/…), da Graph API.
+        None quando não dá para verificar ao vivo (sem token/WABA) — aí a UI não filtra.
+        Cache em memória (templates mudam raro); `forcar` refaz a busca."""
+        if not self.token or not self.waba_id:
+            return None
+        if self._tpl_cache is not None and not forcar:
+            return self._tpl_cache
+        try:
+            import requests
+            r = requests.get(f"{_GRAPH}/{self.waba_id}/message_templates",
+                             params={"fields": "name,status", "limit": 200},
+                             headers={"Authorization": f"Bearer {self.token}"}, timeout=20)
+            if r.status_code != 200:
+                print(f"[wa-templates] meta {r.status_code}: {r.text[:120]}", flush=True)
+                return None
+            self._tpl_cache = {t["name"]: t.get("status") for t in r.json().get("data", [])}
+            return self._tpl_cache
+        except Exception as e:
+            print(f"[wa-templates] falhou: {e}", flush=True)
+            return None
 
     def enviar_template(self, telefone, nome, idioma="pt_BR", params=None):
         """1º contato / fora da janela de 24h: exige template aprovado.

@@ -98,6 +98,12 @@ input:focus,select:focus,textarea:focus{outline:none;box-shadow:3px 3px 0 var(--
  border-radius:9px;padding:7px 10px;margin:0 11px 9px;}
 .conv-manual-nota{font-size:11.5px;font-weight:600;color:#fff;background:var(--guara);border-top:2px solid var(--b);
  padding:6px 12px;display:flex;align-items:center;gap:6px;}
+.conv-tpl{border-top:2px solid var(--b);background:var(--paper);padding:10px 12px;font-size:12.5px;}
+.conv-tpl-top{display:flex;align-items:center;margin-bottom:7px;}
+.conv-tpl-x{margin-left:auto;background:none;border:none;font-size:14px;cursor:pointer;color:var(--ink);padding:0 4px;}
+.conv-tpl select{width:100%;}
+.tpl-campo{display:block;margin-top:6px;}
+.tpl-campo span{display:block;font-size:11px;margin-bottom:2px;}
 .conv-back{display:none;align-items:center;justify-content:center;width:30px;height:30px;flex-shrink:0;border-radius:8px;
  border:2px solid var(--b);background:#fff;cursor:pointer;margin-right:2px;font-size:15px;color:var(--ink);box-shadow:2px 2px 0 var(--b);}
 @media (max-width:900px){
@@ -542,7 +548,9 @@ function renderChrome(d){
     ${d.optout
       ? '<div class="conv-blocked" style="margin:0 11px 11px;"><i class="ti ti-ban"></i> Lead em opt-out — não é possível enviar mensagens.</div>'
       : `${d.modo==='manual'?'<div class="conv-manual-nota"><i class="ti ti-hand-stop"></i> Modo manual — o agente não responde nesta conversa. Você conduz pelo campo abaixo.</div>':''}
+         <div id="convTpl" class="conv-tpl hidden"></div>
          <div class="conv-composer">
+           <button class="btn btn-g" onclick="toggleTpl('${d.id}')" title="Enviar template aprovado (reabre fora da janela de 24h)"><i class="ti ti-mail-fast"></i></button>
            <textarea id="convInput" rows="1" placeholder="Digite uma mensagem…" onkeydown="convKeydown(event)"></textarea>
            <button class="btn btn-p" onclick="convEnviar()" title="Enviar (Enter)"><i class="ti ti-send"></i></button>
          </div>`}`;
@@ -627,6 +635,42 @@ async function convEnviar(){
 }
 
 async function aposAcao(){ await refrescarAberta(); await atualizarLista(); }
+
+async function toggleTpl(id){
+  const box = $('#convTpl'); if(!box) return;
+  if(!box.classList.contains('hidden')){ box.classList.add('hidden'); box.innerHTML=''; return; }
+  const rol = await api('/api/conversas/'+id+'/templates');
+  if(!Array.isArray(rol) || !rol.length){ box.innerHTML = '<div class="muted" style="padding:4px 2px;">Nenhum template aprovado disponível.</div>'; box.classList.remove('hidden'); return; }
+  window.TPL_ROL = rol;
+  const aviso = rol[0].verificado ? '' : '<span class="chip t-warn" style="margin:0 0 0 6px;" title="Sem verificação ao vivo com a Meta (dev/sem token)">não verificado</span>';
+  box.innerHTML = `<div class="conv-tpl-top"><strong>Template aprovado</strong>${aviso}
+      <button class="conv-tpl-x" onclick="toggleTpl('${id}')" title="Fechar">✕</button></div>
+    <select id="tplSel" onchange="renderTplParams('${id}')">${rol.map((t,i)=>`<option value="${i}">${escapeHtml(t.titulo)}</option>`).join('')}</select>
+    <div id="tplDesc" class="muted" style="margin:5px 2px;"></div>
+    <div id="tplParams"></div>
+    <button class="btn btn-p" style="margin-top:6px;" onclick="enviarTemplate('${id}')"><i class="ti ti-send"></i> Enviar template</button>`;
+  box.classList.remove('hidden');
+  renderTplParams(id);
+}
+function renderTplParams(id){
+  const t = (window.TPL_ROL||[])[+($('#tplSel')||{}).value || 0]; if(!t) return;
+  const dd = $('#tplDesc'); if(dd) dd.textContent = t.descricao || '';
+  const pp = $('#tplParams'); if(!pp) return;
+  pp.innerHTML = t.params.map((p,i)=>`<label class="tpl-campo"><span class="muted">${escapeHtml(p.rotulo)}</span>
+    <input id="tplP${i}" value="${escapeHtml(p.valor||'')}"></label>`).join('') ||
+    '<div class="muted" style="margin:2px;">Sem variáveis — envia como está.</div>';
+}
+async function enviarTemplate(id){
+  const t = (window.TPL_ROL||[])[+($('#tplSel')||{}).value || 0]; if(!t) return;
+  const params = t.params.map((p,i)=>($('#tplP'+i)||{}).value || '');
+  const r = await api('/api/conversas/'+id+'/template',{method:'POST',
+    headers:{'Content-Type':'application/json'}, body:JSON.stringify({template:t.nome, params})});
+  if(r.erro){ marcarErro(id, r); return; }
+  if(r.envio && !r.envio.ok){ marcarErro(id, {}, r.envio.motivo || ('não enviado — '+r.envio.status)); return; }
+  CONV_ERRO = null;
+  const box = $('#convTpl'); if(box){ box.classList.add('hidden'); box.innerHTML=''; }
+  await aposAcao();
+}
 
 async function aprovarMsg(id, texto){
   const body = texto ? {texto} : {};
