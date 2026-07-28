@@ -321,7 +321,14 @@ async function carregar(){
   const dc = document.getElementById('dvCount');
   if(Array.isArray(dv)){
     dc.style.display = dv.length ? 'inline-flex' : 'none'; dc.textContent = dv.length;
-    $('#dvs').innerHTML = dv.length ? dv.map(d=>`
+    // O polling de 5s NÃO pode recriar os <textarea> enquanto o operador digita
+    // (mesmo bug das mensagens): re-renderiza só quando o conjunto de dúvidas muda
+    // E ninguém está com foco dentro da lista. Preserva foco/cursor/texto digitado.
+    const dvsBox = $('#dvs'); const dvSig = dv.map(d=>d.id).join(',');
+    const digitando = dvsBox.contains(document.activeElement);
+    if(!digitando && dvsBox.dataset.sig !== dvSig){
+     dvsBox.dataset.sig = dvSig;
+     dvsBox.innerHTML = dv.length ? dv.map(d=>`
       <div class="g" style="padding:12px 14px;margin-bottom:10px;">
         <div style="display:flex;align-items:center;gap:8px;font-size:13px;">
           <i class="ti ti-help-circle" style="color:var(--warn);"></i>
@@ -335,6 +342,7 @@ async function carregar(){
           <button class="btn btn-g" onclick="paraInjetor(${d.id})" title="Dado de catálogo (preço/data/carga)? Atualize a ontologia.">É dado de catálogo → Injetor</button>
         </div>
       </div>`).join('') : '<div class="muted">Nenhuma dúvida aberta. 🎉</div>';
+    }
   }
 
   const vf = await api('/api/verificacao');
@@ -763,6 +771,8 @@ async function responderDuvida(id){
     headers:{'Content-Type':'application/json'}, body:JSON.stringify({resposta:v})});
   if(r.erro){ alert(r.erro); return; }
   alert(r.envio ? 'Resposta elaborada e enviada ao lead ✓' : 'Resposta elaborada — proposta aguardando aprovação na aba Conversas.');
+  if(document.activeElement && document.activeElement.blur) document.activeElement.blur();  // libera o guard de foco
+  const dvsBox = $('#dvs'); if(dvsBox) dvsBox.dataset.sig = '';                              // força re-render da lista
   carregar();
 }
 function paraInjetor(id){

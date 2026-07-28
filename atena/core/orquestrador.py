@@ -32,8 +32,8 @@ def _fmt_ptbr(dec_str):
 ESC_RE = re.compile(r"(superior incompleto|incompleto|p[óo]s|mestrad|doutorad|superior|graduad|gradua[çc]|diploma|m[ée]dio|fundamental)", re.I)
 
 # Regra de ouro (anti-alucinação): mensagem de espera FIXA — nunca redigida pelo LLM.
-MSG_COORDENACAO = ("Certo! Essa informação eu não tenho de pronto para você. "
-                   "Um momento, por favor — vou consultar a coordenação e já retorno! 😊")
+MSG_COORDENACAO = ("Essa informação eu não tenho de pronto. "
+                   "Vou confirmar com a coordenação e já te retorno.")
 
 
 def _inferir_escolaridade(texto):
@@ -55,10 +55,10 @@ def _msg_gate(ont, cod, insistindo=False):
     nivel = ((ont.curso(cod) or {}).get("requisito")) or "superiorCompleto"
     alvo = _NIVEL_PERGUNTA.get(nivel, "o ensino superior")
     if insistindo:
-        return ("Desculpe insistir! 🙏 É que essa informação define os próximos passos: "
-                f"você já concluiu {alvo}?")
-    return ("Que ótimo seu interesse! 😊 Para eu te orientar da melhor forma, só preciso "
-            f"confirmar uma coisa: você já concluiu {alvo}? É o pré-requisito deste curso.")
+        return (f"Só pra confirmar antes de seguir: você já concluiu {alvo}? "
+                "É o que define os próximos passos.")
+    return (f"Antes de te orientar, preciso confirmar uma coisa: você já concluiu {alvo}? "
+            "É o pré-requisito deste curso.")
 
 
 def brain_deterministico(ont, lead, mensagem_lead, historico=None, hoje=None):
@@ -94,11 +94,11 @@ def _brain_deterministico(ont, lead, mensagem_lead, historico=None, hoje=None):
         else:
             abertos = [c for c in ont.portfolio() if c.get("inscricao") == "aberta"][:3]
             lista = "; ".join(f"{c['codigo']} ({c['nome']})" for c in abertos)
-            msg = ("Oi! Que bom falar com você 😊 Sou o Vinícius, da Extensão FEQ Unicamp. "
+            msg = ("Oi! Sou o Vinícius, da Extensão FEQ Unicamp. "
                    "Sobre qual curso você quer informações? "
-                   + (f"Alguns com inscrições abertas agora: {lista}. " if lista else "")
-                   + "Se estiver em dúvida, me conta sua formação e o que você quer "
-                     "melhorar que eu te indico o mais adequado!")
+                   + (f"Com inscrições abertas agora: {lista}. " if lista else "")
+                   + "Se estiver em dúvida, me conta sua formação e o que quer "
+                     "melhorar que eu indico o mais adequado.")
             return C.DecisaoAgente(C.CONTINUAR, "lead sem curso definido — descoberta",
                                    mensagem_ao_lead=msg)
     cap = ont.captavel(cod, hoje)
@@ -131,13 +131,13 @@ def _brain_deterministico(ont, lead, mensagem_lead, historico=None, hoje=None):
                           and AFIRMA_RE.search(mensagem_lead or "")))
             if quer_link and c.get("url_extecamp"):
                 prazo = "/".join(reversed((c.get("inscricoes_fim") or "").split("-")))
-                msg = (f"Perfeito! 🎉 Aqui está o link de inscrição do {cod}: "
+                msg = (f"Aqui está o link de inscrição do {cod}: "
                        f"{c['url_extecamp']} — as inscrições vão até {prazo}. "
-                       f"Qualquer dúvida no preenchimento, me chama por aqui!")
+                       f"Qualquer dúvida no preenchimento, é só me chamar.")
                 return C.DecisaoAgente(C.QUALIFICAR, "elegível — link de inscrição enviado",
                                        mensagem_ao_lead=msg, dados={"escolaridade": esc})
             p = c["plano"]
-            msg = (f"Que ótimo! O {cod} são {p['n']}x de R$ {_fmt_ptbr(p['valor_parcela'])}, "
+            msg = (f"O {cod} são {p['n']}x de R$ {_fmt_ptbr(p['valor_parcela'])}, "
                    f"ou R$ {_fmt_ptbr(p['a_vista'])} à vista. Posso te enviar o link de inscrição?")
             return C.DecisaoAgente(C.QUALIFICAR, "elegível + interesse",
                                    mensagem_ao_lead=msg, dados={"escolaridade": esc})
@@ -189,7 +189,7 @@ class Orquestrador:
         ultima_ag = next((h["texto"] for h in reversed(historico) if h.get("papel") == "agente"), None)
         if dec.mensagem_ao_lead and dec.mensagem_ao_lead == ultima_ag:
             dec = C.DecisaoAgente(C.ESCALAR, "loop detectado (mensagem idêntica à anterior)",
-                                  mensagem_ao_lead="Boa pergunta! Vou pedir para alguém da equipe te responder pessoalmente — só um instante! 😊",
+                                  mensagem_ao_lead="Vou pedir para alguém da equipe te responder isso — só um instante.",
                                   escalonamento_motivo="agente repetiria a mesma resposta")
         if dec.proxima_acao == C.CONSULTAR:
             # regra de ouro: template fixo ao lead + dúvida na fila da coordenação

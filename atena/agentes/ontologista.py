@@ -68,19 +68,36 @@ class Ontologista:
             return None, [], "indefinido"
         code = f"FEQ-{m.group(1)}"
         diffs, tipos = [], []
-        t = texto.lower()
+        t = (texto or "").lower()
+        # Trabalha SEM o código do curso: seus dígitos (ex.: 0333) contaminavam os
+        # números do dado e quebravam o parsing de carga/preço.
+        tc = CODE_RE.sub(" ", t)
         d = _iso(texto)
-        if d and "inscri" in t and re.search(r"(reabr|abriu|reabriu|prorrog|estend|at[ée])", t):
+        # inscrição: reabrir/prorrogar/estender/nova data até DD/MM/AAAA
+        if d and "inscri" in t and re.search(r"(reabr|abriu|reabriu|prorrog|estend|at[ée]|nov[oa] (data|prazo))", t):
             diffs.append(("janelaInscricao.fim", d))
             tipos.append("reabrir_inscricao")
-        mc = re.search(r"carga\D{0,15}(\d{2,4})\s*h", t) or re.search(r"\b(\d{2,4})\s*horas\b", t)
-        if mc:
-            diffs.append(("cargaHoraria.horas", int(mc.group(1))))
-            tipos.append("carga")
-        mv = re.search(r"[àa]\s*vista\D{0,12}r?\$?\s*([\d.]+,\d{2})", t)
-        if mv:
-            diffs.append(("planoPagamento.aVista", _dec(mv.group(1))))
-            tipos.append("preco")
+        # carga horária: "120h" ou "120 horas", em qualquer posição, quando o tema é carga
+        if "carga" in tc or "hora" in tc:
+            mc = re.search(r"(\d{2,4})\s*h(?:oras?)?\b", tc)
+            if mc:
+                diffs.append(("cargaHoraria.horas", int(mc.group(1))))
+                tipos.append("carga")
+        # preço à vista: valor em R$ perto de "à vista" (antes OU depois — janela larga)
+        if "vista" in tc:
+            mv = re.search(r"vista\D*?([\d.]+,\d{2})", tc) or re.search(r"([\d.]+,\d{2})\D{0,10}vista", tc)
+            if mv:
+                diffs.append(("planoPagamento.aVista", _dec(mv.group(1))))
+                tipos.append("preco")
+        # parcelas: "20x de R$ 892,81" / "em 20 vezes de R$ 892,81" / "20 parcelas de ..."
+        # (a trava SHACL exige numParcelas × valorParcela ≈ aVista, então preço só passa
+        #  quando o operador informa o plano coerente — parcelas E à vista.)
+        mp = re.search(r"(\d{1,3})\s*(?:x|vezes|parcelas?)\D*?([\d.]+,\d{2})", tc)
+        if mp:
+            diffs.append(("planoPagamento.numParcelas", int(mp.group(1))))
+            diffs.append(("planoPagamento.valorParcela", _dec(mp.group(2))))
+            if "preco" not in tipos:
+                tipos.append("preco")
         return code, diffs, ("+".join(dict.fromkeys(tipos)) or "indefinido")
 
     # ------------------------------------------------------------------- helpers

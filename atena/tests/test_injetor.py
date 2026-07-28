@@ -57,6 +57,29 @@ def test_atualizacao_ambigua_pede_esclarecimento():
     assert p["status"] == "esclarecer"
 
 
+def test_carga_frase_natural_com_codigo_no_meio():
+    # antes: os dígitos do código (0333) quebravam o \D do parser -> "esclarecer".
+    est, onto = _setup()
+    p = onto.propor("A carga horária do FEQ-0333 passou para 120h")
+    assert any(d["campo"] == "cargaHoraria.horas" and d["para"] == 120 for d in p["diff"])
+    p2 = onto.propor("Atualizar FEQ-0333 para 448 horas")
+    assert any(d["campo"] == "cargaHoraria.horas" and d["para"] == 448 for d in p2["diff"])
+
+
+def test_preco_coerente_valida_incoerente_barra():
+    est, onto = _setup()
+    # plano coerente (parcelas + à vista batem) -> passa SHACL
+    p = onto.propor("FEQ-0499 agora é 20x de R$ 195,00 ou R$ 3.900,00 à vista")
+    campos = {d["campo"]: d["para"] for d in p["diff"]}
+    assert campos.get("planoPagamento.numParcelas") == 20
+    assert campos.get("planoPagamento.valorParcela") == "195.00"
+    assert campos.get("planoPagamento.aVista") == "3900.00"
+    assert p["status"] == "proposta" and p["validacao"]["ok"] is True
+    # mexer só no à vista quebra a trava numParcelas × valorParcela ≈ aVista
+    p2 = onto.propor("Muda só o à vista do FEQ-0499 para R$ 3.900,00")
+    assert p2["status"] == "invalida"
+
+
 if __name__ == "__main__":
     casos = [v for k, v in sorted(globals().items()) if k.startswith("test_") and callable(v)]
     falhas = 0
