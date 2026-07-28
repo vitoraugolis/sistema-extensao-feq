@@ -558,6 +558,8 @@ function renderChrome(d){
       : `${d.modo==='manual'?'<div class="conv-manual-nota"><i class="ti ti-hand-stop"></i> Modo manual — o agente não responde nesta conversa. Você conduz pelo campo abaixo.</div>':''}
          <div id="convTpl" class="conv-tpl hidden"></div>
          <div class="conv-composer">
+           <input type="file" id="convArquivo" class="hidden" onchange="convEnviarMidia('${d.id}')">
+           <button class="btn btn-g" id="convClipe" onclick="$('#convArquivo').click()" title="Enviar arquivo, áudio ou foto (o texto digitado vai como legenda)"><i class="ti ti-paperclip"></i></button>
            <button class="btn btn-g" onclick="toggleTpl('${d.id}')" title="Enviar template aprovado (reabre fora da janela de 24h)"><i class="ti ti-mail-fast"></i></button>
            <textarea id="convInput" rows="1" placeholder="Digite uma mensagem…" onkeydown="convKeydown(event)"></textarea>
            <button class="btn btn-p" onclick="convEnviar()" title="Enviar (Enter)"><i class="ti ti-send"></i></button>
@@ -643,6 +645,23 @@ async function convEnviar(){
 }
 
 async function aposAcao(){ await refrescarAberta(); await atualizarLista(); }
+
+async function convEnviarMidia(id){
+  const inp = $('#convArquivo'); const f = inp && inp.files && inp.files[0];
+  if(!f) return;
+  const cap = $('#convInput'); const legenda = cap ? cap.value.trim() : '';
+  const clipe = $('#convClipe');
+  if(clipe){ clipe.disabled = true; clipe.innerHTML = '<i class="ti ti-loader"></i>'; }
+  const fd = new FormData(); fd.append('arquivo', f); if(legenda) fd.append('legenda', legenda);
+  const r = await api('/api/conversas/'+id+'/midia',{method:'POST', body:fd});  // sem Content-Type: o browser põe o boundary
+  if(clipe){ clipe.disabled = false; clipe.innerHTML = '<i class="ti ti-paperclip"></i>'; }
+  inp.value = '';                                   // permite reenviar o mesmo arquivo
+  if(r.erro){ marcarErro(id, r); return; }
+  if(r.envio && !r.envio.ok){ marcarErro(id, {}, r.envio.motivo || ('não enviado — '+r.envio.status)); return; }
+  CONV_ERRO = null;
+  if(cap) cap.value = '';                           // legenda consumida
+  await aposAcao();
+}
 
 async function toggleTpl(id){
   const box = $('#convTpl'); if(!box) return;

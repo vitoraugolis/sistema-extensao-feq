@@ -63,6 +63,7 @@ GRW = Growth()                       # growth engine (specs 15/16) — mesmo SQL
 ADS = MetaAds()
 WEB = pathlib.Path(__file__).resolve().parents[1] / "web"
 app = Flask(__name__)
+app.config["MAX_CONTENT_LENGTH"] = 105 * 1024 * 1024   # teto de upload (doc da Meta = 100 MB)
 from werkzeug.middleware.proxy_fix import ProxyFix
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1)   # IP real atrás do Caddy
 auth.init_app(app, EST)             # login/RBAC/auditoria — /api/* exige sessão
@@ -477,6 +478,39 @@ def conversa_enviar(card_id):
         if prop:   # humano respondeu por fora -> a proposta do agente fica obsoleta
             EST.set_decisao_status(prop["id"], "recusada")
         EST.log_acao(session.get("usuario", "humano"), "enviar_livre", card_id)
+    return jsonify({"envio": r})
+
+
+@app.route("/api/conversas/<card_id>/midia", methods=["POST"])
+def conversa_enviar_midia(card_id):
+    """Operador envia arquivo/áudio/foto ao lead (multipart: arquivo + legenda opcional).
+    A legenda é texto ao lead -> passa pelo Revisor, como qualquer mensagem."""
+    lead = EST.get_lead(card_id)
+    if not lead:
+        return jsonify({"erro": "lead inexistente"}), 404
+    arq = request.files.get("arquivo")
+    if not arq or not arq.filename:
+        return jsonify({"erro": "nenhum arquivo enviado"}), 400
+    legenda = (request.form.get("legenda") or "").strip()
+    if legenda:
+        rev = revisar(lead["curso"], legenda, ONTO.ont)
+        if not rev["aprovado"]:
+            return jsonify({"erro": "legenda bloqueada pelo Revisor", "bloqueios": rev["bloqueios"]}), 422
+    conteudo = arq.read()
+    r = WA.enviar_midia(lead["telefone"], conteudo, arq.filename,
+                        arq.mimetype or "application/octet-stream", legenda=legenda or None,
+                        forcar=True)     # envio humano: passa fora do horário comercial
+    if r.get("ok"):
+        # áudio não aceita legenda na Meta: se havia texto, vai em mensagem separada
+        if legenda and not r.get("legenda_enviada"):
+            t = WA.enviar(lead["telefone"], legenda, forcar=True)
+            if t.get("ok"):
+                EST.add_conversa(card_id, "agente", legenda, wamid=t.get("wamid"), status="enviado")
+        EST.add_conversa(card_id, "agente", legenda if r.get("legenda_enviada") else "",
+                         tipo=r.get("tipo"), media_id=r.get("media_id"),
+                         wamid=r.get("wamid"), status="enviado")
+        EST.set_lead(card_id, estado_conversa="aguardando_resposta")
+        EST.log_acao(session.get("usuario", "humano"), f"enviar_midia {r.get('tipo')}", card_id)
     return jsonify({"envio": r})
 
 

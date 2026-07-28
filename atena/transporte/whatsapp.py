@@ -38,6 +38,27 @@ def _wamid(j):
     return ((j or {}).get("messages") or [{}])[0].get("id")
 
 
+# Limites de tamanho da Meta por tipo (MB) e os mimes que ela aceita em cada um.
+# O que não estiver nas listas vai como 'document': sempre entrega, sem surpresa
+# (ex.: .webp, .webm — a Meta recusaria como image/audio).
+_LIMITE_MB = {"image": 5, "audio": 16, "video": 16, "document": 100, "sticker": 0.5}
+_MIME_IMAGEM = {"image/jpeg", "image/jpg", "image/png"}
+_MIME_AUDIO = {"audio/aac", "audio/mp4", "audio/mpeg", "audio/amr", "audio/ogg", "audio/opus"}
+_MIME_VIDEO = {"video/mp4", "video/3gpp"}
+
+
+def tipo_de_mime(mime, nome_arquivo=""):
+    """mime -> tipo de mensagem do WhatsApp (image/audio/video/document)."""
+    m = (mime or "").split(";")[0].strip().lower()
+    if m in _MIME_IMAGEM:
+        return "image"
+    if m in _MIME_AUDIO:
+        return "audio"
+    if m in _MIME_VIDEO:
+        return "video"
+    return "document"
+
+
 # Rol de templates aprovados (pt_BR) — nomes e schema de variáveis ancorados no código
 # que JÁ os envia em produção (nutricao.py, app.py). O status real (APPROVED/PENDING/…)
 # vem da Meta em templates_status(); a UI só oferece os que a Meta confirma aprovados.
@@ -165,25 +186,31 @@ class WhatsApp:
             self.est.add_alerta("envio_falhou", f"Mensagem ao lead {cid} NÃO foi entregue: {motivo}")
             out.append({"card_id": cid, "acao": "envio_falhou", "motivo": motivo})
 
-    def enviar(self, telefone, texto, forcar=False, agora=None):
-        if not texto:
-            return {"ok": False, "motivo": "sem texto"}
-        texto = fmt_whatsapp(texto)
-        # guardrails de destinatário: opt-out e janela de 24h (texto livre só dentro dela)
+    def _guarda_destinatario(self, telefone, forcar=False, agora=None):
+        """Regra única de quem pode receber mensagem livre (texto OU mídia): opt-out e
+        janela de 24h da Meta; horário comercial só barra cadência automática.
+        Devolve o dict de recusa, ou None quando pode enviar."""
         card_id = self.est.lead_por_telefone(telefone) if self.est else None
         if card_id:
             lead = self.est.get_lead(card_id)
             if lead and lead.get("optout"):
                 return {"ok": False, "status": "bloqueado", "motivo": "lead em opt-out"}
             ts = self.est.ultima_lead_ts(card_id)
-            import datetime
             if not ts or (datetime.datetime.now() - datetime.datetime.fromisoformat(ts)).total_seconds() > 86400:
                 return {"ok": False, "status": "fora_da_janela_24h",
                         "motivo": "sem mensagem do lead nas últimas 24h — use template aprovado"}
-        # horário comercial: só barra cadência automática; envio humano (forcar) passa.
         if not forcar and not G.dentro_janela(agora):
             return {"ok": False, "status": "fora_do_horario",
                     "motivo": "fora do horário comercial (reenvie no horário)"}
+        return None
+
+    def enviar(self, telefone, texto, forcar=False, agora=None):
+        if not texto:
+            return {"ok": False, "motivo": "sem texto"}
+        texto = fmt_whatsapp(texto)
+        recusa = self._guarda_destinatario(telefone, forcar, agora)
+        if recusa:
+            return recusa
         if not self.token:
             return {"ok": True, "status": "dry_run", "para": telefone, "texto": texto}
         import requests
@@ -196,6 +223,68 @@ class WhatsApp:
         return {"ok": r.status_code == 200, "status": r.status_code,
                 "wamid": _wamid(j) if r.status_code == 200 else None,
                 "motivo": None if r.status_code == 200 else str(j.get("error", {}).get("message", ""))[:120]}
+
+    def enviar_midia(self, telefone, conteudo, nome_arquivo, mime, legenda=None,
+                     forcar=False, agora=None):
+        """Envia arquivo/áudio/foto ao lead: sobe o binário para a Meta, manda a mensagem
+        e guarda uma cópia local para a Central renderizar a mídia na thread.
+        Mesmos guardrails do texto livre (opt-out + janela de 24h)."""
+        if not conteudo:
+            return {"ok": False, "motivo": "arquivo vazio"}
+        tipo = tipo_de_mime(mime, nome_arquivo)
+        limite = _LIMITE_MB.get(tipo, 16) * 1024 * 1024
+        if len(conteudo) > limite:
+            return {"ok": False, "status": "grande_demais",
+                    "motivo": f"{tipo}: limite da Meta é {_LIMITE_MB.get(tipo, 16)} MB"}
+        recusa = self._guarda_destinatario(telefone, forcar, agora)
+        if recusa:
+            return recusa
+        legenda = fmt_whatsapp(legenda) if legenda else None
+        # legenda só acompanha a mídia em image/video/document — áudio a Meta não aceita
+        com_legenda = bool(legenda) and tipo in ("image", "video", "document")
+        if not self.token:                      # dry-run: guarda local e não chama a Meta
+            mid = f"local-{int(datetime.datetime.now().timestamp() * 1000)}"
+            self._guardar_local(mid, conteudo, mime)
+            return {"ok": True, "status": "dry_run", "para": telefone, "tipo": tipo,
+                    "media_id": mid, "arquivo": nome_arquivo, "legenda_enviada": com_legenda}
+        import requests
+        up = requests.post(f"{_GRAPH}/{self.phone_id}/media", timeout=120,
+                           headers={"Authorization": f"Bearer {self.token}"},
+                           data={"messaging_product": "whatsapp", "type": mime},
+                           files={"file": (nome_arquivo, conteudo, mime)})
+        if up.status_code != 200 or not (up.json() or {}).get("id"):
+            j = up.json() if up.text else {}
+            return {"ok": False, "status": up.status_code,
+                    "motivo": "upload falhou: " + str(j.get("error", {}).get("message", ""))[:120]}
+        mid = up.json()["id"]
+        corpo = {"id": mid}
+        if com_legenda:
+            corpo["caption"] = legenda
+        if tipo == "document":
+            corpo["filename"] = nome_arquivo
+        r = requests.post(f"{_GRAPH}/{self.phone_id}/messages", timeout=60,
+                          headers={"Authorization": f"Bearer {self.token}",
+                                   "Content-Type": "application/json"},
+                          json={"messaging_product": "whatsapp", "to": telefone,
+                                "type": tipo, tipo: corpo})
+        j = r.json() if r.text else {}
+        if r.status_code == 200:
+            self._guardar_local(mid, conteudo, mime)
+        return {"ok": r.status_code == 200, "status": r.status_code, "tipo": tipo,
+                "media_id": mid if r.status_code == 200 else None,
+                "wamid": _wamid(j) if r.status_code == 200 else None,
+                "legenda_enviada": bool(corpo.get("caption")),
+                "motivo": None if r.status_code == 200 else str(j.get("error", {}).get("message", ""))[:120]}
+
+    def _guardar_local(self, media_id, conteudo, mime):
+        """Cópia local (mesma pasta das mídias recebidas) para a thread da Central
+        exibir o que foi enviado — a URL da Meta expira e exige token."""
+        try:
+            _MEDIA_DIR.mkdir(parents=True, exist_ok=True)
+            (_MEDIA_DIR / media_id).write_bytes(conteudo)
+            self.est.add_midia(media_id, mime)
+        except Exception as e:
+            print(f"[wa-midia] cópia local de {media_id} falhou: {e}", flush=True)
 
     def templates_status(self, forcar=False):
         """{nome: status} dos templates na Meta (APPROVED/PENDING/REJECTED/…), da Graph API.

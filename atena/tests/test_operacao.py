@@ -234,6 +234,47 @@ def test_extrair_mensagem_cobre_botao_e_midia():
     assert tipo == "image" and leg == "olha isto" and mid == "IMG1"
 
 
+def test_envio_de_midia_tipo_limite_e_guardrails():
+    import tempfile
+    import pathlib as _p
+    from atena.transporte import whatsapp as _wa
+    from atena.transporte.whatsapp import tipo_de_mime
+    os.environ.pop("WHATSAPP_TOKEN", None)
+    # mime -> tipo: o que a Meta não aceita como image/audio vai como document (sempre entrega)
+    assert tipo_de_mime("image/jpeg") == "image" and tipo_de_mime("audio/ogg") == "audio"
+    assert tipo_de_mime("video/mp4") == "video" and tipo_de_mime("application/pdf") == "document"
+    assert tipo_de_mime("image/webp") == "document" and tipo_de_mime("audio/webm") == "document"
+
+    _orig, _wa._MEDIA_DIR = _wa._MEDIA_DIR, _p.Path(tempfile.mkdtemp())   # sem sujar data/media
+    try:
+        est = Estado(":memory:")
+        est.upsert_lead("m1", nome="Ana", telefone="5519999990001", curso="FEQ-0480")
+        wa = WhatsApp(est, Orquestrador(est, ONT))
+        est.add_conversa("m1", "lead", "oi")            # abre a janela de 24h
+        r = wa.enviar_midia("5519999990001", b"%PDF-1.4", "edital.pdf", "application/pdf",
+                            legenda="Segue o edital")
+        assert r["ok"] and r["tipo"] == "document"
+        assert r["legenda_enviada"] is True        # doc/imagem/vídeo levam a legenda junto
+        # áudio NÃO aceita legenda na Meta -> quem chama manda o texto em mensagem separada
+        assert wa.enviar_midia("5519999990001", b"OggS", "audio.ogg", "audio/ogg",
+                               legenda="ouve isso")["legenda_enviada"] is False
+        assert (_wa._MEDIA_DIR / r["media_id"]).exists()          # cópia local p/ a thread
+        assert est.midia_mime(r["media_id"]) == "application/pdf"
+        # limite de tamanho da Meta (imagem = 5 MB) barra ANTES de subir
+        assert wa.enviar_midia("5519999990001", b"x" * (6 * 1024 * 1024), "f.jpg",
+                               "image/jpeg")["status"] == "grande_demais"
+        # mídia respeita os MESMOS guardrails do texto livre
+        est.set_lead("m1", optout=1)
+        assert wa.enviar_midia("5519999990001", b"x", "f.jpg", "image/jpeg")["status"] == "bloqueado"
+        est.set_lead("m1", optout=0)
+        est2 = Estado(":memory:")
+        est2.upsert_lead("m2", nome="B", telefone="5519999990002", curso="FEQ-0480")
+        wa2 = WhatsApp(est2, Orquestrador(est2, ONT))   # sem fala do lead -> fora da janela
+        assert wa2.enviar_midia("5519999990002", b"x", "f.jpg", "image/jpeg")["status"] == "fora_da_janela_24h"
+    finally:
+        _wa._MEDIA_DIR = _orig
+
+
 def test_templates_rol_e_envio_dry_run():
     os.environ.pop("WHATSAPP_TOKEN", None)
     os.environ.pop("WHATSAPP_WABA_ID", None)
