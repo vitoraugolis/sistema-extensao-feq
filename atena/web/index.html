@@ -104,6 +104,10 @@ input:focus,select:focus,textarea:focus{outline:none;box-shadow:3px 3px 0 var(--
 .conv-tpl select{width:100%;}
 .tpl-campo{display:block;margin-top:6px;}
 .tpl-campo span{display:block;font-size:11px;margin-bottom:2px;}
+.tpl-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+@media(max-width:640px){.tpl-grid{grid-template-columns:1fr;}}
+.tpl-previa{background:var(--laranjinha);border:2px solid var(--b);border-radius:11px;
+ padding:10px 12px;font-size:13px;max-width:340px;box-shadow:3px 3px 0 var(--b);}
 .conv-back{display:none;align-items:center;justify-content:center;width:30px;height:30px;flex-shrink:0;border-radius:8px;
  border:2px solid var(--b);background:#fff;cursor:pointer;margin-right:2px;font-size:15px;color:var(--ink);box-shadow:2px 2px 0 var(--b);}
 @media (max-width:900px){
@@ -167,6 +171,7 @@ input:focus,select:focus,textarea:focus{outline:none;box-shadow:3px 3px 0 var(--
       <button class="navi" data-sec="duvidas"><i class="ti ti-help-circle"></i> Dúvidas <span class="tag t-warn" id="dvCount" style="display:none;margin-left:auto;"></span></button>
       <button class="navi" data-sec="verificacao"><i class="ti ti-checklist"></i> Verificação <span class="tag t-warn" id="vfCount" style="display:none;margin-left:auto;"></span></button>
       <button class="navi" data-sec="injetor"><i class="ti ti-database-import"></i> Injetor</button>
+      <button class="navi" data-sec="templates"><i class="ti ti-mail-cog"></i> Templates</button>
       <button class="navi" data-sec="revisor"><i class="ti ti-eye-search"></i> Revisor ao vivo</button>
       <button class="navi" data-sec="config"><i class="ti ti-settings"></i> Configurações</button>
     </nav>
@@ -223,6 +228,41 @@ input:focus,select:focus,textarea:focus{outline:none;box-shadow:3px 3px 0 var(--
             a conversão à Meta); <strong>Não inscreveu</strong> mantém como Lead e o agente envia a
             mensagem de recuperação imediatamente.</p>
           <div id="vfs"></div>
+        </div>
+      </section>
+
+      <section id="templates" class="hidden">
+        <div class="g sec">
+          <h2><i class="ti ti-mail-cog"></i> Templates da Meta</h2>
+          <p class="muted" style="margin:0 0 10px;">Templates aprovados são o que permite <strong>iniciar</strong> conversa ou reabrir fora da janela de 24h. Criar aqui envia para revisão da Meta (fica PENDING até ela aprovar).</p>
+          <div id="tplConexao"></div>
+          <div id="tplLista" style="margin-top:10px;"></div>
+        </div>
+        <div class="g sec">
+          <h3 style="margin:0 0 4px;"><i class="ti ti-plus"></i> Criar template</h3>
+          <p class="muted" style="margin:0 0 10px;">Use <code>{{1}}</code>, <code>{{2}}</code> para as variáveis e dê um exemplo de cada — a Meta exige para aprovar.</p>
+          <div class="tpl-grid">
+            <label class="tpl-campo"><span class="muted">Nome (minúsculas, números e _)</span>
+              <input id="tplNome" placeholder="feq_convite_turma" oninput="tplPreview()"></label>
+            <label class="tpl-campo"><span class="muted">Categoria</span>
+              <select id="tplCat"></select></label>
+          </div>
+          <label class="tpl-campo"><span class="muted">Cabeçalho (opcional)</span>
+            <input id="tplHead" placeholder="Extensão FEQ Unicamp" oninput="tplPreview()"></label>
+          <label class="tpl-campo"><span class="muted">Corpo da mensagem *</span>
+            <textarea id="tplCorpo" rows="4" placeholder="Oi {{1}}! As inscrições do {{2}} estão abertas até {{3}}. Quer que eu te envie o link?" oninput="tplPreview()"></textarea></label>
+          <div id="tplExemplos"></div>
+          <label class="tpl-campo"><span class="muted">Rodapé (opcional)</span>
+            <input id="tplFoot" placeholder="Responda SAIR para não receber mais" oninput="tplPreview()"></label>
+          <label class="tpl-campo"><span class="muted">Botões de resposta rápida (opcional, até 3 — separe por vírgula)</span>
+            <input id="tplBtns" placeholder="Quero o link, Tenho dúvidas" oninput="tplPreview()"></label>
+          <p class="muted" style="margin:12px 2px 4px;">Prévia</p>
+          <div id="tplPrevia" class="tpl-previa"></div>
+          <div style="display:flex;gap:8px;align-items:center;margin-top:12px;">
+            <button class="btn btn-p" onclick="criarTemplate()"><i class="ti ti-send"></i> Enviar para aprovação da Meta</button>
+            <span class="muted">ação externa — o template vai para revisão da Meta</span>
+          </div>
+          <div id="tplOut" style="margin-top:10px;"></div>
         </div>
       </section>
 
@@ -293,6 +333,7 @@ document.querySelectorAll('.navi').forEach(b=>b.onclick=()=>{
   document.querySelectorAll('main section').forEach(s=>s.classList.add('hidden'));
   $('#'+b.dataset.sec).classList.remove('hidden');
   if(b.dataset.sec==='kanban') renderKanban();
+  if(b.dataset.sec==='templates') tplCarregar();
 });
 
 async function carregar(){
@@ -340,6 +381,7 @@ async function carregar(){
         <div style="display:flex;gap:8px;margin-top:8px;align-items:center;">
           <button class="btn btn-p" onclick="responderDuvida(${d.id})"><i class="ti ti-send"></i> Responder e enviar ao lead</button>
           <button class="btn btn-g" onclick="paraInjetor(${d.id})" title="Dado de catálogo (preço/data/carga)? Atualize a ontologia.">É dado de catálogo → Injetor</button>
+          <button class="btn btn-g" style="margin-left:auto;" onclick="descartarDuvida(${d.id})" title="Não faz sentido responder — arquiva a dúvida (fica no histórico)"><i class="ti ti-trash"></i> Descartar</button>
         </div>
       </div>`).join('') : '<div class="muted">Nenhuma dúvida aberta. 🎉</div>';
     }
@@ -375,6 +417,76 @@ async function testarRevisor(){
   const bl = (r.bloqueios||[]).map(b=>`<div class="row" style="background:var(--rosa);"><i class="ti ti-alert-triangle" style="color:var(--bad);"></i><span>${b}</span></div>`).join('');
   const an = (r.ancoras||[]).map(a=>`<span class="chip t-ok"><i class="ti ti-check"></i> ${a}</span>`).join('');
   $('#rout').innerHTML = `<div style="margin-bottom:8px;">${head}</div>${bl}${an?('<div style="margin-top:6px;">'+an+'</div>'):''}`;
+}
+
+// ---------------------------------------------------------------- templates Meta
+const TPL_STATUS = {APPROVED:['t-ok','aprovado'], PENDING:['t-warn','em análise'],
+                    REJECTED:['t-bad','rejeitado'], PAUSED:['t-warn','pausado'],
+                    DISABLED:['t-bad','desativado']};
+async function tplCarregar(forcar){
+  const d = await api('/api/templates' + (forcar?'?forcar=1':''));
+  const cat = $('#tplCat');
+  if(cat && !cat.options.length)
+    cat.innerHTML = (d.categorias||[]).map(c=>`<option value="${c[0]}">${escapeHtml(c[1])}</option>`).join('');
+  $('#tplConexao').innerHTML = d.conectado
+    ? `<span class="chip t-ok"><i class="ti ti-plug-connected"></i> conectado à WABA</span>
+       <button class="btn btn-g" style="margin-left:6px;padding:4px 9px;" onclick="tplCarregar(1)"><i class="ti ti-refresh"></i> Atualizar</button>`
+    : `<div class="row t-warn" style="background:var(--sun);"><i class="ti ti-alert-triangle"></i><span>Sem <code>WHATSAPP_WABA_ID</code>/token no .env — não dá para consultar nem criar na Meta. Abaixo, o rol que o sistema usa no envio.</span></div>`;
+  const ts = d.templates||[];
+  $('#tplLista').innerHTML = ts.length ? ts.map(t=>{
+    const st = TPL_STATUS[t.status] || ['t-acc', t.status||'—'];
+    const corpo = ((t.components||[]).find(c=>c.type==='BODY')||{}).text || '';
+    return `<div class="row" style="align-items:flex-start;">
+      <i class="ti ti-mail"></i>
+      <span><strong>${escapeHtml(t.name)}</strong> <span class="muted">${t.language||''} ${t.category?'· '+t.category:''}</span>
+        ${corpo?`<div class="muted" style="margin-top:3px;">${escapeHtml(corpo).slice(0,150)}</div>`:''}
+        ${t.rejected_reason && t.rejected_reason!=='NONE'?`<div style="color:var(--bad);font-size:11.5px;margin-top:3px;">motivo: ${escapeHtml(t.rejected_reason)}</div>`:''}</span>
+      <span class="tag ${st[0]}" style="margin-left:auto;">${st[1]}</span></div>`;
+  }).join('') : '<div class="muted">Nenhum template.</div>';
+  tplPreview();
+}
+function tplVars(){
+  const c = ($('#tplCorpo')||{}).value || '';
+  return [...new Set((c.match(/\{\{\s*\d+\s*\}\}/g)||[]).map(v=>v.replace(/\D/g,'')))].sort((a,b)=>a-b);
+}
+function tplPreview(){
+  const vars = tplVars(); const box = $('#tplExemplos');
+  if(box && box.dataset.n !== String(vars.length)){    // campos de exemplo seguem as variáveis
+    const antes = [...box.querySelectorAll('input')].map(i=>i.value);
+    box.innerHTML = vars.map((v,i)=>`<label class="tpl-campo"><span class="muted">Exemplo para {{${v}}}</span>
+      <input id="tplEx${i}" value="${escapeHtml(antes[i]||'')}" oninput="tplPreview()"></label>`).join('');
+    box.dataset.n = String(vars.length);
+  }
+  const ex = vars.map((v,i)=>(($('#tplEx'+i)||{}).value||'').trim() || '…');
+  let corpo = (($('#tplCorpo')||{}).value||'');
+  vars.forEach((v,i)=>{ corpo = corpo.split('{{'+v+'}}').join(ex[i]); });
+  const head = (($('#tplHead')||{}).value||'').trim(), foot = (($('#tplFoot')||{}).value||'').trim();
+  const btns = (($('#tplBtns')||{}).value||'').split(',').map(s=>s.trim()).filter(Boolean).slice(0,3);
+  const p = $('#tplPrevia'); if(!p) return;
+  p.innerHTML = (head?`<div style="font-weight:700;margin-bottom:4px;">${escapeHtml(head)}</div>`:'')
+    + `<div>${escapeHtml(corpo).replace(/\n/g,'<br>') || '<span class="muted">(escreva o corpo da mensagem)</span>'}</div>`
+    + (foot?`<div class="muted" style="margin-top:5px;font-size:11px;">${escapeHtml(foot)}</div>`:'')
+    + (btns.length?`<div style="margin-top:7px;display:flex;gap:5px;flex-wrap:wrap;">${btns.map(b=>`<span class="chip" style="margin:0;background:#fff;">${escapeHtml(b)}</span>`).join('')}</div>`:'');
+}
+async function criarTemplate(){
+  const vars = tplVars();
+  const body = {
+    nome: (($('#tplNome')||{}).value||'').trim().toLowerCase(),
+    categoria: (($('#tplCat')||{}).value||''),
+    corpo: (($('#tplCorpo')||{}).value||'').trim(),
+    exemplos: vars.map((v,i)=>(($('#tplEx'+i)||{}).value||'').trim()),
+    cabecalho: (($('#tplHead')||{}).value||'').trim(),
+    rodape: (($('#tplFoot')||{}).value||'').trim(),
+    botoes: (($('#tplBtns')||{}).value||'').split(',').map(s=>s.trim()).filter(Boolean)
+  };
+  $('#tplOut').innerHTML = '<span class="chip t-acc"><i class="ti ti-loader"></i> enviando para a Meta…</span>';
+  const r = await api('/api/templates',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  if(!r.ok){ $('#tplOut').innerHTML = `<div class="row t-bad" style="background:var(--rosa);"><i class="ti ti-ban"></i><span>${escapeHtml(r.erro||'falhou')}</span></div>`; return; }
+  if(r.status==='dry_run'){ $('#tplOut').innerHTML = `<div class="row t-warn" style="background:var(--sun);"><i class="ti ti-flask"></i><span>Validado, mas <strong>nada foi criado</strong>: ${escapeHtml(r.aviso||'')}</span></div>`; return; }
+  $('#tplOut').innerHTML = `<div class="row t-ok" style="background:var(--mint);"><i class="ti ti-circle-check"></i><span><strong>${escapeHtml(r.nome)}</strong> enviado — status <strong>${escapeHtml(r.status)}</strong>. A Meta costuma revisar em minutos; atualize a lista para ver.</span></div>`;
+  ['#tplNome','#tplCorpo','#tplHead','#tplFoot','#tplBtns'].forEach(s=>{ const e=$(s); if(e) e.value=''; });
+  const bx = $('#tplExemplos'); if(bx){ bx.innerHTML=''; bx.dataset.n=''; }
+  tplCarregar(1);
 }
 
 async function analisarInjetor(){
@@ -792,6 +904,16 @@ async function responderDuvida(id){
   alert(r.envio ? 'Resposta elaborada e enviada ao lead ✓' : 'Resposta elaborada — proposta aguardando aprovação na aba Conversas.');
   if(document.activeElement && document.activeElement.blur) document.activeElement.blur();  // libera o guard de foco
   const dvsBox = $('#dvs'); if(dvsBox) dvsBox.dataset.sig = '';                              // força re-render da lista
+  carregar();
+}
+async function descartarDuvida(id){
+  const motivo = prompt('Descartar esta dúvida? Ela sai da fila e fica arquivada no histórico.\n\nMotivo (opcional):');
+  if(motivo === null) return;                       // cancelou
+  const r = await api('/api/duvidas/'+id+'/descartar',{method:'POST',
+    headers:{'Content-Type':'application/json'}, body:JSON.stringify({motivo})});
+  if(r.erro){ alert(r.erro); return; }
+  if(document.activeElement && document.activeElement.blur) document.activeElement.blur();
+  const dvsBox = $('#dvs'); if(dvsBox) dvsBox.dataset.sig = '';   // força re-render da lista
   carregar();
 }
 function paraInjetor(id){

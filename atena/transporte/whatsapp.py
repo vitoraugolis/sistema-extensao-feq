@@ -82,6 +82,43 @@ TEMPLATES_ROL = [
 ]
 
 
+CATEGORIAS_TEMPLATE = [
+    ("UTILITY", "Utilidade — atualização de algo que o lead já pediu/contratou"),
+    ("MARKETING", "Marketing — divulgação, oferta, convite, reengajamento"),
+    ("AUTHENTICATION", "Autenticação — código de verificação"),
+]
+_NOME_TEMPLATE_RE = re.compile(r"^[a-z0-9_]{1,512}$")
+_VAR_RE = re.compile(r"\{\{\s*(\d+)\s*\}\}")
+
+
+def _n_variaveis(texto):
+    return len({int(v) for v in _VAR_RE.findall(texto or "")})
+
+
+def validar_template(nome, categoria, corpo, exemplos=None):
+    """Checa o que a Meta rejeitaria, ANTES de gastar a chamada. Devolve o erro (str) ou None."""
+    if not _NOME_TEMPLATE_RE.match(nome or ""):
+        return "nome inválido: use só letras minúsculas, números e _ (ex.: feq_convite_turma)"
+    if categoria not in dict(CATEGORIAS_TEMPLATE):
+        return "categoria inválida"
+    corpo = (corpo or "").strip()
+    if not corpo:
+        return "o corpo da mensagem é obrigatório"
+    if len(corpo) > 1024:
+        return f"corpo tem {len(corpo)} caracteres — o limite da Meta é 1024"
+    nums = sorted({int(v) for v in _VAR_RE.findall(corpo)})
+    if nums and nums != list(range(1, len(nums) + 1)):
+        return f"as variáveis devem ser sequenciais a partir de {{{{1}}}} — encontrei {nums}"
+    if nums:
+        # a Meta recusa corpo que começa ou termina em variável
+        if _VAR_RE.match(corpo) or corpo.endswith("}}"):
+            return "o corpo não pode começar nem terminar com uma variável — escreva algum texto em volta"
+        exemplos = [e for e in (exemplos or []) if str(e).strip()]
+        if len(exemplos) < len(nums):
+            return f"informe um exemplo para cada variável ({len(nums)} no corpo, {len(exemplos)} preenchido(s))"
+    return None
+
+
 def extrair_mensagem(m):
     """Normaliza um message do webhook -> (tipo, texto/legenda, media_id, mime).
     Cobre texto, cliques de botão (quick-reply de template) e mídias."""
@@ -286,9 +323,9 @@ class WhatsApp:
         except Exception as e:
             print(f"[wa-midia] cópia local de {media_id} falhou: {e}", flush=True)
 
-    def templates_status(self, forcar=False):
-        """{nome: status} dos templates na Meta (APPROVED/PENDING/REJECTED/…), da Graph API.
-        None quando não dá para verificar ao vivo (sem token/WABA) — aí a UI não filtra.
+    def templates_listar(self, forcar=False):
+        """Lista os templates da WABA na Graph API (nome, status, categoria, idioma,
+        componentes). None quando não dá para consultar (sem token/WABA).
         Cache em memória (templates mudam raro); `forcar` refaz a busca."""
         if not self.token or not self.waba_id:
             return None
@@ -297,16 +334,60 @@ class WhatsApp:
         try:
             import requests
             r = requests.get(f"{_GRAPH}/{self.waba_id}/message_templates",
-                             params={"fields": "name,status", "limit": 200},
+                             params={"fields": "name,status,category,language,components,rejected_reason",
+                                     "limit": 200},
                              headers={"Authorization": f"Bearer {self.token}"}, timeout=20)
             if r.status_code != 200:
                 print(f"[wa-templates] meta {r.status_code}: {r.text[:120]}", flush=True)
                 return None
-            self._tpl_cache = {t["name"]: t.get("status") for t in r.json().get("data", [])}
+            self._tpl_cache = r.json().get("data", [])
             return self._tpl_cache
         except Exception as e:
             print(f"[wa-templates] falhou: {e}", flush=True)
             return None
+
+    def templates_status(self, forcar=False):
+        """{nome: status} — derivado da listagem, para o seletor de envio filtrar aprovados."""
+        lst = self.templates_listar(forcar)
+        return None if lst is None else {t["name"]: t.get("status") for t in lst}
+
+    def criar_template(self, nome, categoria, corpo, exemplos=None, cabecalho=None,
+                       rodape=None, botoes=None, idioma="pt_BR"):
+        """Cria um template na Meta e o submete para aprovação (fica PENDING).
+        Valida o que a Meta rejeitaria antes de gastar a chamada. Sem token/WABA: dry-run."""
+        erro = validar_template(nome, categoria, corpo, exemplos)
+        if erro:
+            return {"ok": False, "erro": erro}
+        comps = []
+        if cabecalho:
+            comps.append({"type": "HEADER", "format": "TEXT", "text": cabecalho})
+        corpo_comp = {"type": "BODY", "text": corpo}
+        n = _n_variaveis(corpo)
+        if n:
+            corpo_comp["example"] = {"body_text": [[str(e) for e in (exemplos or [])[:n]]]}
+        comps.append(corpo_comp)
+        if rodape:
+            comps.append({"type": "FOOTER", "text": rodape})
+        botoes = [b for b in (botoes or []) if (b or "").strip()]
+        if botoes:
+            comps.append({"type": "BUTTONS",
+                          "buttons": [{"type": "QUICK_REPLY", "text": b.strip()} for b in botoes[:3]]})
+        payload = {"name": nome, "language": idioma, "category": categoria, "components": comps}
+        if not self.token or not self.waba_id:
+            return {"ok": True, "status": "dry_run", "enviado": payload,
+                    "aviso": "sem WHATSAPP_TOKEN/WHATSAPP_WABA_ID — nada foi criado na Meta"}
+        import requests
+        r = requests.post(f"{_GRAPH}/{self.waba_id}/message_templates", timeout=30,
+                          headers={"Authorization": f"Bearer {self.token}",
+                                   "Content-Type": "application/json"}, json=payload)
+        j = r.json() if r.text else {}
+        if r.status_code == 200:
+            self._tpl_cache = None            # invalida: a lista mudou
+            return {"ok": True, "id": j.get("id"), "status": j.get("status", "PENDING"),
+                    "categoria": j.get("category", categoria), "nome": nome}
+        return {"ok": False, "status": r.status_code,
+                "erro": str(j.get("error", {}).get("error_user_msg")
+                            or j.get("error", {}).get("message", ""))[:300]}
 
     def enviar_template(self, telefone, nome, idioma="pt_BR", params=None):
         """1º contato / fora da janela de 24h: exige template aprovado.

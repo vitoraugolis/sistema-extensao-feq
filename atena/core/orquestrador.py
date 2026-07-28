@@ -80,6 +80,18 @@ def _brain_deterministico(ont, lead, mensagem_lead, historico=None, hoje=None):
     if G.detectar_optout(mensagem_lead):
         return C.DecisaoAgente(C.OPTOUT, "lead pediu opt-out",
                                mensagem_ao_lead="Tudo bem! Não vou mais enviar mensagens. Se mudar de ideia, é só chamar.")
+    # transparência: perguntou se é robô -> assume que é IA e oferece uma pessoa
+    if G.pergunta_se_e_robo(mensagem_lead) and not G.quer_humano(mensagem_lead):
+        return C.DecisaoAgente(C.CONTINUAR, "lead perguntou se é robô — resposta transparente",
+                               mensagem_ao_lead="Sou sim — um agente de inteligência artificial da "
+                                                "Extensão FEQ Unicamp. Consigo te ajudar com "
+                                                "informações dos cursos e com a inscrição. Se preferir "
+                                                "falar com uma pessoa do time, é só me dizer que eu repasso.")
+    if G.quer_humano(mensagem_lead):
+        return C.DecisaoAgente(C.ESCALAR, "lead pediu atendimento humano",
+                               mensagem_ao_lead="Claro, vou repassar para uma pessoa do time falar "
+                                                "com você. Só um momento.",
+                               escalonamento_motivo="lead pediu atendimento humano")
     if G.gatilho_sensivel(mensagem_lead):
         return C.DecisaoAgente(C.ESCALAR, "gatilho sensível",
                                escalonamento_motivo="desconto/reclamação/intenção de fechar")

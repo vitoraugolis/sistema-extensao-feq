@@ -234,6 +234,48 @@ def test_extrair_mensagem_cobre_botao_e_midia():
     assert tipo == "image" and leg == "olha isto" and mid == "IMG1"
 
 
+def test_criar_template_valida_antes_de_chamar_a_meta():
+    from atena.transporte.whatsapp import validar_template
+    ok_corpo = "Oi {{1}}! As inscrições do {{2}} vão até {{3}}. Quer o link?"
+    assert validar_template("feq_convite", "UTILITY", ok_corpo, ["Ana", "FEQ-0480", "16/08"]) is None
+    assert "nome inválido" in validar_template("FEQ Convite!", "UTILITY", "oi tudo bem", [])
+    assert "categoria" in validar_template("feq_x", "PROMO", "oi tudo bem", [])
+    assert "obrigatório" in validar_template("feq_x", "UTILITY", "   ", [])
+    assert "sequenciais" in validar_template("feq_x", "UTILITY", "oi {{1}} e {{3}} fim", ["a", "b"])
+    assert "exemplo" in validar_template("feq_x", "UTILITY", ok_corpo, ["só um"])
+    # a Meta recusa corpo que começa ou termina em variável
+    assert "começar nem terminar" in validar_template("feq_x", "UTILITY", "{{1}} bem-vindo ao curso", ["Ana"])
+    assert "começar nem terminar" in validar_template("feq_x", "UTILITY", "seu curso é o {{1}}", ["Ana"])
+    # sem token/WABA não cria nada na Meta (dry-run), mas monta o payload correto
+    os.environ["WHATSAPP_TOKEN"] = ""
+    os.environ["WHATSAPP_WABA_ID"] = ""
+    est = Estado(":memory:")
+    wa = WhatsApp(est, Orquestrador(est, ONT))
+    r = wa.criar_template("feq_convite", "UTILITY", ok_corpo, ["Ana", "FEQ-0480", "16/08"],
+                          rodape="Responda SAIR para não receber mais", botoes=["Quero o link"])
+    assert r["ok"] and r["status"] == "dry_run"
+    comps = {c["type"]: c for c in r["enviado"]["components"]}
+    assert comps["BODY"]["example"]["body_text"] == [["Ana", "FEQ-0480", "16/08"]]
+    assert comps["BUTTONS"]["buttons"][0] == {"type": "QUICK_REPLY", "text": "Quero o link"}
+    assert r["enviado"]["language"] == "pt_BR" and r["enviado"]["category"] == "UTILITY"
+    assert wa.criar_template("Nome Errado", "UTILITY", ok_corpo, ["a", "b", "c"])["ok"] is False
+
+
+def test_assume_que_e_ia_e_repassa_para_humano():
+    est, orq = Estado(":memory:"), None
+    est.upsert_lead("r1", nome="Ana", telefone="+55 19 9", curso="FEQ-0480",
+                    fase="Lead", estado_conversa="qualificacao")
+    orq = Orquestrador(est, ONT)
+    d = orq.processar_mensagem("r1", "você é um robô?")["decisao"]
+    msg = (d["mensagem_ao_lead"] or "").lower()
+    assert "inteligência artificial" in msg              # assume, não desconversa
+    assert "pessoa" in msg                               # e oferece atendimento humano
+    assert d["proxima_acao"] != C.ESCALAR                # só perguntou, não pediu humano
+    d2 = orq.processar_mensagem("r1", "prefiro falar com uma pessoa")["decisao"]
+    assert d2["proxima_acao"] == C.ESCALAR                          # pediu -> repassa
+    assert est.get_lead("r1")["estado_conversa"] == "escalado_humano"
+
+
 def test_envio_de_midia_tipo_limite_e_guardrails():
     import tempfile
     import pathlib as _p

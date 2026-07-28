@@ -22,8 +22,31 @@ OPTOUT_RE = re.compile(r"\b(sair|parar|pare|n[ãa]o quero|descadastr\w*|remover|
 SENSIVEL_RE = re.compile(r"\b(desconto|abatimento|bolsa|reclama\w*|insatisf\w*|processo|advogad\w*|reembolso|cancelar matr[íi]cula|quero fechar|quero me matricular)\b", re.I)
 
 
+# "você é robô?" — transparência: assumimos que é IA e oferecemos passar para uma pessoa.
+IDENTIDADE_RE = re.compile(
+    r"(você|voce|vc|tu)\s+(é|e|eh)\s+(um\s+|uma\s+)?(rob[ôo]|b[oô]t|ia\b|intelig[êe]ncia artificial|"
+    r"m[áa]quina|humano|pessoa|gente|real|de verdade)"
+    r"|\b(rob[ôo]|b[oô]t|chatbot)\s*\?"
+    r"|(falando com)\s+(um\s+|uma\s+)?(rob[ôo]|b[oô]t|m[áa]quina|ia\b|pessoa|humano)", re.I)
+# pedido explícito de atendimento humano
+QUER_HUMANO_RE = re.compile(
+    r"(falar|conversar|atendimento|atendente)\s+(com\s+)?(uma?\s+)?"
+    r"(pessoa|humano|gente|atendente|respons[áa]vel|algu[ée]m)"
+    r"|(passa|transfer|encaminh)\w*\s+(me\s+|para\s+|pra\s+|p/\s*)*(uma?\s+)?"
+    r"(pessoa|humano|atendente|algu[ée]m|respons[áa]vel)"
+    r"|quero\s+(uma?\s+)?(pessoa|humano|atendente)", re.I)
+
+
 def detectar_optout(texto):
     return bool(OPTOUT_RE.search(texto or ""))
+
+
+def pergunta_se_e_robo(texto):
+    return bool(IDENTIDADE_RE.search(texto or ""))
+
+
+def quer_humano(texto):
+    return bool(QUER_HUMANO_RE.search(texto or ""))
 
 
 def gatilho_sensivel(texto):

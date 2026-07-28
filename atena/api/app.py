@@ -42,7 +42,8 @@ from atena.agentes.ingestao import Ingestao, normalizar_meta, fetch_meta_lead
 from atena.agentes import nutricao, reconciliacao
 from atena.agentes.curador import Curador
 from atena.agentes.cerebro import cerebro_factory, modelo_atual, testar_modelo, PROVEDORES, chave_do
-from atena.transporte.whatsapp import WhatsApp, TEMPLATES_ROL as WhatsApp_TEMPLATES
+from atena.transporte.whatsapp import (WhatsApp, TEMPLATES_ROL as WhatsApp_TEMPLATES,
+                                       CATEGORIAS_TEMPLATE as WhatsApp_CATEGORIAS)
 from atena.growth.db import Growth
 from atena.growth.meta_ads import MetaAds
 from atena.growth import ponte
@@ -514,6 +515,36 @@ def conversa_enviar_midia(card_id):
     return jsonify({"envio": r})
 
 
+@app.route("/api/templates")
+def templates_listar():
+    """Gestão de templates: o que existe na WABA + status na Meta. Sem token/WABA,
+    devolve o rol local usado no envio, sinalizando que não deu para consultar."""
+    lst = WA.templates_listar(forcar=request.args.get("forcar") == "1")
+    if lst is None:
+        return jsonify({"conectado": False, "categorias": WhatsApp_CATEGORIAS,
+                        "templates": [{"name": t["nome"], "status": None,
+                                       "language": t["idioma"], "category": None}
+                                      for t in WhatsApp_TEMPLATES]})
+    return jsonify({"conectado": True, "categorias": WhatsApp_CATEGORIAS, "templates": lst})
+
+
+@app.route("/api/templates", methods=["POST"])
+def templates_criar():
+    """Cria o template na Meta e submete para aprovação (ação externa — o operador
+    dispara conscientemente pela Central; fica PENDING até a Meta revisar)."""
+    b = request.get_json(silent=True) or {}
+    r = WA.criar_template(
+        nome=(b.get("nome") or "").strip().lower(), categoria=(b.get("categoria") or "").strip(),
+        corpo=b.get("corpo") or "", exemplos=b.get("exemplos") or [],
+        cabecalho=(b.get("cabecalho") or "").strip() or None,
+        rodape=(b.get("rodape") or "").strip() or None, botoes=b.get("botoes") or [])
+    if not r.get("ok"):
+        return jsonify(r), 400
+    EST.log_acao(session.get("usuario", "operador"),
+                 f"criar_template {b.get('nome')} ({b.get('categoria')})")
+    return jsonify(r)
+
+
 def _valor_param(k, lead):
     """Prefill ancorado (nome/curso/prazo) — o operador confere e edita antes de enviar."""
     info = ONTO.ont.curso(lead.get("curso", "")) or {}
@@ -821,6 +852,19 @@ def duvidas_listar():
         l = EST.get_lead(d["card_id"]) or {}
         out.append({**d, "lead": l.get("nome") or d["card_id"], "curso": l.get("curso", "")})
     return jsonify(out)
+
+
+@app.route("/api/duvidas/<int:did>/descartar", methods=["POST"])
+def duvidas_descartar(did):
+    """Dúvida que não faz sentido responder sai da fila. ARQUIVA (status='descartada')
+    em vez de apagar: o registro e o motivo ficam para auditoria."""
+    d = EST.get_duvida(did)
+    if not d or d["status"] != "aberta":
+        return jsonify({"erro": "dúvida inexistente ou já tratada"}), 404
+    motivo = ((request.get_json(silent=True) or {}).get("motivo") or "").strip() or "sem sentido responder"
+    EST.responder_duvida(did, f"[descartada] {motivo}", status="descartada")
+    EST.log_acao(session.get("usuario", "operador"), f"descartar_duvida {did}: {motivo}", d["card_id"])
+    return jsonify({"ok": True, "id": did})
 
 
 @app.route("/api/duvidas/<int:did>/responder", methods=["POST"])
