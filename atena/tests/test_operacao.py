@@ -25,6 +25,28 @@ def _payload(msg_id, texto="tenho superior, quero saber o preço"):
         {"id": msg_id, "from": "5519999990002", "text": {"body": texto}}]}}]}]}
 
 
+def test_fuso_do_processo_e_brt_independente_do_host():
+    """O VPS roda em UTC; sem isto os timestamps saem 3h adiantados (a cadência das
+    08:00 BRT virava 11:00 no banco). Importar o pacote tem de fixar BRT."""
+    import subprocess
+    import sys as _sys
+    raiz = str(Path(__file__).resolve().parents[2])
+    codigo = ("import atena, datetime, os;"
+              "from zoneinfo import ZoneInfo;"
+              "brt = datetime.datetime.now(ZoneInfo('America/Sao_Paulo'));"
+              "print(os.environ['TZ'], datetime.datetime.now().hour == brt.hour)")
+    amb = {k: v for k, v in os.environ.items() if k != "TZ"}   # host sem TZ, como o VPS
+    amb["PYTHONPATH"] = raiz
+    saida = subprocess.run([_sys.executable, "-c", codigo], capture_output=True,
+                           text=True, env=amb, cwd=raiz).stdout.strip()
+    assert saida == "America/Sao_Paulo True", saida
+    # TZ explícito no ambiente continua mandando (escape hatch de deploy/teste)
+    amb["TZ"] = "UTC"
+    saida2 = subprocess.run([_sys.executable, "-c", "import atena, os; print(os.environ['TZ'])"],
+                            capture_output=True, text=True, env=amb, cwd=raiz).stdout.strip()
+    assert saida2 == "UTC", saida2
+
+
 def test_dedupe_reentrega_nao_duplica():
     est = Estado(":memory:")
     est.upsert_lead("c1", nome="X", telefone="+55 19 99999-0002", curso="FEQ-0480",

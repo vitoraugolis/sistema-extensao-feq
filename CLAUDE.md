@@ -144,6 +144,9 @@ python3 faro_probe.py
 - Dedupe de lead **sempre por telefone** (digits-only) antes de criar card.
 - Mensagem ao lead **sempre** passa pelo Revisor antes de "enviar".
 - Datas: entrada/saída humana em DD/MM/AAAA; sistema em ISO 8601.
+- Fuso: **America/Sao_Paulo (BRT)** sempre. `atena/__init__.py` fixa `TZ` no import do
+  pacote, então `datetime.now()` ingênuo já sai em BRT mesmo com o host em UTC (caso do
+  VPS). Script que rode fora do pacote precisa `import atena` para herdar isso.
 
 ## 8. Definition of Done (por entrega)
 

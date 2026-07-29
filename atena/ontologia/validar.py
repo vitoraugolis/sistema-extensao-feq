@@ -14,6 +14,10 @@ Uso:  python3 atena/ontologia/validar.py
 """
 import sys, datetime
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+import atena  # noqa: F401 — importar o pacote fixa o fuso do processo em BRT
+
 from rdflib import Graph, Namespace, Literal, URIRef
 from rdflib.namespace import XSD
 from pyshacl import validate
