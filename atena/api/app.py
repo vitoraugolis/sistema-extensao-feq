@@ -43,7 +43,8 @@ from atena.agentes import nutricao, reconciliacao
 from atena.agentes.curador import Curador
 from atena.agentes.cerebro import cerebro_factory, modelo_atual, testar_modelo, PROVEDORES, chave_do
 from atena.transporte.whatsapp import (WhatsApp, TEMPLATES_ROL as WhatsApp_TEMPLATES,
-                                       CATEGORIAS_TEMPLATE as WhatsApp_CATEGORIAS)
+                                       CATEGORIAS_TEMPLATE as WhatsApp_CATEGORIAS,
+                                       _n_variaveis)
 from atena.growth.db import Growth
 from atena.growth.meta_ads import MetaAds
 from atena.growth import ponte
@@ -557,20 +558,39 @@ def _valor_param(k, lead):
     return ""
 
 
-def _rol_para_lead(lead):
-    """Rol de templates prefillado p/ ESTE lead, filtrado pelos aprovados na Meta.
-    Sem verificação ao vivo (dev/sem token), devolve tudo marcado 'não verificado'."""
-    status = WA.templates_status()          # {nome: status} ou None
+def _templates_enviaveis():
+    """Fonte da verdade do que dá para enviar AGORA: os APPROVED da WABA. O rol local
+    só enriquece (título amigável, rótulos e prefill) os que ele conhece — assim um
+    template novo, criado pela aba Templates, já fica disponível para envio.
+    Sem conexão com a Meta (dev), cai no rol local marcado 'não verificado'."""
+    lst = WA.templates_listar()
+    if lst is None:
+        return [dict(t, verificado=False) for t in WhatsApp_TEMPLATES]
+    local = {t["nome"]: t for t in WhatsApp_TEMPLATES}
     out = []
-    for t in WhatsApp_TEMPLATES:
-        st = status.get(t["nome"]) if status is not None else None
-        if status is not None and st != "APPROVED":
-            continue                        # ao vivo: só os que a Meta confirma aprovados
-        out.append({"nome": t["nome"], "titulo": t["titulo"], "descricao": t["descricao"],
-                    "verificado": status is not None,
-                    "params": [{"k": p["k"], "rotulo": p["rotulo"], "valor": _valor_param(p["k"], lead)}
-                               for p in t["params"]]})
+    for t in lst:
+        if t.get("status") != "APPROVED" or t.get("name") == "hello_world":
+            continue           # hello_world é o exemplo em inglês da Meta — nunca vai a um lead
+        nome = t.get("name", "")
+        corpo = next((c.get("text", "") for c in (t.get("components") or [])
+                      if c.get("type") == "BODY"), "")
+        n = _n_variaveis(corpo)
+        base = local.get(nome)
+        if base and len(base["params"]) == n:      # conhecido e com o mesmo nº de variáveis
+            titulo, descricao, params = base["titulo"], base["descricao"], base["params"]
+        else:                                       # criado na Central ou alterado na Meta
+            titulo, descricao = nome, corpo[:160]
+            params = [{"k": f"var{i + 1}", "rotulo": f"Variável {{{{{i + 1}}}}}"} for i in range(n)]
+        out.append({"nome": nome, "idioma": t.get("language", "pt_BR"), "titulo": titulo,
+                    "descricao": descricao, "params": params, "verificado": True})
     return out
+
+
+def _rol_para_lead(lead):
+    """Templates enviáveis com as variáveis já prefillados para ESTE lead."""
+    return [{**t, "params": [{"k": p["k"], "rotulo": p["rotulo"],
+                              "valor": _valor_param(p["k"], lead)} for p in t["params"]]}
+            for t in _templates_enviaveis()]
 
 
 @app.route("/api/conversas/<card_id>/templates")
@@ -589,9 +609,9 @@ def conversa_enviar_template(card_id):
     if not lead:
         return jsonify({"erro": "lead inexistente"}), 404
     b = request.get_json(silent=True) or {}
-    tpl = next((t for t in WhatsApp_TEMPLATES if t["nome"] == b.get("template")), None)
+    tpl = next((t for t in _templates_enviaveis() if t["nome"] == b.get("template")), None)
     if not tpl:
-        return jsonify({"erro": "template fora do rol aprovado"}), 400
+        return jsonify({"erro": "template indisponível (não está aprovado na Meta)"}), 400
     params = [str(p) for p in (b.get("params") or [])]
     if len(params) != len(tpl["params"]):
         return jsonify({"erro": f"{tpl['nome']} espera {len(tpl['params'])} variável(is)"}), 400

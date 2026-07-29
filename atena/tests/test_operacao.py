@@ -234,6 +234,36 @@ def test_extrair_mensagem_cobre_botao_e_midia():
     assert tipo == "image" and leg == "olha isto" and mid == "IMG1"
 
 
+def test_templates_enviaveis_seguem_a_waba_nao_o_rol_fixo():
+    """Template criado na Central (fora do rol local) precisa ficar enviável;
+    PENDING não pode aparecer. A WABA é a fonte da verdade."""
+    import os as _os
+    import tempfile as _tf
+    _os.environ.pop("ATENA_USERS", None)
+    _os.environ["WHATSAPP_TOKEN"] = ""
+    _os.environ["WHATSAPP_WABA_ID"] = ""
+    import atena.core.estado as _E
+    _E.DEFAULT_DB = _tf.mktemp(suffix=".db")
+    import atena.api.app as A
+    assert [t["verificado"] for t in A._templates_enviaveis()] == [False] * len(A.WhatsApp_TEMPLATES)
+    A.WA.token, A.WA.waba_id = "x", "y"          # simula conexão
+    A.WA._tpl_cache = [
+        {"name": "feq_abertura_curso", "status": "APPROVED", "language": "pt_BR",
+         "components": [{"type": "BODY", "text": "Oi {{1}}, sobre o {{2}}..."}]},
+        {"name": "feq_conteudo_0333", "status": "APPROVED", "language": "pt_BR",
+         "components": [{"type": "BODY", "text": "Conteúdo do curso {{1}} para você"}]},
+        {"name": "em_analise", "status": "PENDING", "language": "pt_BR",
+         "components": [{"type": "BODY", "text": "oi"}]},
+    ]
+    envs = {t["nome"]: t for t in A._templates_enviaveis()}
+    assert "em_analise" not in envs                                  # só APPROVED
+    assert envs["feq_abertura_curso"]["titulo"] == "Abertura de curso"   # conhecido: rótulos amigáveis
+    assert [p["rotulo"] for p in envs["feq_abertura_curso"]["params"]] == ["Nome", "Curso"]
+    assert "feq_conteudo_0333" in envs                               # novo na Meta: enviável
+    assert len(envs["feq_conteudo_0333"]["params"]) == 1              # variável derivada do corpo
+    A.WA.token, A.WA.waba_id, A.WA._tpl_cache = "", "", None
+
+
 def test_criar_template_valida_antes_de_chamar_a_meta():
     from atena.transporte.whatsapp import validar_template
     ok_corpo = "Oi {{1}}! As inscrições do {{2}} vão até {{3}}. Quer o link?"
@@ -293,13 +323,18 @@ def test_envio_de_midia_tipo_limite_e_guardrails():
         est.upsert_lead("m1", nome="Ana", telefone="5519999990001", curso="FEQ-0480")
         wa = WhatsApp(est, Orquestrador(est, ONT))
         est.add_conversa("m1", "lead", "oi")            # abre a janela de 24h
+        # forcar=True é como a Central envia (ação humana passa fora do horário comercial)
         r = wa.enviar_midia("5519999990001", b"%PDF-1.4", "edital.pdf", "application/pdf",
-                            legenda="Segue o edital")
+                            legenda="Segue o edital", forcar=True)
         assert r["ok"] and r["tipo"] == "document"
         assert r["legenda_enviada"] is True        # doc/imagem/vídeo levam a legenda junto
         # áudio NÃO aceita legenda na Meta -> quem chama manda o texto em mensagem separada
         assert wa.enviar_midia("5519999990001", b"OggS", "audio.ogg", "audio/ogg",
-                               legenda="ouve isso")["legenda_enviada"] is False
+                               legenda="ouve isso", forcar=True)["legenda_enviada"] is False
+        # sem forcar, mídia respeita o horário comercial (igual ao texto livre)
+        fora = datetime.datetime(2026, 7, 29, 3, 0)
+        assert wa.enviar_midia("5519999990001", b"x", "f.jpg", "image/jpeg",
+                               agora=fora)["status"] == "fora_do_horario"
         assert (_wa._MEDIA_DIR / r["media_id"]).exists()          # cópia local p/ a thread
         assert est.midia_mime(r["media_id"]) == "application/pdf"
         # limite de tamanho da Meta (imagem = 5 MB) barra ANTES de subir
