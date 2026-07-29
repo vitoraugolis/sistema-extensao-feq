@@ -497,9 +497,12 @@ check("douglas-alves-goulart.jpg" in lp_real and "Cientista de Dados" in lp_real
       "0480: Douglas em destaque com foto + bio readequada do LinkedIn")
 check("Mais professores do curso" in lp_real and "Demais professores" not in lp_real,
       "rótulo trocado para 'Mais professores do curso'")
-check('class="depo-avatar"' in lp_real and 'class="depo-aspa"' in lp_real
-      and "&ldquo;" not in lp_real,
-      "depoimentos redesenhados (avatar + aspa unicode, sem entidade que o WP mangla)")
+check('class="depo-aspa"' in lp_real and "&ldquo;" not in lp_real,
+      "depoimentos com aspa unicode (sem entidade que o WP mangla)")
+# Foto real de quem deu o depoimento quando existe nas páginas oficiais; iniciais quando não.
+check('class="depo-foto"' in lp_real and "2024/02/luiz.png" in lp_real
+      and "2024/02/juliana.png" in lp_real and 'class="depo-avatar"' not in lp_real,
+      "0480: depoentes com foto oficial (Luiz e Juliana), sem cair nas iniciais")
 check('class="depo-texto"' in lp_real and "<blockquote" not in lp_real,
       "depoimento usa .depo-texto, não <blockquote> (o tema WP pinta blockquote de branco)")
 check("914,20" not in lp_real and "1.097,05" not in lp_real,
@@ -550,6 +553,13 @@ check("Quero ser avisado" in _lp0499 and "Inscreva-se" not in _lp0499,
 check("lista de espera" in _lp0499.lower() and 'id="inscricao"' not in _lp0499,
       "0499: some a seção 'Como se inscrever' (não há inscrição aberta)")
 check('href="#inscricao"' not in _lp0499, "0499: nav-âncora sem atalho de Inscrição")
+# fallback: os depoentes do 0499 não têm foto publicada -> iniciais, nunca rosto inventado
+check('class="depo-avatar"' in _lp0499 and 'class="depo-foto"' not in _lp0499,
+      "0499: depoentes sem foto oficial ficam com as iniciais")
+# prova social (professor + depoimentos) vem ANTES do conteúdo programático
+check(lp_real.index('data-secao="professor"') < lp_real.index('data-secao="depoimentos"')
+      < lp_real.index('data-secao="conteudo"') < lp_real.index('data-secao="investimento"'),
+      "ordem: professor -> depoimentos -> conteúdo -> investimento")
 _b64 = re.search(r'atob\("([^"]+)"\)', _lp0499).group(1)
 _cfg = base64.b64decode(_b64).decode()
 check('"aberto": false' in _cfg and '"destino": ""' in _cfg,

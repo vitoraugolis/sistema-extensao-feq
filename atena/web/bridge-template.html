@@ -98,6 +98,24 @@
 <!-- 3a. Período de oferecimento (datas de início e fim das aulas — Extecamp) -->
 {{PERIODO_OFERECIMENTO}}
 
+<!-- 3c. Professor — prova social vem cedo, antes do conteúdo longo -->
+<section id="professor" data-secao="professor" class="secao-divisor max-w-4xl mx-auto px-6 py-16">
+  <div class="bg-white/5 border border-white/10 rounded-2xl p-8 flex items-center gap-4">
+    {{FOTO_PROFESSOR_HTML}}
+    <div>
+      <p class="text-sm uppercase tracking-widest text-slate-400 mb-1">Professor responsável</p>
+      <h2 class="text-xl font-semibold">{{PROFESSOR}}</h2>
+      <p class="mt-2 text-slate-300 text-sm">{{PROFESSOR_DESC}}</p>
+      {{PROFESSOR_CREDENCIAL_HTML}}
+    </div>
+  </div>
+  {{PROFESSORES_BIO_HTML}}
+  {{OUTROS_PROFESSORES_HTML}}
+</section>
+
+<!-- 3d. Depoimentos reais (transcritos das páginas oficiais; some se não houver) -->
+{{SECAO_DEPOIMENTOS}}
+
 <!-- 3b. Habilidades desenvolvidas (texto oficial; some se o curso não tiver) -->
 {{SECAO_HABILIDADES}}
 
@@ -119,24 +137,6 @@
   </div>
   {{EMPRESAS_HTML}}
 </section>
-
-<!-- 6. Professor -->
-<section id="professor" data-secao="professor" class="secao-divisor max-w-4xl mx-auto px-6 py-16">
-  <div class="bg-white/5 border border-white/10 rounded-2xl p-8 flex items-center gap-4">
-    {{FOTO_PROFESSOR_HTML}}
-    <div>
-      <p class="text-sm uppercase tracking-widest text-slate-400 mb-1">Professor responsável</p>
-      <h2 class="text-xl font-semibold">{{PROFESSOR}}</h2>
-      <p class="mt-2 text-slate-300 text-sm">{{PROFESSOR_DESC}}</p>
-      {{PROFESSOR_CREDENCIAL_HTML}}
-    </div>
-  </div>
-  {{PROFESSORES_BIO_HTML}}
-  {{OUTROS_PROFESSORES_HTML}}
-</section>
-
-<!-- 6b. Depoimentos reais (transcritos das páginas oficiais; some se não houver) -->
-{{SECAO_DEPOIMENTOS}}
 
 <!-- 7. Investimento -->
 <section id="investimento" data-secao="investimento" class="secao-divisor max-w-4xl mx-auto px-6 py-16">

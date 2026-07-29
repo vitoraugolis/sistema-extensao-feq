@@ -360,6 +360,10 @@ h1, h2, h3, p { margin: 0; }
   background: rgb(251 191 36 / 0.18); border: 1.5px solid rgb(251 191 36 / 0.5);
   color: #fbbf24; font-size: 0.8125rem; font-weight: 700;
 }
+.depo-foto {
+  flex-shrink: 0; width: 44px; height: 44px; border-radius: 9999px;
+  object-fit: cover; border: 1.5px solid rgb(251 191 36 / 0.5);
+}
 .depo-quem { min-width: 0; }
 .depoimento figcaption strong { display: block; font-size: 0.9rem; color: #fff; }
 .depoimento .muted-cap { display: block; color: #cbd5e1; font-size: 0.78rem; margin-top: 0.1rem; }

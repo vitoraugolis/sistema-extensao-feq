@@ -368,12 +368,19 @@ def _secao_depoimentos_html(depoimentos):
     """Depoimentos REAIS transcritos das páginas oficiais preexistentes."""
     if not depoimentos:
         return ""
+    def _avatar(d):
+        """Foto real publicada nas páginas oficiais; sem foto, iniciais (nunca inventar rosto)."""
+        if d.get("foto"):
+            return (f'<img class="depo-foto" src="{_esc(d["foto"])}" alt="Foto de {_esc(d["nome"])}" '
+                    f'loading="lazy" width="48" height="48">')
+        return f'<span class="depo-avatar" aria-hidden="true">{_esc(_iniciais(d["nome"]))}</span>'
+
     cards = "\n    ".join(
         '<figure class="depoimento">'
         '<span class="depo-aspa" aria-hidden="true">“</span>'
         f'<p class="depo-texto">{_esc(d["texto"])}</p>'
         '<figcaption>'
-        f'<span class="depo-avatar" aria-hidden="true">{_esc(_iniciais(d["nome"]))}</span>'
+        f'{_avatar(d)}'
         f'<span class="depo-quem"><strong>{_esc(d["nome"])}</strong>'
         f'<span class="muted-cap">{_esc(d.get("cargo") or "")}</span></span>'
         '</figcaption></figure>'
