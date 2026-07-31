@@ -286,6 +286,31 @@ def test_templates_enviaveis_seguem_a_waba_nao_o_rol_fixo():
     A.WA.token, A.WA.waba_id, A.WA._tpl_cache = "", "", None
 
 
+def test_lp_editada_tem_precedencia_sobre_o_gerado():
+    """Gestão de LPs: o HTML editado na Central NÃO pode ser apagado por um deploy de
+    rotina — renderizar() precisa preferi-lo ao gerado. E restaurar volta ao gerado."""
+    import tempfile as _tf
+    from atena.growth.db import Growth
+    from atena.growth import wp_deploy_bridge as WP
+    est = Estado(":memory:")
+    g = Growth(":memory:")
+    curso = {"curso": "FEQ-0480", "turma": "009"}
+    saida = _tf.mkdtemp()
+
+    gerado = WP.renderizar(g, ONT, [curso], saida, est=est)
+    assert gerado and "bridge-form" in gerado[0]["html"]        # veio da ontologia
+    assert gerado[0]["slug"] == "inscricao-feq-0480-009"
+
+    est.set_lp_html("FEQ-0480", "<html>versão editada à mão</html>", autor="vitor")
+    editado = WP.renderizar(g, ONT, [curso], saida, est=est)
+    assert editado[0]["html"] == "<html>versão editada à mão</html>"   # edição vence
+    assert est.get_lp_html("FEQ-0480")["autor"] == "vitor"
+
+    est.del_lp_html("FEQ-0480")
+    voltou = WP.renderizar(g, ONT, [curso], saida, est=est)
+    assert "bridge-form" in voltou[0]["html"]                   # gerado de novo
+
+
 def test_criar_template_valida_antes_de_chamar_a_meta():
     from atena.transporte.whatsapp import validar_template
     ok_corpo = "Oi {{1}}! As inscrições do {{2}} vão até {{3}}. Quer o link?"

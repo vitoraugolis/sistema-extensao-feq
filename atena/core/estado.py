@@ -45,6 +45,11 @@ CREATE TABLE IF NOT EXISTS alertas(
 CREATE TABLE IF NOT EXISTS usuarios(
   usuario TEXT PRIMARY KEY, senha_hash TEXT, papel TEXT, ativo INTEGER DEFAULT 1, criado TEXT);
 CREATE TABLE IF NOT EXISTS midias(media_id TEXT PRIMARY KEY, mime TEXT, criado TEXT);
+-- HTML de LP editado à mão na Central. Existir aqui = a página parou de ser gerada a
+-- partir da ontologia (não recebe mais preço/data/lista de espera automáticos) até
+-- que o operador restaure. Ver Gestão de LPs.
+CREATE TABLE IF NOT EXISTS lp_html(
+  curso TEXT PRIMARY KEY, html TEXT, atualizado TEXT, autor TEXT);
 """
 
 FASES = ["Lead", "Prospect", "Inscrito", "Matriculado", "Em espera", "Perdido"]
@@ -339,6 +344,32 @@ class Estado:
             return r["card_id"]
 
     # --------------------------------------------------------------- mídias
+    # ------------------------------------------------------------- LPs editadas
+    def set_lp_html(self, curso, html, autor="operador"):
+        with self._lock:
+            self.conn.execute(
+                "INSERT INTO lp_html(curso,html,atualizado,autor) VALUES(?,?,?,?) "
+                "ON CONFLICT(curso) DO UPDATE SET html=excluded.html, "
+                "atualizado=excluded.atualizado, autor=excluded.autor",
+                (curso, html, _agora(), autor))
+            self.conn.commit()
+
+    def get_lp_html(self, curso):
+        with self._lock:
+            r = self.conn.execute("SELECT * FROM lp_html WHERE curso=?", (curso,)).fetchone()
+        return dict(r) if r else None
+
+    def del_lp_html(self, curso):
+        with self._lock:
+            n = self.conn.execute("DELETE FROM lp_html WHERE curso=?", (curso,)).rowcount
+            self.conn.commit()
+        return n
+
+    def cursos_lp_editada(self):
+        with self._lock:
+            return {r["curso"]: r["atualizado"]
+                    for r in self.conn.execute("SELECT curso, atualizado FROM lp_html")}
+
     def add_midia(self, media_id, mime):
         with self._lock:
             self.conn.execute("INSERT OR IGNORE INTO midias(media_id,mime,criado) VALUES(?,?,?)",

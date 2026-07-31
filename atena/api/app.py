@@ -13,6 +13,7 @@ import sys
 import time
 import datetime
 import pathlib
+import tempfile
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2]))
 
@@ -515,6 +516,90 @@ def conversa_enviar_midia(card_id):
         EST.set_lead(card_id, estado_conversa="aguardando_resposta")
         EST.log_acao(session.get("usuario", "humano"), f"enviar_midia {r.get('tipo')}", card_id)
     return jsonify({"envio": r})
+
+
+# ----------------------------------------------------------------- Gestão de LPs
+def _lp_slug(curso, turma):
+    from atena.growth.wp_deploy_bridge import _slug
+    return _slug(curso, turma)
+
+
+def _lp_gerado(curso):
+    """HTML que a ontologia produziria AGORA (sem considerar edição à mão)."""
+    from atena.growth.wp_deploy_bridge import _webhook_url
+    return ponte.render(GRW, _ont(), curso, webhook_url=_webhook_url())
+
+
+@app.route("/api/lps")
+def lps_listar():
+    """Uma linha por LP: link no ar, status da inscrição e se está editada à mão."""
+    editadas = EST.cursos_lp_editada()
+    base = (os.environ.get("WP_URL") or "").rstrip("/")
+    out = []
+    for m in GRW.cursos():
+        c = _ont().curso(m["curso"]) or {}
+        cap = _ont().captavel(m["curso"])
+        slug = _lp_slug(m["curso"], m["turma"])
+        out.append({"curso": m["curso"], "nome": c.get("nome", m["curso"]), "turma": m["turma"],
+                    "slug": slug, "link": f"{base}/{slug}/" if base else "",
+                    "previa": f"/ponte?curso={m['curso']}",
+                    "inscricao": cap.get("status"), "aberto": bool(cap.get("captavel")),
+                    "editada": m["curso"] in editadas, "editada_em": editadas.get(m["curso"])})
+    return jsonify({"wp_configurado": bool(base), "lps": out})
+
+
+@app.route("/api/lps/<curso>")
+def lp_html(curso):
+    curso = curso.upper()
+    ed = EST.get_lp_html(curso)
+    html = ed["html"] if ed else _lp_gerado(curso)
+    if not html:
+        return jsonify({"erro": "curso sem LP (fora do cursos_metas)"}), 404
+    return jsonify({"curso": curso, "html": html,
+                    "origem": "editado" if ed else "gerado",
+                    "atualizado": (ed or {}).get("atualizado"), "autor": (ed or {}).get("autor")})
+
+
+@app.route("/api/lps/<curso>", methods=["POST"])
+def lp_salvar(curso):
+    """Salva a edição. A partir daqui a página NÃO é mais regenerada pela ontologia
+    (preço/data/lista de espera deixam de se atualizar sozinhos) até restaurar."""
+    curso = curso.upper()
+    html = (request.get_json(silent=True) or {}).get("html") or ""
+    if len(html.strip()) < 200:
+        return jsonify({"erro": "HTML muito curto — provável engano"}), 400
+    if not _lp_gerado(curso) and not EST.get_lp_html(curso):
+        return jsonify({"erro": "curso sem LP (fora do cursos_metas)"}), 404
+    EST.set_lp_html(curso, html, autor=session.get("usuario", "operador"))
+    return jsonify({"ok": True, "curso": curso, "bytes": len(html)})
+
+
+@app.route("/api/lps/<curso>/restaurar", methods=["POST"])
+def lp_restaurar(curso):
+    """Descarta a edição: a LP volta a ser gerada pela ontologia."""
+    curso = curso.upper()
+    if not EST.del_lp_html(curso):
+        return jsonify({"erro": "esta LP não estava editada"}), 404
+    EST.log_acao(session.get("usuario", "operador"), f"restaurou LP gerada {curso}")
+    return jsonify({"ok": True, "curso": curso})
+
+
+@app.route("/api/lps/<curso>/publicar", methods=["POST"])
+def lp_publicar(curso):
+    """Publica ESTA LP no WordPress (ação externa: muda uma página pública)."""
+    if session.get("papel") != "supervisor":
+        return jsonify({"erro": "publicar exige papel supervisor"}), 403
+    curso = curso.upper()
+    m = next((x for x in GRW.cursos() if x["curso"] == curso), None)
+    if not m:
+        return jsonify({"erro": "curso sem LP (fora do cursos_metas)"}), 404
+    from atena.growth import wp_deploy_bridge as WP
+    paginas = WP.renderizar(GRW, _ont(), [m], pathlib.Path(tempfile.mkdtemp()), est=EST)
+    if not paginas:
+        return jsonify({"erro": "nada para publicar"}), 400
+    r = WP.publicar(paginas)[0]
+    EST.log_acao(session.get("usuario", "operador"), f"publicou LP {curso}: {r.get('status')}")
+    return jsonify(r)
 
 
 @app.route("/api/templates")

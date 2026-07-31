@@ -37,13 +37,23 @@ def _webhook_url():
     return f"{base}/webhook/ponte" if base else "/webhook/ponte"
 
 
-def renderizar(g, ont, cursos, saida):
-    """Gera o HTML de cada turma em `saida`. Retorna [{curso, slug, arquivo, html}]."""
+def renderizar(g, ont, cursos, saida, est=None):
+    """Gera o HTML de cada turma em `saida`. Retorna [{curso, slug, arquivo, html}].
+    LP editada à mão na Central (tabela lp_html) tem precedência sobre o gerado — senão
+    um deploy de rotina apagaria em silêncio o trabalho do operador."""
     saida = pathlib.Path(saida)
     saida.mkdir(parents=True, exist_ok=True)
+    if est is None:
+        from atena.core.estado import Estado
+        est = Estado()
     paginas = []
     for m in cursos:
-        html = ponte.render(g, ont, m["curso"], webhook_url=_webhook_url())
+        editada = est.get_lp_html(m["curso"])
+        html = editada["html"] if editada else ponte.render(g, ont, m["curso"],
+                                                            webhook_url=_webhook_url())
+        if editada:
+            print(f"[wp-deploy] {m['curso']}: usando HTML EDITADO na Central "
+                  f"({editada['atualizado']}) — não regenerado", flush=True)
         if not html:
             print(f"[wp-deploy] {m['curso']}: fora do cursos_metas — pulado", flush=True)
             continue

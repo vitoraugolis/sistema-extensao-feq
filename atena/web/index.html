@@ -104,6 +104,19 @@ input:focus,select:focus,textarea:focus{outline:none;box-shadow:3px 3px 0 var(--
 .conv-tpl select{width:100%;}
 .tpl-campo{display:block;margin-top:6px;}
 .tpl-campo span{display:block;font-size:11px;margin-bottom:2px;}
+/* Gestão de LPs — editor lado a lado: código à esquerda, página ao vivo à direita */
+.lp-ed-top{display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:4px;}
+.lp-ed-acoes{margin-left:auto;display:flex;gap:7px;flex-wrap:wrap;}
+.lp-split{display:grid;grid-template-columns:1fr 1fr;gap:10px;height:min(72vh,720px);}
+.lp-split textarea{height:100%;resize:none;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+ font-size:12px;line-height:1.5;white-space:pre;overflow:auto;tab-size:2;}
+.lp-split iframe{width:100%;height:100%;border:2px solid var(--b);border-radius:11px;background:#0f172a;
+ box-shadow:3px 3px 0 var(--b);}
+@media(max-width:900px){.lp-split{grid-template-columns:1fr;height:auto;}
+ .lp-split textarea{height:340px;} .lp-split iframe{height:420px;}}
+.lp-linha{display:flex;align-items:center;gap:10px;padding:9px 11px;border-radius:9px;
+ background:var(--paper);border:2px solid var(--b);margin-bottom:7px;flex-wrap:wrap;}
+.lp-linha a{font-size:12px;}
 .tpl-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
 @media(max-width:640px){.tpl-grid{grid-template-columns:1fr;}}
 .tpl-previa{background:var(--laranjinha);border:2px solid var(--b);border-radius:11px;
@@ -171,6 +184,7 @@ input:focus,select:focus,textarea:focus{outline:none;box-shadow:3px 3px 0 var(--
       <button class="navi" data-sec="duvidas"><i class="ti ti-help-circle"></i> Dúvidas <span class="tag t-warn" id="dvCount" style="display:none;margin-left:auto;"></span></button>
       <button class="navi" data-sec="verificacao"><i class="ti ti-checklist"></i> Verificação <span class="tag t-warn" id="vfCount" style="display:none;margin-left:auto;"></span></button>
       <button class="navi" data-sec="injetor"><i class="ti ti-database-import"></i> Injetor</button>
+      <button class="navi" data-sec="lps"><i class="ti ti-browser"></i> LPs</button>
       <button class="navi" data-sec="templates"><i class="ti ti-mail-cog"></i> Templates</button>
       <button class="navi" data-sec="revisor"><i class="ti ti-eye-search"></i> Revisor ao vivo</button>
       <button class="navi" data-sec="config"><i class="ti ti-settings"></i> Configurações</button>
@@ -230,6 +244,35 @@ input:focus,select:focus,textarea:focus{outline:none;box-shadow:3px 3px 0 var(--
             a conversão à Meta); <strong>Não inscreveu</strong> mantém como Lead e o agente envia a
             mensagem de recuperação imediatamente.</p>
           <div id="vfs"></div>
+        </div>
+      </section>
+
+      <section id="lps" class="hidden">
+        <div class="g sec">
+          <h2><i class="ti ti-browser"></i> Gestão de LPs</h2>
+          <p class="muted" style="margin:0 0 10px;">As páginas são <strong>geradas pela ontologia</strong> (preço, datas e lista de espera se atualizam sozinhos). Ao editar o HTML, a página congela nesse conteúdo até você restaurar.</p>
+          <div id="lpAviso"></div>
+          <div id="lpLista" style="margin-top:8px;"></div>
+        </div>
+        <div id="lpEditor" class="g sec hidden">
+          <div class="lp-ed-top">
+            <div>
+              <strong id="lpEdTitulo"></strong>
+              <div class="muted" id="lpEdSub"></div>
+            </div>
+            <div class="lp-ed-acoes">
+              <button class="btn btn-g" onclick="lpFechar()"><i class="ti ti-x"></i> Fechar</button>
+              <button class="btn btn-g" onclick="lpPrevia()" title="Atualizar a prévia com o que está no editor"><i class="ti ti-refresh"></i> Prévia</button>
+              <button class="btn btn-g" onclick="lpRestaurar()" title="Descartar a edição e voltar ao HTML gerado pela ontologia"><i class="ti ti-rotate"></i> Restaurar gerado</button>
+              <button class="btn btn-v" onclick="lpSalvar()"><i class="ti ti-device-floppy"></i> Salvar</button>
+              <button class="btn btn-p" onclick="lpPublicar()"><i class="ti ti-cloud-upload"></i> Salvar e publicar</button>
+            </div>
+          </div>
+          <div id="lpEdOut" style="margin:8px 0;"></div>
+          <div class="lp-split">
+            <textarea id="lpCodigo" spellcheck="false" oninput="lpMarcarSujo()"></textarea>
+            <iframe id="lpFrame" title="Prévia da landing page"></iframe>
+          </div>
         </div>
       </section>
 
@@ -336,6 +379,7 @@ document.querySelectorAll('.navi').forEach(b=>b.onclick=()=>{
   $('#'+b.dataset.sec).classList.remove('hidden');
   if(b.dataset.sec==='kanban') renderKanban();
   if(b.dataset.sec==='templates') tplCarregar();
+  if(b.dataset.sec==='lps') lpCarregar();
 });
 
 async function carregar(){
@@ -419,6 +463,96 @@ async function testarRevisor(){
   const bl = (r.bloqueios||[]).map(b=>`<div class="row" style="background:var(--rosa);"><i class="ti ti-alert-triangle" style="color:var(--bad);"></i><span>${b}</span></div>`).join('');
   const an = (r.ancoras||[]).map(a=>`<span class="chip t-ok"><i class="ti ti-check"></i> ${a}</span>`).join('');
   $('#rout').innerHTML = `<div style="margin-bottom:8px;">${head}</div>${bl}${an?('<div style="margin-top:6px;">'+an+'</div>'):''}`;
+}
+
+// ------------------------------------------------------------- Gestão de LPs
+let LP_ABERTA = null, LP_SUJO = false;
+async function lpCarregar(){
+  const d = await api('/api/lps');
+  $('#lpAviso').innerHTML = d.wp_configurado ? ''
+    : '<div class="row t-warn" style="background:var(--sun);"><i class="ti ti-alert-triangle"></i><span>Sem <code>WP_URL</code> no .env: dá para editar e pré-visualizar, mas publicar roda em dry-run.</span></div>';
+  $('#lpLista').innerHTML = (d.lps||[]).map(l=>{
+    const insc = l.aberto ? '<span class="chip t-ok" style="margin:0;">inscrição aberta</span>'
+                          : '<span class="chip t-warn" style="margin:0;">lista de espera</span>';
+    const edit = l.editada
+      ? `<span class="chip t-acc" style="margin:0;" title="Editada em ${l.editada_em||''} — não recebe mais atualizações da ontologia"><i class="ti ti-pencil"></i> editada à mão</span>`
+      : '<span class="chip" style="margin:0;background:var(--paper);">gerada</span>';
+    return `<div class="lp-linha">
+      <i class="ti ti-browser"></i>
+      <div style="min-width:190px;">
+        <strong>${l.curso}</strong> <span class="muted">turma ${l.turma}</span>
+        <div class="muted" style="font-size:11.5px;">${escapeHtml(l.nome).slice(0,58)}</div>
+      </div>
+      ${insc} ${edit}
+      <a href="${l.previa}" target="_blank" title="Ver como está agora"><i class="ti ti-eye"></i> prévia</a>
+      ${l.link?`<a href="${l.link}" target="_blank" title="Página publicada"><i class="ti ti-external-link"></i> no ar</a>`:''}
+      <button class="btn btn-v" style="margin-left:auto;padding:5px 10px;" onclick="lpAbrir('${l.curso}')"><i class="ti ti-code"></i> Editar HTML</button>
+    </div>`;
+  }).join('') || '<div class="muted">Nenhuma LP configurada.</div>';
+}
+async function lpAbrir(curso){
+  const d = await api('/api/lps/'+curso);
+  if(d.erro){ $('#lpEdOut').innerHTML = `<div class="row t-bad" style="background:var(--rosa);">${d.erro}</div>`; return; }
+  LP_ABERTA = curso; LP_SUJO = false;
+  $('#lpEditor').classList.remove('hidden');
+  $('#lpEdTitulo').textContent = `Editando ${curso}`;
+  lpSub(d);
+  $('#lpCodigo').value = d.html;
+  $('#lpEdOut').innerHTML = '';
+  lpPrevia();
+  $('#lpEditor').scrollIntoView({behavior:'smooth', block:'start'});
+}
+function lpSub(d){
+  const origem = d.origem==='editado'
+    ? `editado por ${escapeHtml(d.autor||'—')} em ${(d.atualizado||'').replace('T',' ').slice(0,16)} — <strong>não recebe mais atualizações da ontologia</strong>`
+    : 'gerado pela ontologia agora (preço, datas e lista de espera automáticos)';
+  $('#lpEdSub').innerHTML = origem + ` · ${(($('#lpCodigo')||{}).value||d.html||'').length.toLocaleString('pt-BR')} caracteres`;
+}
+function lpMarcarSujo(){
+  if(LP_SUJO) return;
+  LP_SUJO = true;
+  $('#lpEdOut').innerHTML = '<span class="chip t-warn"><i class="ti ti-pencil"></i> alterações não salvas</span>';
+}
+function lpPrevia(){
+  const f = $('#lpFrame'); if(f) f.srcdoc = ($('#lpCodigo')||{}).value || '';
+}
+function lpFechar(){
+  if(LP_SUJO && !confirm('Há alterações não salvas. Fechar mesmo assim?')) return;
+  LP_ABERTA = null; LP_SUJO = false;
+  $('#lpEditor').classList.add('hidden'); $('#lpCodigo').value = ''; $('#lpFrame').srcdoc = '';
+}
+async function lpSalvar(silencioso){
+  if(!LP_ABERTA) return false;
+  const r = await api('/api/lps/'+LP_ABERTA,{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({html: $('#lpCodigo').value})});
+  if(r.erro){ $('#lpEdOut').innerHTML = `<div class="row t-bad" style="background:var(--rosa);"><i class="ti ti-ban"></i><span>${escapeHtml(r.erro)}</span></div>`; return false; }
+  LP_SUJO = false;
+  if(!silencioso) $('#lpEdOut').innerHTML = '<span class="chip t-ok"><i class="ti ti-check"></i> salvo — publique para o lead ver</span>';
+  await lpCarregar();
+  const d = await api('/api/lps/'+LP_ABERTA); lpSub(d);
+  return true;
+}
+async function lpRestaurar(){
+  if(!LP_ABERTA) return;
+  if(!confirm('Descartar a edição desta LP e voltar ao HTML gerado pela ontologia?')) return;
+  const r = await api('/api/lps/'+LP_ABERTA+'/restaurar',{method:'POST'});
+  if(r.erro){ $('#lpEdOut').innerHTML = `<div class="row t-bad" style="background:var(--rosa);">${escapeHtml(r.erro)}</div>`; return; }
+  const curso = LP_ABERTA; await lpCarregar(); await lpAbrir(curso);
+  $('#lpEdOut').innerHTML = '<span class="chip t-ok"><i class="ti ti-rotate"></i> restaurada — voltou a ser gerada pela ontologia</span>';
+}
+async function lpPublicar(){
+  if(!LP_ABERTA) return;
+  if(!confirm(`Publicar a LP do ${LP_ABERTA} no site? A página pública muda na hora.`)) return;
+  if(!await lpSalvar(true)) return;
+  $('#lpEdOut').innerHTML = '<span class="chip t-acc"><i class="ti ti-loader"></i> publicando…</span>';
+  const r = await api('/api/lps/'+LP_ABERTA+'/publicar',{method:'POST'});
+  if(r.erro){ $('#lpEdOut').innerHTML = `<div class="row t-bad" style="background:var(--rosa);"><i class="ti ti-ban"></i><span>${escapeHtml(r.erro)}</span></div>`; return; }
+  const ok = r.status==='publicado', dry = r.status==='dry_run';
+  $('#lpEdOut').innerHTML = ok
+    ? `<div class="row t-ok" style="background:var(--mint);"><i class="ti ti-circle-check"></i><span>Publicada — <a href="${r.link}" target="_blank">abrir no site</a></span></div>`
+    : dry ? '<div class="row t-warn" style="background:var(--sun);"><i class="ti ti-flask"></i><span>Dry-run: sem credenciais do WordPress, nada foi publicado.</span></div>'
+          : `<div class="row t-bad" style="background:var(--rosa);"><i class="ti ti-ban"></i><span>Falhou: ${escapeHtml(r.motivo||r.status||'')}</span></div>`;
+  await lpCarregar();
 }
 
 // ---------------------------------------------------------------- templates Meta
