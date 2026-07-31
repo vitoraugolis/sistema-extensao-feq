@@ -9,6 +9,7 @@ PROPOSTA para aprovação humana (envio = tier externa/irreversível).
 import re
 import sys
 import pathlib
+import threading
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2]))
 
@@ -27,6 +28,20 @@ def _fmt_ptbr(dec_str):
     inteiro, _, dec = str(dec_str).partition(".")
     inteiro = f"{int(inteiro):,}".replace(",", ".")
     return f"{inteiro},{(dec or '00')[:2]:0<2}"
+
+
+# Uma conversa por vez, POR LEAD. O webhook trata cada mensagem numa thread; quando o
+# lead manda duas seguidas (caso real: 2 falas no mesmo minuto), as duas liam o histórico
+# ANTES de qualquer resposta ser gravada -> o cérebro respondia a mesma coisa duas vezes e
+# a trava anti-loop não via, porque comparava com um histórico já vencido.
+# ponytail: dict de locks por card; some só no restart — 1 lock por lead é irrelevante aqui.
+_LOCKS = {}
+_LOCKS_GUARD = threading.Lock()
+
+
+def _lock_do_lead(card_id):
+    with _LOCKS_GUARD:
+        return _LOCKS.setdefault(card_id, threading.Lock())
 
 
 ESC_RE = re.compile(r"(superior incompleto|incompleto|p[óo]s|mestrad|doutorad|superior|graduad|gradua[çc]|diploma|m[ée]dio|fundamental)", re.I)
@@ -167,12 +182,25 @@ class Orquestrador:
         self.brain = brain or (lambda lead, msg, hist=None: brain_deterministico(self.ont, lead, msg, hist))
 
     def processar_mensagem(self, card_id, mensagem_lead, tipo="texto", media_id=None):
+        """Serializa por lead: a 2ª mensagem só é tratada depois que a 1ª virou resposta
+        gravada, então o cérebro sempre vê o histórico completo (ver _lock_do_lead)."""
+        with _lock_do_lead(card_id):
+            return self._processar_mensagem(card_id, mensagem_lead, tipo, media_id)
+
+    def _processar_mensagem(self, card_id, mensagem_lead, tipo="texto", media_id=None):
         lead = self.est.get_lead(card_id)
         if not lead:
             raise ValueError(f"lead {card_id} não existe")
         if lead.get("optout"):
             return {"ignorado": "lead em opt-out"}
         historico = self.est.historico(card_id)   # antes de gravar a msg atual
+        # O que o agente acabou de responder ainda é PROPOSTA (só entra no histórico quando
+        # é aprovada/enviada). Sem isto o cérebro não enxerga a própria fala anterior e
+        # repete a mesma resposta para a 2ª mensagem do lead — foi o que apareceu no print.
+        pend = self.est.decisao_pendente(card_id)
+        if pend and (pend.get("mensagem") or "").strip():
+            historico = historico + [{"papel": "agente", "texto": pend["mensagem"],
+                                      "ts": pend.get("ts")}]
         self.est.add_conversa(card_id, "lead", mensagem_lead, tipo=tipo, media_id=media_id)
 
         # Modo manual (por conversa): o humano conduz. Registramos a mensagem do lead

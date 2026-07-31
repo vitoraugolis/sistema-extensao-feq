@@ -43,6 +43,53 @@ def test_dispatch_multiprovider_sem_chave_cai_no_deterministico():
     assert modelo_atual()[1]                               # com um id não-vazio
 
 
+def test_saida_estruturada_do_llm_nao_depende_de_prosa():
+    """Produção (31/07): o LLM escrevia prosa antes/em vez do JSON e TODA conversa caía no
+    determinístico — o agente virava um robô de preço que ignorava a pergunta. Duas travas:
+    Claude usa tool use forçado, e o parser tolera prosa/cercas em volta do objeto."""
+    from atena.agentes import cerebro as CB
+
+    # 1) parser: prosa antes, cerca ```json e texto depois não podem derrubar o JSON
+    assert CB._json('Faz sentido!\n\n{"proxima_acao": "continuar", "mensagem_ao_lead": "oi"}'
+                    )["proxima_acao"] == "continuar"
+    assert CB._json('```json\n{"proxima_acao": "qualificar", "motivo": "x"}\n```'
+                    )["proxima_acao"] == "qualificar"
+    assert CB._json('{"nota": 1} e depois {"proxima_acao": "descartar"}'
+                    )["proxima_acao"] == "descartar"      # escolhe o objeto do contrato
+    assert CB._json("sem json nenhum aqui") is None
+
+    # 2) Claude: manda tools + tool_choice e lê o bloco tool_use (não o texto solto)
+    enviado = {}
+
+    class _Resp:
+        status_code = 200
+        def json(self):
+            return {"content": [{"type": "text", "text": "vou responder..."},
+                                {"type": "tool_use", "name": "responder_lead",
+                                 "input": {"mensagem_ao_lead": "Oi!", "proxima_acao": "continuar",
+                                           "motivo": "saudação"}}]}
+    import requests
+    _orig = requests.post
+    requests.post = lambda url, **kw: (enviado.update(kw.get("json") or {}), _Resp())[1]
+    try:
+        out = CB._claude("k", "claude-sonnet-4-6", "sys", [{"role": "user", "content": "oi"}])
+    finally:
+        requests.post = _orig
+    assert enviado["tool_choice"] == {"type": "tool", "name": "responder_lead"}
+    assert enviado["tools"][0]["input_schema"]["properties"]["proxima_acao"]["enum"]
+    assert CB._json(out)["mensagem_ao_lead"] == "Oi!"      # veio do tool_use, não do texto
+
+    # 3) OpenAI: sem response_format json_object o modelo responde prosa (era o bug real)
+    requests.post = lambda url, **kw: (enviado.update(kw.get("json") or {}),
+                                       type("R", (), {"status_code": 200,
+                                                      "json": lambda s: {"choices": [{"message": {"content": "{}"}}]}})())[1]
+    try:
+        CB._openai("k", "gpt-4o-mini", "sys", [{"role": "user", "content": "oi"}])
+    finally:
+        requests.post = _orig
+    assert enviado["response_format"] == {"type": "json_object"}
+
+
 def test_config_persistencia():
     est = Estado(":memory:")
     est.set_config("modelo", "claude:claude-haiku-4-5")

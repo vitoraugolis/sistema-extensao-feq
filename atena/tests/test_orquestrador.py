@@ -53,6 +53,29 @@ def test_gatilho_sensivel_escala():
     assert est.get_lead("c1")["estado_conversa"] == "escalado_humano"
 
 
+def test_duas_mensagens_juntas_nao_geram_resposta_duplicada():
+    """Caso real (print de 31/07): o lead mandou 2 falas no mesmo minuto, o webhook tratou
+    cada uma numa thread e as duas leram o histórico antes de qualquer resposta ser gravada
+    -> a MESMA mensagem foi enviada duas vezes. O lock por lead tem de serializar."""
+    import threading
+    import time
+    est, orq = _novo(escolaridade="Superior Completo")
+
+    def brain_lento(lead, msg, hist=None):
+        n = sum(1 for h in (hist or []) if h.get("papel") == "agente")
+        time.sleep(0.15)                       # janela larga para a corrida acontecer
+        return C.DecisaoAgente(C.CONTINUAR, "teste",
+                               mensagem_ao_lead=f"resposta vendo {n} msg(s) do agente")
+    orq.brain = brain_lento
+    ts = [threading.Thread(target=orq.processar_mensagem, args=("c1", m))
+          for m in ("Uma área em expansão", "Quando abre novas turmas?")]
+    for t in ts: t.start()
+    for t in ts: t.join()
+    props = [d["mensagem"] for d in est.listar_decisoes("c1")]
+    assert len(props) == 2, props
+    assert props[0] != props[1], f"resposta duplicada: {props}"   # a 2ª viu a 1ª
+
+
 def test_modo_manual_nao_gera_resposta():
     est, orq = _novo(escolaridade="Superior Completo")
     est.set_lead("c1", modo="manual")

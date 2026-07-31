@@ -44,22 +44,55 @@ def modelo_atual():
     return (prov, mid) if prov in PROVEDORES and mid else ("claude", "claude-sonnet-4-6")
 
 
+# Saída estruturada do Claude via TOOL USE forçado. Pedir JSON em texto não bastava: o
+# modelo escrevia prosa antes do objeto (ou só prosa) e a conversa caía no determinístico
+# — foi o que deixou o agente "confuso" em produção. Com tool_choice a resposta É o objeto.
+_FERRAMENTA = {
+    "name": "responder_lead",
+    "description": "Responde ao lead e decide o próximo passo do atendimento.",
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "mensagem_ao_lead": {"type": "string",
+                                 "description": "Texto completo que será enviado ao lead."},
+            "proxima_acao": {"type": "string", "enum": sorted(C.ACOES)},
+            "motivo": {"type": "string", "description": "Justificativa em até 15 palavras."},
+            "escalonamento_motivo": {"type": ["string", "null"]},
+            "dados": {"type": "object", "properties": {
+                "escolaridade": {"type": ["string", "null"]},
+                "curso": {"type": ["string", "null"]},
+                "duvida": {"type": ["string", "null"]}}},
+        },
+        "required": ["mensagem_ao_lead", "proxima_acao", "motivo"],
+    },
+}
+
+
 def _claude(key, mid, system, messages):
     import requests
     r = requests.post(_URL, timeout=40,
                       headers={"x-api-key": key, "anthropic-version": "2023-06-01",
                                "content-type": "application/json"},
-                      json={"model": mid, "max_tokens": 1000, "system": system, "messages": messages})
+                      json={"model": mid, "max_tokens": 2000, "system": system,
+                            "messages": messages, "tools": [_FERRAMENTA],
+                            "tool_choice": {"type": "tool", "name": _FERRAMENTA["name"]}})
     if r.status_code != 200:
         raise RuntimeError(f"Claude {r.status_code}: {r.text[:120]}")
-    return r.json()["content"][0]["text"]
+    blocos = r.json().get("content", [])
+    uso = next((b for b in blocos if b.get("type") == "tool_use"), None)
+    if uso:
+        return json.dumps(uso["input"], ensure_ascii=False)   # contrato de texto p/ o _json()
+    return next((b.get("text", "") for b in blocos if b.get("type") == "text"), "")
 
 
 def _openai(key, mid, system, messages):
     import requests
     r = requests.post("https://api.openai.com/v1/chat/completions", timeout=40,
                       headers={"Authorization": f"Bearer {key}"},
-                      json={"model": mid, "max_completion_tokens": 1000,
+                      json={"model": mid, "max_completion_tokens": 2000,
+                            # sem isto o modelo responde PROSA e o cérebro inteiro cai no
+                            # determinístico (era o caso do gpt-4o-mini em produção)
+                            "response_format": {"type": "json_object"},
                             "messages": [{"role": "system", "content": system}] + messages})
     if r.status_code != 200:
         raise RuntimeError(f"OpenAI {r.status_code}: {r.text[:120]}")
@@ -121,8 +154,26 @@ def _turns(historico, mensagem_lead):
 
 
 def _json(texto):
-    m = re.search(r"\{.*\}", texto or "", re.S)
-    return json.loads(m.group(0)) if m else None
+    """Extrai o objeto JSON da resposta do LLM.
+    O regex guloso anterior (\\{.*\\}) quebrava quando o modelo escrevia prosa antes do
+    JSON ou cercas ``` — e o Claude faz isso com frequência. Aqui varremos cada '{' com
+    raw_decode (que para no fim do objeto e ignora o que vier depois) e preferimos o
+    objeto que traz 'proxima_acao', para não pegar uma chave solta citada no texto."""
+    t = texto or ""
+    dec = json.JSONDecoder()
+    candidatos = []
+    for i, ch in enumerate(t):
+        if ch != "{":
+            continue
+        try:
+            obj, _ = dec.raw_decode(t[i:])
+        except ValueError:
+            continue
+        if isinstance(obj, dict):
+            if "proxima_acao" in obj:
+                return obj
+            candidatos.append(obj)
+    return candidatos[0] if candidatos else None
 
 
 _NIVEL_TEXTO = {"medio": "ensino médio completo",
@@ -250,10 +301,12 @@ def _system_prompt(ctx, lead_nome=None):
         "quase na hora; boleto até 3 dias úteis) ele acessa a área do aluno para enviar os "
         "documentos; (4) após o FIM das inscrições, a secretaria da FEQ envia por e-mail o 1º "
         "boleto do curso. Não invente etapas nem prazos além destes.\n"
-        'Responda SOMENTE em JSON, preenchendo os campos com conteúdo REAL (nunca reticências '
-        'ou placeholder): {"mensagem_ao_lead": "<o texto completo que será enviado ao lead>", '
-        '"proxima_acao": "continuar|qualificar|descartar|em_espera|escalar_humano|encerrar_optout", '
-        '"motivo": "<justificativa curta>", "escalonamento_motivo": null, '
+        'Responda SOMENTE em JSON (nada de texto fora do objeto, nada de cercas ```), '
+        'preenchendo os campos com conteúdo REAL (nunca reticências ou placeholder): '
+        '{"mensagem_ao_lead": "<o texto completo que será enviado ao lead>", '
+        '"proxima_acao": "continuar|qualificar|descartar|em_espera|escalar_humano|'
+        'consultar_coordenacao|encerrar_optout", '
+        '"motivo": "<justificativa em no MÁXIMO 15 palavras>", "escalonamento_motivo": null, '
         '"dados": {"escolaridade": null, "curso": null, "duvida": null}}'
     )
 
