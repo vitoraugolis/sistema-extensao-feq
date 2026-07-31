@@ -190,9 +190,11 @@ input:focus,select:focus,textarea:focus{outline:none;box-shadow:3px 3px 0 var(--
         <div class="g sec" style="padding:14px 16px;">
           <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
             <h2 style="display:flex;align-items:center;gap:7px;margin:0;"><i class="ti ti-layout-columns"></i> Funil de leads</h2>
-            <select id="kbFiltro" onchange="renderKanban()" style="width:auto;padding:5px 9px;font-size:12.5px;margin-left:auto;"><option value="">Todos os cursos</option></select>
+            <input id="kbBusca" placeholder="Buscar por nome ou telefone…" oninput="renderKanban()"
+                   style="width:auto;flex:1;min-width:180px;max-width:320px;padding:5px 9px;font-size:12.5px;margin-left:auto;">
+            <select id="kbFiltro" onchange="renderKanban()" style="width:auto;padding:5px 9px;font-size:12.5px;"><option value="">Todos os cursos</option></select>
           </div>
-          <p class="muted" style="margin:6px 2px 10px;">Clique num card para abrir a conversa. O filtro considera todos os cursos de interesse do lead.</p>
+          <p class="muted" style="margin:6px 2px 10px;">Clique num card para abrir a conversa. A busca ignora acentos e a máscara do telefone; o filtro considera todos os cursos de interesse do lead.</p>
           <div class="kb-board" id="kbBoard"></div>
         </div>
       </section>
@@ -200,7 +202,7 @@ input:focus,select:focus,textarea:focus{outline:none;box-shadow:3px 3px 0 var(--
       <section id="conversas" class="hidden">
         <div class="g conv-shell">
           <div class="conv-side">
-            <div class="conv-search"><input id="convBusca" placeholder="Buscar por nome ou curso…" oninput="renderListaConv()"></div>
+            <div class="conv-search"><input id="convBusca" placeholder="Buscar por nome, curso ou telefone…" oninput="renderListaConv()"></div>
             <div class="conv-list" id="convLista"></div>
           </div>
           <div class="conv-main" id="convMain">
@@ -532,11 +534,20 @@ async function atualizarLista(){
   renderListaConv();
 }
 
+// Busca tolerante: ignora caixa, acento ("jose" acha "José") e, quando o termo é
+// numérico, também a máscara do telefone ("19999" acha "+55 (19) 99999-0001").
+function _busca(s){ return (s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim(); }
+function _digitos(s){ return (s||'').replace(/\D/g,''); }
+
 async function renderKanban(){
   const d = await api('/api/kanban');
   if(!d.colunas) return;
   const filtro = ($('#kbFiltro')||{}).value || '';
-  const passa = c => !filtro || (c.cursos||[c.curso]).includes(filtro);
+  const q = _busca(($('#kbBusca')||{}).value);
+  const qNum = _digitos(q);
+  const casa = c => !q || _busca(c.nome).includes(q) || _busca(c.id).includes(q)
+    || (qNum && _digitos(c.telefone).includes(qNum));
+  const passa = c => (!filtro || (c.cursos||[c.curso]).includes(filtro)) && casa(c);
   $('#kbBoard').innerHTML = d.colunas.map(col=>{
     const leads = col.leads.filter(passa);
     return `<div class="kb-col">
@@ -582,9 +593,11 @@ async function reativarLead(id){
 }
 
 function renderListaConv(){
-  const q = (($('#convBusca')||{}).value || '').toLowerCase().trim();
-  const lst = CONV_LISTA.filter(c => !q || (c.lead||'').toLowerCase().includes(q) ||
-    (c.curso||'').toLowerCase().includes(q) || c.id.toLowerCase().includes(q));
+  const q = _busca(($('#convBusca')||{}).value);
+  const qNum = _digitos(q);
+  const lst = CONV_LISTA.filter(c => !q || _busca(c.lead).includes(q) ||
+    _busca(c.curso).includes(q) || _busca(c.id).includes(q) ||
+    (qNum && _digitos(c.id).includes(qNum)));
   $('#convLista').innerHTML = lst.length ? lst.map(c=>`
     <div class="conv-item ${c.id===CONV_ABERTA?'on':''}" onclick="abrirConversa('${c.id}')">
       <div class="conv-ava">${c.iniciais}</div>

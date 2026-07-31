@@ -217,6 +217,7 @@ def kanban():
         fase = l["fase"] if l["fase"] in cols else "Lead"
         cols[fase].append({
             "id": l["card_id"], "nome": l["nome"] or l["card_id"],
+            "telefone": l.get("telefone") or "",     # busca do funil aceita número
             "iniciais": _iniciais(l["nome"]), "curso": l["curso"],
             "cursos": EST.cursos_interesse(l),
             "estado": l["estado_conversa"], "ha": _ha(l["atualizado"]),
