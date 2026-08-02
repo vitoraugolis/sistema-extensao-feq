@@ -21,6 +21,10 @@ import re
 MONEY_RE = re.compile(r"R?\$?\s*\d{1,3}(?:[.\s]\d{3})*,\d{2}")
 PARC_RE = re.compile(r"(\d{1,3})\s*x\s*(?:de\s*)?R?\$?\s*(\d{1,3}(?:[.\s]\d{3})*,\d{2})", re.I)
 DATE_RE = re.compile(r"\b(\d{2})/(\d{2})/(\d{4})\b")
+# Data SEM ano ("as inscrições vão até 07/08"). Precisou existir quando o corpus
+# passou a alimentar o cérebro com precedentes: eles carregam datas de turmas
+# antigas, e nesse formato escapavam do DATE_RE e chegavam ao lead.
+DATE_CURTA_RE = re.compile(r"\b(\d{2})/(\d{2})\b(?!\s*/)")
 HOUR_RE = re.compile(r"(\d{1,4})\s*(?:h\b|horas\b)", re.I)
 CODE_RE = re.compile(r"FEQ[-\s]?(\d{3,4})", re.I)
 LIMIAR_RELOGIO = 24  # ≤ 24h = hora-de-relógio; > 24h = carga horária
@@ -85,12 +89,27 @@ def revisar_estrutural(codigo, texto, ont, fonte_extra=None):
         else:
             bloq.append(f"Valor monetário fora da base ({escopo}): {m.group(0).strip()}.")
 
-    # 3) Datas.
-    for d, mn, y in DATE_RE.findall(texto):
+    # 3) Datas completas (DD/MM/AAAA).
+    data_spans = []
+    for m in DATE_RE.finditer(texto):
+        data_spans.append(m.span())
+        d, mn, y = m.groups()
         if (y + mn + d) in datas:
             usadas.append(f"data {d}/{mn}/{y}")
         else:
             bloq.append(f"Data fora da base ({escopo}): {d}/{mn}/{y}.")
+
+    # 3b) Datas sem ano (DD/MM): valida dia+mês contra as âncoras, em qualquer ano.
+    for m in DATE_CURTA_RE.finditer(texto):
+        if any(a <= m.start() < b for a, b in data_spans):
+            continue                      # já contada como data completa
+        d, mn = m.group(1), m.group(2)
+        if not (1 <= int(mn) <= 12 and 1 <= int(d) <= 31):
+            continue                      # não é data (ex.: "20/26 vagas")
+        if any(x[4:] == mn + d for x in datas):
+            usadas.append(f"data {d}/{mn}")
+        else:
+            bloq.append(f"Data fora da base ({escopo}): {d}/{mn}.")
 
     # 4) Carga horária × hora-de-relógio (fail-closed p/ carga desconhecida).
     for m in HOUR_RE.finditer(texto):

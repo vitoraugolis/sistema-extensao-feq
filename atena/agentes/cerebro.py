@@ -235,7 +235,7 @@ def _bloco_curso(ctx):
            if not ctx["captavel"].get("captavel") else ""))
 
 
-def _system_prompt(ctx, lead_nome=None):
+def _system_prompt(ctx, lead_nome=None, precedentes=""):
     nome = (lead_nome or "").strip()
     citados = "\n".join(
         f"CURSO CITADO PELO LEAD ({x['curso']['codigo']}, inscrição {x['captavel']['status']}):\n"
@@ -265,7 +265,8 @@ def _system_prompt(ctx, lead_nome=None):
         + _bloco_curso(ctx)
         + f"PORTFÓLIO COMPLETO DA FEQ (você conhece todos; use p/ orientar e redirecionar):\n"
         f"{json.dumps(ctx.get('portfolio', []), ensure_ascii=False)}\n"
-        + (citados + "\n" if citados else "") +
+        + (citados + "\n" if citados else "")
+        + (precedentes or "") +
         "GROUNDING: os dados acima são a ÚNICA fonte de fatos. NUNCA invente preço/data/carga/"
         "requisito/ementa. Curso com inscrição 'encerrada' => informe e ofereça alternativas "
         "abertas do portfólio.\n"
@@ -287,7 +288,11 @@ def _system_prompt(ctx, lead_nome=None):
         + _gate_instr(ctx.get("elegivel"), ctx) +
         "DESCONTOS: TODOS os cursos da Extensão FEQ dão 10% para alunos e ex-alunos da Unicamp "
         "(qualquer nível — graduação, pós, extensão etc.) — informe isso diretamente quando "
-        "perguntarem e confirme se o lead se enquadra. Se houver política específica do curso, ela "
+        "perguntarem e confirme se o lead se enquadra. NUNCA CALCULE o valor com desconto "
+        "aplicado (nem a parcela, nem o à vista): diga a porcentagem e o valor CHEIO que está "
+        "nos dados; o abatimento é aplicado pela Extecamp na inscrição. Valor calculado por você "
+        "não existe na base e é bloqueado antes de chegar ao lead. "
+        "Se houver política específica do curso, ela "
         "estará no campo 'descontos' dos dados; use-a. Para OUTRAS categorias de desconto não "
         "listadas (ex.: servidor público) ou negociação de valor, use consultar_coordenacao. "
         "Não peça CPF/endereço nesta fase; escale (escalar_humano) em reclamação/insatisfação/"
@@ -324,7 +329,10 @@ def cerebro_llm(ont, lead, mensagem_lead, historico=None):
     #   3. SEM curso (botão de WhatsApp da LP)    -> descoberta: pergunta qual curso
     if not ctx.get("existe") and not ctx.get("descoberta"):
         return brain_deterministico(ont, lead, mensagem_lead, historico)
-    sysp = _system_prompt(ctx, lead.get("nome"))
+    # Precedentes do corpus (spec 18): nunca bloqueia a conversa — sem corpus, string vazia
+    from atena.corpus.recuperacao import bloco_prompt
+    sysp = _system_prompt(ctx, lead.get("nome"),
+                          precedentes=bloco_prompt(mensagem_lead, lead.get("curso")))
     turns = _turns(historico, mensagem_lead)
     # tenta o modelo escolhido; se falhar e não for Claude, tenta Claude; só então o determinístico
     tentativas = [None]
