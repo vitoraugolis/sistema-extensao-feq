@@ -518,6 +518,19 @@ def conversa_enviar_midia(card_id):
     return jsonify({"envio": r})
 
 
+@app.route("/api/medicao")
+def medicao():
+    """Medição do funil por coorte (spec 18 §3.1). Só mede — otimização está atrás
+    do gate de §3.4 (hoje o sinal de conversão é 1 em 253)."""
+    from atena.avaliacao.medicao import medir
+    try:
+        dias = max(1, min(365, int(request.args.get("dias", 30))))
+    except ValueError:
+        dias = 30
+    curso = (request.args.get("curso") or "").strip().upper() or None
+    return jsonify(medir(dias=dias, curso=curso))
+
+
 # ----------------------------------------------------------------- Gestão de LPs
 def _lp_slug(curso, turma):
     from atena.growth.wp_deploy_bridge import _slug

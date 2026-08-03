@@ -104,6 +104,23 @@ input:focus,select:focus,textarea:focus{outline:none;box-shadow:3px 3px 0 var(--
 .conv-tpl select{width:100%;}
 .tpl-campo{display:block;margin-top:6px;}
 .tpl-campo span{display:block;font-size:11px;margin-bottom:2px;}
+/* Medição do funil — barras proporcionais + destaque do gargalo */
+.md-etapa{margin-bottom:11px;}
+.md-rot{font-size:12.5px;margin-bottom:3px;}
+.md-barra-fora{display:flex;align-items:center;gap:8px;background:var(--paper);
+ border:2px solid var(--b);border-radius:9px;padding:3px;}
+.md-barra{height:20px;border-radius:6px;background:var(--feq);border:1.5px solid var(--b);min-width:6px;}
+.md-gargalo{background:var(--guara);}
+.md-n{font-size:12.5px;font-weight:700;white-space:nowrap;padding-right:6px;}
+.md-passo{font-size:11.5px;color:#5b5b5b;margin:3px 0 0 3px;}
+.md-alerta{color:var(--bad);font-weight:700;}
+.md-serie{display:flex;align-items:flex-end;gap:3px;height:110px;padding:4px;
+ background:var(--paper);border:2px solid var(--b);border-radius:9px;overflow-x:auto;}
+.md-dia{display:flex;flex-direction:column;align-items:center;justify-content:flex-end;
+ height:100%;min-width:22px;flex:1;}
+.md-col{width:70%;background:var(--feq);border:1.5px solid var(--b);border-radius:3px 3px 0 0;min-height:2px;}
+.md-data{font-size:8.5px;color:#5b5b5b;margin-top:2px;white-space:nowrap;}
+
 /* Gestão de LPs — editor lado a lado: código à esquerda, página ao vivo à direita */
 .lp-ed-top{display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:4px;}
 .lp-ed-acoes{margin-left:auto;display:flex;gap:7px;flex-wrap:wrap;}
@@ -184,6 +201,7 @@ input:focus,select:focus,textarea:focus{outline:none;box-shadow:3px 3px 0 var(--
       <button class="navi" data-sec="duvidas"><i class="ti ti-help-circle"></i> Dúvidas <span class="tag t-warn" id="dvCount" style="display:none;margin-left:auto;"></span></button>
       <button class="navi" data-sec="verificacao"><i class="ti ti-checklist"></i> Verificação <span class="tag t-warn" id="vfCount" style="display:none;margin-left:auto;"></span></button>
       <button class="navi" data-sec="injetor"><i class="ti ti-database-import"></i> Injetor</button>
+      <button class="navi" data-sec="medicao"><i class="ti ti-chart-arrows-vertical"></i> Medição</button>
       <button class="navi" data-sec="lps"><i class="ti ti-browser"></i> LPs</button>
       <button class="navi" data-sec="templates"><i class="ti ti-mail-cog"></i> Templates</button>
       <button class="navi" data-sec="revisor"><i class="ti ti-eye-search"></i> Revisor ao vivo</button>
@@ -244,6 +262,35 @@ input:focus,select:focus,textarea:focus{outline:none;box-shadow:3px 3px 0 var(--
             a conversão à Meta); <strong>Não inscreveu</strong> mantém como Lead e o agente envia a
             mensagem de recuperação imediatamente.</p>
           <div id="vfs"></div>
+        </div>
+      </section>
+
+      <section id="medicao" class="hidden">
+        <div class="g sec">
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+            <h2 style="margin:0;"><i class="ti ti-chart-arrows-vertical"></i> Medição do funil</h2>
+            <select id="mdDias" onchange="mdCarregar()" style="width:auto;padding:5px 9px;font-size:12.5px;margin-left:auto;">
+              <option value="7">últimos 7 dias</option>
+              <option value="30" selected>últimos 30 dias</option>
+              <option value="90">últimos 90 dias</option>
+              <option value="365">tudo</option>
+            </select>
+            <select id="mdCurso" onchange="mdCarregar()" style="width:auto;padding:5px 9px;font-size:12.5px;"><option value="">Todos os cursos</option></select>
+          </div>
+          <p class="muted" style="margin:6px 2px 10px;">Coorte: acompanha os leads <strong>criados</strong> na janela — não divide conversões do mês por leads do mês. As etapas são cumulativas, então quem avançou conta nas anteriores.</p>
+          <div id="mdFunil"></div>
+        </div>
+        <div class="g sec">
+          <h3 style="margin:0 0 8px;"><i class="ti ti-heartbeat"></i> Saúde do agente</h3>
+          <div id="mdSaude"></div>
+          <h3 style="margin:14px 0 8px;"><i class="ti ti-clock"></i> Tempos (mediana)</h3>
+          <div id="mdTempos"></div>
+        </div>
+        <div class="g sec">
+          <h3 style="margin:0 0 8px;"><i class="ti ti-list-details"></i> Por curso</h3>
+          <div id="mdCursos"></div>
+          <h3 style="margin:14px 0 8px;"><i class="ti ti-timeline"></i> Série diária</h3>
+          <div id="mdSerie"></div>
         </div>
       </section>
 
@@ -380,6 +427,7 @@ document.querySelectorAll('.navi').forEach(b=>b.onclick=()=>{
   if(b.dataset.sec==='kanban') renderKanban();
   if(b.dataset.sec==='templates') tplCarregar();
   if(b.dataset.sec==='lps') lpCarregar();
+  if(b.dataset.sec==='medicao') mdCarregar();
 });
 
 async function carregar(){
@@ -463,6 +511,69 @@ async function testarRevisor(){
   const bl = (r.bloqueios||[]).map(b=>`<div class="row" style="background:var(--rosa);"><i class="ti ti-alert-triangle" style="color:var(--bad);"></i><span>${b}</span></div>`).join('');
   const an = (r.ancoras||[]).map(a=>`<span class="chip t-ok"><i class="ti ti-check"></i> ${a}</span>`).join('');
   $('#rout').innerHTML = `<div style="margin-bottom:8px;">${head}</div>${bl}${an?('<div style="margin-top:6px;">'+an+'</div>'):''}`;
+}
+
+// ----------------------------------------------------------- Medição do funil
+async function mdCarregar(){
+  const dias = ($('#mdDias')||{}).value || 30;
+  const curso = ($('#mdCurso')||{}).value || '';
+  const m = await api(`/api/medicao?dias=${dias}${curso?'&curso='+curso:''}`);
+  const sel = $('#mdCurso');
+  if(sel && sel.options.length <= 1 && window.CURSOS_ALL)
+    sel.innerHTML = '<option value="">Todos os cursos</option>' +
+      window.CURSOS_ALL.map(c=>`<option value="${c}">${c}</option>`).join('');
+  if(!m.coorte){ $('#mdFunil').innerHTML = '<div class="muted">Nenhum lead criado nesta janela.</div>';
+    ['#mdSaude','#mdTempos','#mdCursos','#mdSerie'].forEach(s=>$(s).innerHTML=''); return; }
+
+  // Gargalo = onde se perde MAIS GENTE, não o menor percentual: queda de 1 para 0
+  // é 0% mas custa 1 pessoa, enquanto 90 -> 1 custa 89. Percentual sobre base
+  // minúscula não tem significado e roubaria o destaque do problema real.
+  let pior = null;
+  (m.etapas||[]).forEach(e=>{ if(e.perdidos!==null && e.perdidos>0 && (!pior || e.perdidos > pior.perdidos)) pior = e; });
+  $('#mdFunil').innerHTML = (m.etapas||[]).map(e=>{
+    const larg = Math.max(2, e.do_topo||0);
+    const gargalo = pior && e.chave===pior.chave;
+    return `<div class="md-etapa" title="${escapeHtml(e.descricao||'')}">
+      <div class="md-rot"><strong>${e.rotulo}</strong><span class="muted"> ${escapeHtml(e.descricao||'')}</span></div>
+      <div class="md-barra-fora"><div class="md-barra${gargalo?' md-gargalo':''}" style="width:${larg}%;"></div>
+        <span class="md-n">${e.n} <span class="muted">(${e.do_topo}%)</span></span></div>
+      ${e.da_anterior!==null?`<div class="md-passo ${gargalo?'md-alerta':''}">${e.da_anterior}% da etapa anterior · perdeu ${e.perdidos}${gargalo?' ← maior queda':''}</div>`:''}
+    </div>`;}).join('');
+
+  const s = m.saude||{};
+  const chip = (rot, v, suf, bom) => {
+    const cls = v===null||v===undefined ? '' : (bom===null ? 't-acc' : (bom ? 't-ok' : 't-bad'));
+    return `<span class="chip ${cls}">${rot}: <strong>${v===null||v===undefined?'—':v}${suf||''}</strong></span>`;
+  };
+  $('#mdSaude').innerHTML =
+    chip('decisões', s.decisoes, '', null) +
+    chip('bloqueio do Revisor', s.revisor_bloqueio_pct, '%', (s.revisor_bloqueio_pct||0) < 5) +
+    chip('escalonamento', s.escalonamento_pct, '%', (s.escalonamento_pct||0) < 15) +
+    chip('consulta à coordenação', s.consulta_coordenacao_pct, '%', (s.consulta_coordenacao_pct||0) < 10) +
+    chip('opt-out', s.optout_pct, '%', (s.optout_pct||0) < 5) +
+    chip('quedas no determinístico', (s.fallback_deterministico||{}).desde_o_restart, '', null) +
+    '<div class="muted" style="margin-top:6px;font-size:11.5px;">Quedas no determinístico contam desde o último restart do serviço (indicador de curto prazo, não histórico).</div>';
+
+  const t = m.tempos||{}, am = t.amostras||{};
+  const th = (rot, v, n, nota) => `<div class="row"><i class="ti ti-clock"></i><span>${rot}: <strong>${v===null?'—':v+' h'}</strong> <span class="muted">(mediana de ${n})</span>${nota?`<div class="muted" style="font-size:11.5px;">${nota}</div>`:''}</span></div>`;
+  $('#mdTempos').innerHTML =
+    th('até o 1º contato nosso', t.ate_1o_contato_h, am['1o_contato']) +
+    th('até o lead responder', t.ate_resposta_do_lead_h, am.resposta) +
+    th('até iniciar inscrição', t.ate_clique_h, am.clique, t.nota_clique);
+
+  $('#mdCursos').innerHTML = (m.por_curso||[]).map(p=>`
+    <div class="row"><strong style="min-width:78px;">${p.curso}</strong>
+      <span class="muted">${p.leads} leads · ${p.qualificados} qualificados · ${p.cliques} iniciaram</span>
+      <span class="tag ${p.inscritos?'t-ok':'t-warn'}" style="margin-left:auto;">${p.inscritos} inscrito(s) · ${p.conversao_pct}%</span>
+    </div>`).join('') || '<div class="muted">—</div>';
+
+  const serie = m.serie||[], topo = Math.max(1, ...serie.map(d=>d.leads));
+  $('#mdSerie').innerHTML = serie.length ? `<div class="md-serie">${serie.map(d=>`
+    <div class="md-dia" title="${d.dia}: ${d.leads} leads, ${d.qualificacoes} qualificações, ${d.cliques} iniciaram">
+      <div class="md-col" style="height:${Math.round(100*d.leads/topo)}%;"></div>
+      <span class="md-data">${d.dia.slice(8)}/${d.dia.slice(5,7)}</span>
+    </div>`).join('')}</div>
+    <div class="muted" style="font-size:11.5px;margin-top:4px;">Altura = leads criados no dia. Passe o mouse para ver qualificações e inícios de inscrição.</div>` : '<div class="muted">—</div>';
 }
 
 // ------------------------------------------------------------- Gestão de LPs
