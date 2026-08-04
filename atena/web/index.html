@@ -222,7 +222,7 @@ input:focus,select:focus,textarea:focus{outline:none;box-shadow:3px 3px 0 var(--
       <button class="navi on" data-sec="painel"><i class="ti ti-layout-dashboard"></i> Painel</button>
       <button class="navi" data-sec="kanban"><i class="ti ti-layout-columns"></i> Funil</button>
       <button class="navi" data-sec="conversas"><i class="ti ti-messages"></i> Conversas</button>
-      <button class="navi" data-sec="aprovacoes"><i class="ti ti-inbox"></i> Aprovações</button>
+      <button class="navi" data-sec="aprovacoes"><i class="ti ti-inbox"></i> Aprovações <span class="tag t-bad" id="apCount" style="display:none;margin-left:auto;"></span></button>
       <button class="navi" data-sec="duvidas"><i class="ti ti-help-circle"></i> Dúvidas <span class="tag t-warn" id="dvCount" style="display:none;margin-left:auto;"></span></button>
       <button class="navi" data-sec="verificacao"><i class="ti ti-checklist"></i> Verificação <span class="tag t-warn" id="vfCount" style="display:none;margin-left:auto;"></span></button>
       <button class="navi" data-sec="injetor"><i class="ti ti-database-import"></i> Injetor</button>
@@ -273,7 +273,17 @@ input:focus,select:focus,textarea:focus{outline:none;box-shadow:3px 3px 0 var(--
         </div>
       </section>
 
-      <section id="aprovacoes" class="hidden"><div class="g sec"><h2>Fila de aprovação humana</h2><div id="aprov"></div></div></section>
+      <section id="aprovacoes" class="hidden">
+        <div class="g sec">
+          <h2><i class="ti ti-inbox"></i> Fila de intervenção humana</h2>
+          <p class="muted" style="margin:0 0 10px;">O que o agente <strong>não resolveu sozinho</strong> — em ordem de urgência. Cada vez que você resolve um destes, o curador transforma a sua resposta em lição para o sistema não precisar perguntar de novo.</p>
+          <div id="aprov"></div>
+        </div>
+        <div class="g sec">
+          <h3 style="margin:0 0 8px;"><i class="ti ti-bell"></i> Alertas do sistema</h3>
+          <div id="aprovAlertas"></div>
+        </div>
+      </section>
 
       <section id="duvidas" class="hidden">
         <div class="g sec">
@@ -531,8 +541,52 @@ async function carregar(){
   }
 
   const ap = await api('/api/aprovacoes');
-  const cor = {escalonamento:'t-warn',captabilidade:'t-bad',injetor:'t-acc'};
-  $('#aprov').innerHTML = ap.map(a=>`<div class="row"><i class="ti ${a.icone}"></i><span>${a.texto}</span><span class="tag ${cor[a.tipo]||'t-acc'}">${a.tipo}</span></div>`).join('');
+  renderAprovacoes(ap);
+}
+
+const AP_ESTILO = {
+  escalonamento: {rot:'o agente pediu ajuda', cls:'t-bad',  ico:'ti-hand-stop'},
+  manual:        {rot:'modo manual',          cls:'t-warn', ico:'ti-user-edit'},
+  proposta:      {rot:'resposta aguardando aprovação', cls:'t-acc', ico:'ti-robot'},
+  duvida:        {rot:'dúvida p/ coordenação', cls:'t-warn', ico:'ti-help-circle'},
+  injetor:       {rot:'ontologia',            cls:'t-acc',  ico:'ti-database-import'},
+  captabilidade: {rot:'curso encerrado',      cls:'t-bad',  ico:'ti-calendar-x'},
+};
+function _idade(h){
+  if(h===null||h===undefined) return '';
+  return h < 1 ? `há ${Math.round(h*60)} min` : (h < 48 ? `há ${Math.round(h)} h` : `há ${Math.round(h/24)} d`);
+}
+function renderAprovacoes(ap){
+  const itens = ap.itens||[], badge = document.getElementById('apCount');
+  if(badge){ badge.style.display = ap.agir ? 'inline-flex' : 'none'; badge.textContent = ap.agir; }
+  $('#aprov').innerHTML = itens.length ? itens.map(i=>{
+    const e = AP_ESTILO[i.tipo] || {rot:i.tipo, cls:'t-acc', ico:'ti-point'};
+    const acao = i.acao==='abrir' && i.card_id
+      ? `<button class="btn btn-p" style="padding:5px 10px;" onclick="abrirDoKanban('${i.card_id}')"><i class="ti ti-message"></i> Abrir conversa</button>`
+        + (i.tipo==='escalonamento'
+            ? `<button class="btn btn-g" style="padding:5px 10px;" onclick="resolverEscalonamento('${i.card_id}')" title="Já tratei — devolver ao fluxo do agente"><i class="ti ti-check"></i> Resolvido</button>` : '')
+      : i.acao==='duvidas'
+        ? `<button class="btn btn-p" style="padding:5px 10px;" onclick="document.querySelector('.navi[data-sec=&quot;duvidas&quot;]').click()"><i class="ti ti-arrow-right"></i> Responder</button>`
+        : `<button class="btn btn-g" style="padding:5px 10px;" onclick="document.querySelector('.navi[data-sec=&quot;injetor&quot;]').click()"><i class="ti ti-arrow-right"></i> Injetor</button>`;
+    return `<div class="row" style="align-items:flex-start;">
+      <i class="ti ${e.ico}"></i>
+      <span style="min-width:0;">
+        <strong>${escapeHtml(i.nome || i.curso || '—')}</strong>
+        <span class="muted">${i.curso && i.nome ? '· '+i.curso : ''} ${_idade(i.horas)}</span>
+        <div class="muted" style="font-size:11.5px;">${escapeHtml((i.motivo||'').slice(0,150))}</div>
+      </span>
+      <span class="tag ${e.cls}" style="margin-left:auto;">${e.rot}</span>
+      <span style="display:flex;gap:6px;">${acao}</span>
+    </div>`;}).join('')
+    : '<div class="muted">Nada esperando por você. O agente está dando conta sozinho. 🎉</div>';
+  $('#aprovAlertas').innerHTML = (ap.alertas||[]).length
+    ? ap.alertas.map(a=>`<div class="row"><i class="ti ti-alert-circle"></i><span>${escapeHtml(a.motivo)}</span><span class="muted" style="margin-left:auto;">${_idade(a.horas)}</span></div>`).join('')
+    : '<div class="muted">Sem alertas.</div>';
+}
+async function resolverEscalonamento(id){
+  const r = await api('/api/leads/'+id+'/resolver',{method:'POST'});
+  if(r.erro){ alert(r.erro); return; }
+  carregar();
 }
 
 async function testarRevisor(){

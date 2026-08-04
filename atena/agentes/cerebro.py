@@ -68,14 +68,18 @@ _FERRAMENTA = {
 }
 
 
-def _claude(key, mid, system, messages):
+def _claude(key, mid, system, messages, ferramenta=None):
+    """`ferramenta`: schema de saída estruturada. Precisa ser PARÂMETRO, não fixo — o
+    tool use amarrado ao schema do cérebro fazia todo outro consumidor (curador,
+    injetor, teste de modelo) receber o contrato errado e cair em fallback."""
     import requests
+    corpo = {"model": mid, "max_tokens": 2000, "system": system, "messages": messages}
+    if ferramenta:
+        corpo["tools"] = [ferramenta]
+        corpo["tool_choice"] = {"type": "tool", "name": ferramenta["name"]}
     r = requests.post(_URL, timeout=40,
                       headers={"x-api-key": key, "anthropic-version": "2023-06-01",
-                               "content-type": "application/json"},
-                      json={"model": mid, "max_tokens": 2000, "system": system,
-                            "messages": messages, "tools": [_FERRAMENTA],
-                            "tool_choice": {"type": "tool", "name": _FERRAMENTA["name"]}})
+                               "content-type": "application/json"}, json=corpo)
     if r.status_code != 200:
         raise RuntimeError(f"Claude {r.status_code}: {r.text[:120]}")
     blocos = r.json().get("content", [])
@@ -85,7 +89,7 @@ def _claude(key, mid, system, messages):
     return next((b.get("text", "") for b in blocos if b.get("type") == "text"), "")
 
 
-def _openai(key, mid, system, messages):
+def _openai(key, mid, system, messages, ferramenta=None):
     import requests
     r = requests.post("https://api.openai.com/v1/chat/completions", timeout=40,
                       headers={"Authorization": f"Bearer {key}"},
@@ -99,7 +103,7 @@ def _openai(key, mid, system, messages):
     return r.json()["choices"][0]["message"]["content"]
 
 
-def _gemini(key, mid, system, messages):
+def _gemini(key, mid, system, messages, ferramenta=None):
     import requests
     contents = [{"role": "user" if m["role"] == "user" else "model",
                  "parts": [{"text": m["content"]}]} for m in messages]
@@ -114,14 +118,15 @@ def _gemini(key, mid, system, messages):
     return r.json()["candidates"][0]["content"]["parts"][0]["text"]
 
 
-def chamar_llm(system, messages, modelo=None):
-    """Despacha para o provedor do modelo ativo (ou do `modelo` explícito)."""
+def chamar_llm(system, messages, modelo=None, ferramenta=None):
+    """Despacha para o provedor do modelo ativo (ou do `modelo` explícito).
+    `ferramenta` só afeta o Claude (tool use); OpenAI/Gemini já pedem JSON genérico."""
     prov, mid = modelo_atual() if not modelo else (modelo.partition(":")[0], modelo.partition(":")[2])
     key = chave_do(prov)
     if not key:
         raise RuntimeError(f"sem chave para o provedor '{prov}'")
     fn = {"claude": _claude, "openai": _openai, "gemini": _gemini}[prov]
-    return fn(key, mid, system, messages)
+    return fn(key, mid, system, messages, ferramenta)
 
 
 def testar_modelo(modelo):
@@ -340,7 +345,7 @@ def cerebro_llm(ont, lead, mensagem_lead, historico=None):
         tentativas.append(f"claude:{os.environ.get('ANTHROPIC_MODEL', 'claude-sonnet-4-6')}")
     for m in tentativas:
         try:
-            data = _json(chamar_llm(sysp, turns, modelo=m))
+            data = _json(chamar_llm(sysp, turns, modelo=m, ferramenta=_FERRAMENTA))
             if not data or data.get("proxima_acao") not in C.ACOES:
                 raise ValueError("saída do LLM inválida")
             # guarda anti-placeholder: ação conversacional exige mensagem de verdade

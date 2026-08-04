@@ -63,7 +63,7 @@ def _enviar_template(est, ont, wa, l, nome):
     if r.get("ok"):
         est.set_lead(l["card_id"], reengajos=(l.get("reengajos") or 0) + 1)
         est.add_conversa(l["card_id"], "agente", f"[template {nome}] prazo {prazo}",
-                         wamid=r.get("wamid"), status="enviado")
+                         wamid=r.get("wamid"), status="enviado", autor="template")
     return r
 
 

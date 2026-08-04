@@ -447,7 +447,7 @@ def _primeiro_contato(card_id):
         r = WA.enviar_template(lead["telefone"], tpl, params=params)
         if r.get("ok"):
             EST.add_conversa(card_id, "agente", f"[template {tpl}] {curso}",
-                             wamid=r.get("wamid"), status="enviado")
+                             wamid=r.get("wamid"), status="enviado", autor="template")
             EST.set_lead(card_id, estado_conversa="aguardando_resposta")
             return r
     return r
@@ -499,7 +499,10 @@ def _aprovar_e_enviar(card_id, texto=None, ator="humano"):
             return {"erro": "edição bloqueada pelo Revisor", "bloqueios": rev["bloqueios"]}, 422
     r = WA.enviar(lead["telefone"], texto, forcar=True)   # resposta humana: não trava por horário
     if r.get("ok"):
-        EST.add_conversa(card_id, "agente", texto, wamid=r.get("wamid"), status="enviado")
+        # texto do LLM; se o humano editou antes de aprovar, a correção é sinal p/ o corpus
+        autoria = "llm" if texto == prop["mensagem"] else f"llm+edicao:{ator}"
+        EST.add_conversa(card_id, "agente", texto, wamid=r.get("wamid"), status="enviado",
+                         autor=autoria)
         EST.set_decisao_status(prop["id"], "enviada")
         EST.log_acao(ator, "aprovar_enviar", card_id)
     return {"envio": r}, 200
@@ -515,7 +518,8 @@ def _entregar_represada(card_id):
     lead = EST.get_lead(card_id)
     r = WA.enviar(lead["telefone"], prop["mensagem"], forcar=True)
     if r.get("ok"):
-        EST.add_conversa(card_id, "agente", prop["mensagem"], wamid=r.get("wamid"), status="enviado")
+        EST.add_conversa(card_id, "agente", prop["mensagem"], wamid=r.get("wamid"),
+                         status="enviado", autor="coordenacao")
         EST.set_decisao_status(prop["id"], "enviada")
         EST.log_acao("sistema", "resposta_duvida_represada_entregue", card_id)
         return True
@@ -528,7 +532,7 @@ def _reabrir_conversa(card_id):
     lead = EST.get_lead(card_id)
     r = WA.enviar_template(lead["telefone"], "retomar_atendimento")
     if r.get("ok"):
-        EST.add_conversa(card_id, "agente", "[template retomar_atendimento]",
+        EST.add_conversa(card_id, "agente", "[template retomar_atendimento]", autor="template",
                          wamid=r.get("wamid"), status="enviado")
         EST.log_acao("sistema", "retomada_enviada_duvida_represada", card_id)
     return r
@@ -558,7 +562,8 @@ def conversa_enviar(card_id):
         return jsonify({"erro": "mensagem bloqueada pelo Revisor", "bloqueios": rev["bloqueios"]}), 422
     r = WA.enviar(lead["telefone"], texto, forcar=True)   # envio humano: passa fora do horário
     if r.get("ok"):
-        EST.add_conversa(card_id, "agente", texto, wamid=r.get("wamid"), status="enviado")
+        EST.add_conversa(card_id, "agente", texto, wamid=r.get("wamid"), status="enviado",
+                         autor=f"humano:{session.get('usuario','humano')}")
         EST.set_lead(card_id, estado_conversa="aguardando_resposta")
         prop = EST.decisao_pendente(card_id)
         if prop:   # humano respondeu por fora -> a proposta do agente fica obsoleta
@@ -591,7 +596,8 @@ def conversa_enviar_midia(card_id):
         if legenda and not r.get("legenda_enviada"):
             t = WA.enviar(lead["telefone"], legenda, forcar=True)
             if t.get("ok"):
-                EST.add_conversa(card_id, "agente", legenda, wamid=t.get("wamid"), status="enviado")
+                EST.add_conversa(card_id, "agente", legenda, wamid=t.get("wamid"), status="enviado",
+                                 autor=f"humano:{session.get('usuario','humano')}")
         EST.add_conversa(card_id, "agente", legenda if r.get("legenda_enviada") else "",
                          tipo=r.get("tipo"), media_id=r.get("media_id"),
                          wamid=r.get("wamid"), status="enviado")
@@ -799,7 +805,8 @@ def conversa_enviar_template(card_id):
     r = WA.enviar_template(lead["telefone"], tpl["nome"], idioma=tpl["idioma"], params=params or None)
     if r.get("ok"):
         rotulo = f"[template {tpl['nome']}]" + (f" {' · '.join(params)}" if params else "")
-        EST.add_conversa(card_id, "agente", rotulo, wamid=r.get("wamid"), status="enviado")
+        EST.add_conversa(card_id, "agente", rotulo, wamid=r.get("wamid"), status="enviado",
+                         autor="template")
         if lead.get("estado_conversa") in ("aguardando_1o_contato", "escalado_humano", "manual_humano"):
             EST.set_lead(card_id, estado_conversa="aguardando_resposta")
         EST.log_acao(session.get("usuario", "operador"), f"template {tpl['nome']}", card_id)
@@ -858,11 +865,59 @@ def conversa_recusar(card_id):
 
 @app.route("/api/aprovacoes")
 def aprovacoes():
-    out = []
+    """Fila de intervenção humana — ACIONÁVEL (spec 18).
+
+    Antes isto era uma lista de texto sem botão: quando o agente desistia e pedia
+    humano, virava uma linha perdida no meio de alertas, sem contador no menu e sem
+    como agir. A intervenção humana é o sinal mais importante do sistema (é o que o
+    curador transforma em lição), então ela precisa ser visível e ter ação.
+    """
+    agora = datetime.datetime.now()
+    def _ha_h(ts):
+        try:
+            return round((agora - datetime.datetime.fromisoformat(ts)).total_seconds() / 3600, 1)
+        except (TypeError, ValueError):
+            return None
+
+    itens = []
     for l in EST.listar_leads():
+        if l.get("optout"):
+            continue
+        cid = l["card_id"]
+        # 1) o agente desistiu e pediu humano -> prioridade máxima
         if l["estado_conversa"] == "escalado_humano":
-            out.append({"tipo": "escalonamento", "icone": "ti-alert-triangle",
-                        "texto": f"{l.get('motivo') or 'escalonamento'} · {l['curso']} ({l['nome']})"})
+            itens.append({"tipo": "escalonamento", "prioridade": 1, "card_id": cid,
+                          "nome": l.get("nome") or cid, "curso": l.get("curso"),
+                          "motivo": l.get("motivo") or "o agente pediu ajuda",
+                          "horas": _ha_h(l.get("atualizado")), "acao": "abrir"})
+            continue
+        # 2) lead em modo manual com fala nova esperando resposta humana
+        if (l.get("modo") or "auto") == "manual":
+            hist = EST.historico(cid)
+            ult = hist[-1] if hist else None
+            if ult and ult.get("papel") == "lead":
+                itens.append({"tipo": "manual", "prioridade": 2, "card_id": cid,
+                              "nome": l.get("nome") or cid, "curso": l.get("curso"),
+                              "motivo": "conversa em modo manual — você conduz",
+                              "horas": _ha_h(ult.get("ts")), "acao": "abrir"})
+    # 3) proposta do agente aguardando aprovação para sair
+    for l in EST.listar_leads():
+        if l.get("optout") or l["estado_conversa"] == "escalado_humano":
+            continue
+        prop = EST.decisao_pendente(l["card_id"])
+        if prop:
+            itens.append({"tipo": "proposta", "prioridade": 3, "card_id": l["card_id"],
+                          "nome": l.get("nome") or l["card_id"], "curso": l.get("curso"),
+                          "motivo": (prop.get("mensagem") or "")[:120],
+                          "horas": _ha_h(prop.get("ts")), "acao": "abrir"})
+    # 4) dúvidas abertas para a coordenação
+    for d in EST.listar_duvidas("aberta"):
+        l = EST.get_lead(d["card_id"]) or {}
+        itens.append({"tipo": "duvida", "prioridade": 2, "card_id": d["card_id"],
+                      "nome": l.get("nome") or d["card_id"], "curso": l.get("curso"),
+                      "motivo": d.get("pergunta") or "", "horas": _ha_h(d.get("criado")),
+                      "acao": "duvidas"})
+    # 5) curso encerrado com leads ativos (decisão de negócio, não de conversa)
     ativos = {}
     for l in EST.listar_leads():
         if l["fase"] in ("Lead", "Prospect"):
@@ -870,15 +925,30 @@ def aprovacoes():
     for cod, n in sorted(ativos.items()):
         cap = _ont().captavel(cod)
         if cap.get("existe") and not cap.get("captavel"):
-            out.append({"tipo": "captabilidade", "icone": "ti-calendar-x",
-                        "texto": f"{cod} {cap['status']} · {n} leads ativos"})
+            itens.append({"tipo": "captabilidade", "prioridade": 4, "curso": cod,
+                          "motivo": f"inscrição {cap['status']} · {n} lead(s) ativos",
+                          "acao": "injetor"})
+    # 6) proposta de ontologia aguardando aprovação
     for p in EST.listar_propostas("proposta"):
-        out.append({"tipo": "injetor", "icone": "ti-database-import",
-                    "texto": f"{p['tipo']} · {p['alvo']}", "pid": p["id"]})
-    for a in EST.listar_alertas(5):
-        out.append({"tipo": "alerta", "icone": "ti-alert-circle",
-                    "texto": f"[{a['tipo']}] {a['texto']} · {(a['criado'] or '')[5:16]}"})
-    return jsonify(out)
+        itens.append({"tipo": "injetor", "prioridade": 3, "pid": p["id"],
+                      "motivo": f"{p['tipo']} em {p['alvo']}", "acao": "injetor"})
+
+    itens.sort(key=lambda x: (x["prioridade"], -(x.get("horas") or 0)))
+    agir = [i for i in itens if i["prioridade"] <= 3]
+    alertas = [{"tipo": "alerta", "motivo": f"[{a['tipo']}] {a['texto']}",
+                "horas": _ha_h(a.get("criado"))} for a in EST.listar_alertas(8)]
+    return jsonify({"itens": itens, "alertas": alertas, "agir": len(agir)})
+
+
+@app.route("/api/leads/<card_id>/resolver", methods=["POST"])
+def lead_resolver(card_id):
+    """Operador tratou o escalonamento: devolve a conversa ao fluxo normal."""
+    lead = EST.get_lead(card_id)
+    if not lead:
+        return jsonify({"erro": "lead inexistente"}), 404
+    EST.set_lead(card_id, estado_conversa="aguardando_resposta", motivo="")
+    EST.log_acao(session.get("usuario", "operador"), "escalonamento resolvido", card_id)
+    return jsonify({"ok": True})
 
 
 @app.route("/api/injetor", methods=["POST"])
@@ -1213,12 +1283,23 @@ def _operacoes():
                 EST.add_alerta("degradacao",
                                f"{len(recentes)} respostas caíram no fallback determinístico em 15 min — verificar journalctl")
             h = datetime.datetime.utcnow().hour
-            if h == 6 and not _rodou_hoje("op_backup"):       # 03:30h BRT ~ 06h UTC
+            if h == 6 and not _rodou_hoje("op_backup"):       # 06h BRT (o processo já roda em BRT)
                 fazer_backup()
             if h == 7 and not _rodou_hoje("op_lgpd"):
                 EST.anonimizar_antigos(dias=180)
-            if h == 11 and not _rodou_hoje("op_canario"):     # 08h BRT
+            if h == 11 and not _rodou_hoje("op_canario"):     # 11h BRT
                 _canario()
+            # aprendizado contínuo (spec 18): ingere o novo e destila as resoluções
+            # humanas do dia em lições. 05h BRT — fora do horário de atendimento.
+            if h == 5 and not _rodou_hoje("op_curador"):
+                try:
+                    from atena.corpus import ingestao as _ing, curador as _cur
+                    _ing.rodar()
+                    r = _cur.curar(limite=40)
+                    print(f"[operacoes] curador: {r['licoes']} lição(ões), "
+                          f"{r['descartadas']} descartada(s)", flush=True)
+                except Exception as e:
+                    print(f"[operacoes] curador falhou: {e}", flush=True)
             # reativação comercial: só dentro do horário, a cada ~2h. Nudge em texto livre p/
             # quem travou na janela de 24h; template escalonado p/ quem esfriou fora dela.
             # veredito automático de "não inscreveu" (chave da aba Verificação).

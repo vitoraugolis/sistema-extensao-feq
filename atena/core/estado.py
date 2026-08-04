@@ -91,7 +91,11 @@ class Estado:
                     "ALTER TABLE conversas ADD COLUMN media_id TEXT",
                     "ALTER TABLE conversas ADD COLUMN wamid TEXT",     # id do WhatsApp p/ status
                     "ALTER TABLE conversas ADD COLUMN status TEXT",    # enviado/entregue/lido/falhou
-                    "ALTER TABLE leads ADD COLUMN modo TEXT DEFAULT 'auto'"):  # auto=agente responde; manual=humano conduz
+                    "ALTER TABLE leads ADD COLUMN modo TEXT DEFAULT 'auto'",   # auto=agente responde; manual=humano conduz
+                    # QUEM escreveu a mensagem do 'agente'. Sem isto, texto digitado por
+                    # humano e texto gerado pelo LLM ficam indistinguíveis no banco — e é
+                    # justamente a fala humana que ensina o sistema (corpus, spec 18).
+                    "ALTER TABLE conversas ADD COLUMN autor TEXT"):
             try:
                 self.conn.execute(mig)
             except sqlite3.OperationalError:
@@ -312,18 +316,22 @@ class Estado:
 
     # ------------------------------------------------------------ conversas
     def add_conversa(self, card_id, papel, texto, tipo="texto", media_id=None,
-                     wamid=None, status=None):
+                     wamid=None, status=None, autor=None):
+        """autor: quem produziu a fala do 'agente' — 'humano:<usuario>' (digitada na
+        Central), 'llm' (cérebro), 'template', 'coordenacao'. É o que permite ao corpus
+        aprender com as resoluções humanas (spec 18)."""
         with self._lock:
             self.conn.execute(
-                "INSERT INTO conversas(card_id,papel,texto,tipo,media_id,wamid,status,ts)"
-                " VALUES(?,?,?,?,?,?,?,?)",
-                (card_id, papel, texto, tipo, media_id, wamid, status, _agora()))
+                "INSERT INTO conversas(card_id,papel,texto,tipo,media_id,wamid,status,ts,autor)"
+                " VALUES(?,?,?,?,?,?,?,?,?)",
+                (card_id, papel, texto, tipo, media_id, wamid, status, _agora(), autor))
             self.conn.commit()
 
     def historico(self, card_id):
         with self._lock:
             rows = self.conn.execute(
-                "SELECT papel,texto,tipo,media_id,wamid,status,ts FROM conversas WHERE card_id=? ORDER BY id",
+                "SELECT papel,texto,tipo,media_id,wamid,status,ts,autor FROM conversas"
+                " WHERE card_id=? ORDER BY id",
                 (card_id,)).fetchall()
         return [dict(r) for r in rows]
 

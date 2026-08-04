@@ -154,7 +154,7 @@ def _toque(g, est, ont, wa, p, agora):
                  ts=agora.isoformat(timespec="seconds"))
     est.add_conversa(p["card_id"], "agente",
                      f"[recuperação de inscrição — template {tpl}] prazo {prazo}",
-                     wamid=r.get("wamid"), status="enviado")
+                     wamid=r.get("wamid"), status="enviado", autor="template")
     return p["card_id"]
 
 

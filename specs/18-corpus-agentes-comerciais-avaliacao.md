@@ -213,3 +213,110 @@ produzir número bonito sem significado — e pior, mudar a operação com base 
    2c roda no agendador e é observável na Central.
 3. **Avaliação**: 3.1 visível na Central com série temporal; 3.2/3.3 atrás do
    gate de §3.4, com replay contrafactual antes de qualquer aplicação em lead real.
+
+---
+
+# Revisão de 04/08/2026 — o fluxo de RL do sistema multiagentes
+
+> Escrita depois de instrumentar a autoria das mensagens (`conversas.autor`) e
+> medir o que realmente existe de sinal. Substitui a intenção de §3.2/3.3.
+
+## R1. O erro que quase cometemos: otimizar para conversão
+
+A recompensa "natural" seria a matrícula. Medido: **1 conversão em 265 leads**.
+Um episódio positivo. Qualquer bandit, GA ou PPO treinado nisso ajusta ruído —
+e, pior, produz um número convincente que muda a operação sem base.
+
+## R2. O sinal que EXISTE hoje: autonomia
+
+Com a autoria instrumentada, aparece um rótulo denso e barato:
+
+| Medida | Valor (04/08/2026) |
+|---|---|
+| Conversas engajadas (lead falou) | 113 |
+| Conversas que precisaram de humano | **32 (28%)** |
+| Falas digitadas por humano | 105 |
+| Mensagens geradas pelo LLM | 418 |
+| Escalonamentos abertos agora | 6 |
+| Dúvidas à coordenação | 21 |
+
+**Taxa de autonomia = 72%** — e cada conversa é um episódio rotulado, não um a
+cada 265. É esta a função-objetivo tratável hoje, e ela coincide com o que o
+usuário pediu: *"até resolver todas as dúvidas sem nem mesmo me consultar"*.
+
+Cuidado que impede a métrica de virar perversa: **autonomia sozinha é gamificável**
+— o agente "não precisa de humano" se simplesmente responder qualquer coisa. Por
+isso a recompensa é composta e o Revisor entra com sinal negativo:
+
+```
+r(episódio) = + 1.0 · sem_intervenção_humana
+              + 0.3 · lead_respondeu_depois        (não matou a conversa)
+              + 2.0 · iniciou_inscrição
+              + 8.0 · inscrito                      (raro hoje; peso alto p/ quando vier)
+              − 1.0 · bloqueio_do_Revisor           (autonomia com alucinação não conta)
+              − 2.0 · opt-out                       (dano permanente)
+```
+
+Pesos são iniciais e devem ser recalibrados quando houver ≥30 conversões (§3.4).
+
+## R3. Onde está a "política" num sistema multiagentes
+
+Não há uma política única. Há quatro pontos de decisão, e é neles que se atribui
+crédito quando um episódio precisa de humano:
+
+| Agente | Decide | Falha típica que gera intervenção |
+|---|---|---|
+| Cérebro (LLM) | o que responder, escalar ou consultar | escalou o que já sabia; respondeu vago |
+| Revisor | deixa sair ou bloqueia | bloqueou resposta correta (falso positivo) |
+| Bibliotecário/Corpus | que contexto entrega | não achou o precedente que existia |
+| Nutrição/Funil | quando tocar, com qual template | tocou fora de hora; template errado |
+
+**Atribuição de crédito prática** (sem gradiente): ao registrar uma intervenção,
+gravar a causa observável — `escalou`, `revisor_bloqueou`, `sem_precedente`,
+`lead_insatisfeito`. Isso já é coletável: `decisoes.acao`, `aprovado_revisor` e o
+motivo do escalonamento. Sem essa etiqueta, "melhorar o sistema" é adivinhação.
+
+## R4. O laço de aprendizado que JÁ roda (e por que é o certo agora)
+
+```
+lead pergunta → agente não resolve → HUMANO responde (intervenção = rótulo negativo)
+      ↓                                        ↓
+  corpus busca precedente          curador destila a resolução em LIÇÃO
+      ↑                                        ↓
+      └──────────── lição entra no corpus ─────┘
+                (próxima pergunta parecida: agente resolve sozinho)
+```
+
+Isto é *policy improvement* por memória, não por gradiente. É o método correto
+para este regime: dado escasso, ação discreta, e cada exemplo custa caro (o tempo
+de uma pessoa). Um método de gradiente precisaria de milhares de episódios para
+aprender o que uma lição bem escrita ensina de primeira.
+
+**O que falta instrumentar para fechar o laço** (próximo passo natural):
+a cada intervenção, registrar o TEMA; depois medir *reincidência por tema*.
+Se "prazo de reconhecimento de pagamento" gerou 6 intervenções antes da lição e
+0 depois, a lição funcionou. Essa curva por tema é a evidência de aprendizado —
+mais informativa que uma taxa global.
+
+## R5. Quando (e só então) ligar otimização estatística
+
+| Método | Para quê | Pré-condição |
+|---|---|---|
+| **Bandit contextual** (Thompson) | escolher variante de mensagem/cadência | ≥ 30 episódios por variante |
+| **Algoritmo genético** | ajustar o vetor da cadência (dias entre toques, teto, janela) | replay contrafactual sobre histórico ≥ 100 episódios |
+| **RL por gradiente** | — | **não se justifica**: espaço de ação minúsculo, episódios longos, dado caro |
+
+O GA aqui não experimenta no lead real: avalia sobre o histórico (dado o que
+aconteceu, a política candidata teria tocado antes/depois?). Só a candidata
+vencedora vai a teste real, e mesmo assim atrás do gate de §3.4.
+
+## R6. Painel de aprendizado (o que a Central deve mostrar)
+
+1. **Taxa de autonomia** — conversas sem intervenção / conversas engajadas, por semana.
+2. **Intervenções por tema** — onde o sistema ainda depende de você.
+3. **Reincidência pós-lição** — o tema voltou depois de virar lição?
+4. **Cobertura do corpus** — % de perguntas que acharam precedente acima do limiar.
+5. **Saúde dos guardrails** — bloqueios do Revisor e quedas no determinístico (já em §3.1).
+
+Ordem de implementação sugerida: (1) etiquetar causa/tema da intervenção →
+(2) painel de autonomia → (3) curva de reincidência → só depois (4) bandit.

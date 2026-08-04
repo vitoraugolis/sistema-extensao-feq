@@ -72,12 +72,23 @@ def test_saida_estruturada_do_llm_nao_depende_de_prosa():
     _orig = requests.post
     requests.post = lambda url, **kw: (enviado.update(kw.get("json") or {}), _Resp())[1]
     try:
-        out = CB._claude("k", "claude-sonnet-4-6", "sys", [{"role": "user", "content": "oi"}])
+        out = CB._claude("k", "claude-sonnet-4-6", "sys", [{"role": "user", "content": "oi"}],
+                         ferramenta=CB._FERRAMENTA)
     finally:
         requests.post = _orig
     assert enviado["tool_choice"] == {"type": "tool", "name": "responder_lead"}
     assert enviado["tools"][0]["input_schema"]["properties"]["proxima_acao"]["enum"]
     assert CB._json(out)["mensagem_ao_lead"] == "Oi!"      # veio do tool_use, não do texto
+
+    # 2b) a ferramenta é PARÂMETRO: sem ela, nada de tool_choice. Amarrada ao schema do
+    # cérebro, todo outro consumidor (curador, injetor) recebia o contrato errado.
+    enviado.clear()
+    requests.post = lambda url, **kw: (enviado.update(kw.get("json") or {}), _Resp())[1]
+    try:
+        CB._claude("k", "claude-sonnet-4-6", "sys", [{"role": "user", "content": "oi"}])
+    finally:
+        requests.post = _orig
+    assert "tool_choice" not in enviado and "tools" not in enviado
 
     # 3) OpenAI: sem response_format json_object o modelo responde prosa (era o bug real)
     requests.post = lambda url, **kw: (enviado.update(kw.get("json") or {}),

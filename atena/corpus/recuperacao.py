@@ -53,7 +53,10 @@ def precedentes(mensagem, curso=None, k=MAX_PRECEDENTES, corpus=None):
         # resposta que temos veio de outro curso. Como precedente não é fonte de
         # fato (o registro do curso é), aproveitar entre cursos é seguro e útil.
         for escopo in ([curso, None] if curso else [None]):
-            for tipo in ("duvida", "qa"):   # coordenação primeiro: fonte autorizada
+            # ordem de valor: lição curada de resolução HUMANA > resposta da coordenação
+            # > precedente qualquer. O que uma pessoa escreveu para resolver o problema
+            # vale mais que o que o próprio agente já respondeu.
+            for tipo in ("licao", "duvida", "qa"):
                 for x in c.buscar(mensagem, k=k * 2, tipo=tipo, curso=escopo, minimo=LIMIAR):
                     resp = (x["meta"] or {}).get("resposta")
                     if not _util(resp) or x["chave"] in vistos:
@@ -62,7 +65,8 @@ def precedentes(mensagem, curso=None, k=MAX_PRECEDENTES, corpus=None):
                     achados.append({"pergunta": x["texto"], "resposta": resp,
                                     "escore": x["escore"], "tipo": tipo,
                                     "mesmo_curso": (x["meta"] or {}).get("curso") == curso})
-        achados.sort(key=lambda a: (a["tipo"] != "duvida", not a["mesmo_curso"], -a["escore"]))
+        ordem = {"licao": 0, "duvida": 1, "qa": 2}
+        achados.sort(key=lambda a: (ordem.get(a["tipo"], 9), not a["mesmo_curso"], -a["escore"]))
         return achados[:k]
     except Exception as e:
         print(f"[corpus] recuperação indisponível ({type(e).__name__}: {e})", flush=True)
@@ -76,7 +80,8 @@ def bloco_prompt(mensagem, curso=None, corpus=None):
         return ""
     linhas = "\n".join(
         f"- Já perguntaram: \"{a['pergunta'][:180]}\"\n  Respondemos: \"{a['resposta'][:400]}\""
-        + ("   [resposta da COORDENAÇÃO — fonte autorizada]" if a["tipo"] == "duvida" else "")
+        + {"licao": "   [LIÇÃO — foi assim que um humano resolveu este problema]",
+           "duvida": "   [resposta da COORDENAÇÃO — fonte autorizada]"}.get(a["tipo"], "")
         for a in achados)
     return (
         "PRECEDENTES (como já respondemos perguntas parecidas):\n" + linhas + "\n"
