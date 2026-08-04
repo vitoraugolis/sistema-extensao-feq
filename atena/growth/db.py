@@ -12,6 +12,14 @@ from pathlib import Path
 
 DEFAULT_DB = Path(__file__).resolve().parents[1] / "data" / "atena.db"
 
+
+def _db_padrao():
+    """Growth e Estado gravam no MESMO arquivo. Cada um com sua constante já causou
+    dano: apontar só o Estado para outro banco (teste/preview) fazia o Growth
+    continuar escrevendo no real. Resolve em tempo de chamada, com uma fonte só."""
+    from atena.core.estado import DEFAULT_DB as _EST_DB
+    return _EST_DB
+
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS cursos_metas(
   curso TEXT PRIMARY KEY, turma TEXT, url TEXT,
@@ -64,7 +72,7 @@ def _agora():
 
 class Growth:
     def __init__(self, db=None):
-        self.path = ":memory:" if db == ":memory:" else str(db or DEFAULT_DB)
+        self.path = ":memory:" if db == ":memory:" else str(db or _db_padrao())
         if self.path != ":memory:":
             Path(self.path).parent.mkdir(parents=True, exist_ok=True)
         self.conn = sqlite3.connect(self.path, check_same_thread=False)

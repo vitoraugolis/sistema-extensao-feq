@@ -104,6 +104,11 @@ input:focus,select:focus,textarea:focus{outline:none;box-shadow:3px 3px 0 var(--
 .conv-tpl select{width:100%;}
 .tpl-campo{display:block;margin-top:6px;}
 .tpl-campo span{display:block;font-size:11px;margin-bottom:2px;}
+/* Faixa da decisão automática da Verificação */
+.vf-auto{display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:var(--paper);
+ border:2px solid var(--b);border-radius:11px;padding:10px 13px;margin-bottom:12px;}
+.vf-auto.on{background:var(--laranjinha);border-color:var(--guara);}
+
 /* Chave estilo iOS — liga o modo de mover leads no funil */
 .chave{display:inline-flex;align-items:center;gap:8px;cursor:pointer;user-select:none;font-size:12.5px;font-weight:600;}
 .chave input{position:absolute;opacity:0;width:0;height:0;}
@@ -286,6 +291,7 @@ input:focus,select:focus,textarea:focus{outline:none;box-shadow:3px 3px 0 var(--
             registre o desfecho: <strong>Inscreveu</strong> move o lead para Inscrito no funil (e reporta
             a conversão à Meta); <strong>Não inscreveu</strong> mantém como Lead e o agente envia a
             mensagem de recuperação imediatamente.</p>
+          <div id="vfAuto"></div>
           <div id="vfs"></div>
         </div>
       </section>
@@ -508,9 +514,11 @@ async function carregar(){
 
   const vf = await api('/api/verificacao');
   const vc = document.getElementById('vfCount');
-  if(Array.isArray(vf)){
-    vc.style.display = vf.length ? 'inline-flex' : 'none'; vc.textContent = vf.length;
-    $('#vfs').innerHTML = vf.length ? vf.map(v=>`
+  if(vf && Array.isArray(vf.pendentes)){
+    const lst = vf.pendentes;
+    vc.style.display = lst.length ? 'inline-flex' : 'none'; vc.textContent = lst.length;
+    if(!VF_MEXENDO) renderVerifAuto(vf);           // não recriar o controle enquanto o operador mexe
+    $('#vfs').innerHTML = lst.length ? lst.map(v=>`
       <div class="row">
         <i class="ti ti-user-search"></i>
         <span><strong>${v.nome||'(sem nome)'}</strong> · ${v.telefone||''} · ${v.curso}
@@ -789,6 +797,56 @@ async function aprovarProposta(pid){
   const r = await api('/api/injetor/'+pid+'/aprovar',{method:'POST'});
   if(r.ok){ $('#injout').innerHTML = `<div class="row t-ok" style="background:var(--mint);"><i class="ti ti-circle-check"></i><span>Aplicado e versionado (${r.versao.versao}). Ontologia recarregada.</span></div>`; carregar(); }
   else { $('#injout').innerHTML = `<div class="row t-bad" style="background:var(--rosa);"><i class="ti ti-ban"></i><span>${r.erro}</span></div>`; }
+}
+
+// -------------------------------------- Verificação: veredito automático
+// Diferente da chave do funil, esta é config de SERVIDOR: a decisão roda no
+// agendador, sem navegador aberto. Por isso vai para /api/config, não localStorage.
+let VF_MEXENDO = false;   // trava o re-render do polling enquanto o operador ajusta
+
+function renderVerifAuto(vf){
+  const cx = $('#vfAuto'); if(!cx) return;
+  const opcoes = [6, 12, 24, 48, 72, 168].filter(h => h >= (vf.min_horas||6));
+  cx.innerHTML = `
+    <div class="vf-auto ${vf.auto?'on':''}">
+      <label class="chave" title="Decide sozinho 'não inscreveu' para pendências antigas, no mesmo caminho do botão.">
+        <input type="checkbox" id="vfAutoChk" ${vf.auto?'checked':''} onchange="vfAutoSalvar()">
+        <span class="trilho"><span class="btn-chave"></span></span>
+        <span>Decidir "não inscreveu" automaticamente</span>
+      </label>
+      <label class="muted" style="display:flex;align-items:center;gap:6px;">após
+        <select id="vfAutoH" onchange="vfAutoSalvar()" style="width:auto;padding:4px 8px;font-size:12px;">
+          ${opcoes.map(h=>`<option value="${h}" ${h===vf.horas?'selected':''}>${h<24?h+'h':(h/24)+' dia'+(h>24?'s':'')}</option>`).join('')}
+        </select> sem confirmação
+      </label>
+      ${vf.auto?`<button class="btn btn-g" style="padding:5px 10px;" onclick="vfAutoAgora()"><i class="ti ti-player-play"></i> Aplicar agora (${vf.elegiveis})</button>`:''}
+      <span class="muted" style="flex-basis:100%;font-size:11.5px;margin-top:2px;">
+        ${vf.auto
+          ? `<strong>${vf.elegiveis}</strong> de ${vf.pendentes.length} pendência(s) já passaram de ${vf.horas}h. A decisão automática roda a cada 15 min, só no horário comercial (ela dispara o toque de recuperação), no máximo 15 por vez.`
+          : 'Desligada: cada pendência espera o seu veredito. Ligue para limpar sozinho a fila de quem não concluiu.'}
+      </span>
+      <div id="vfAutoOut" style="flex-basis:100%;"></div>
+    </div>`;
+}
+async function vfAutoSalvar(){
+  VF_MEXENDO = true;
+  const body = {verif_auto: $('#vfAutoChk').checked,
+                verif_auto_horas: parseInt($('#vfAutoH').value, 10)};
+  const r = await api('/api/config',{method:'POST',headers:{'Content-Type':'application/json'},
+                                     body:JSON.stringify(body)});
+  VF_MEXENDO = false;
+  if(r.erro){ $('#vfAutoOut').innerHTML = `<span class="chip t-bad">${escapeHtml(r.erro)}</span>`; return; }
+  carregar();
+}
+async function vfAutoAgora(){
+  if(!confirm('Aplicar "não inscreveu" nas pendências vencidas agora? Cada uma recebe o toque de recuperação.')) return;
+  $('#vfAutoOut').innerHTML = '<span class="chip t-acc"><i class="ti ti-loader"></i> aplicando…</span>';
+  const r = await api('/api/verificacao/auto',{method:'POST'});
+  if(r.erro){ $('#vfAutoOut').innerHTML = `<span class="chip t-bad">${escapeHtml(r.erro)}</span>`; return; }
+  const n = (r.aplicados||[]).length, com = (r.aplicados||[]).filter(a=>a.toque).length;
+  await carregar();          // recria a faixa ANTES de escrever, senão o resultado some
+  const cx = $('#vfAutoOut');
+  if(cx) cx.innerHTML = `<span class="chip t-ok"><i class="ti ti-check"></i> ${n} decidida(s), ${com} com toque de recuperação enviado</span>`;
 }
 
 async function verificar(id, sim){

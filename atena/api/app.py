@@ -276,7 +276,51 @@ def verificacao_lista():
         out.append({**p, "nome": l.get("nome"), "telefone": l.get("telefone"),
                     "fase": l.get("fase")})
     out.sort(key=lambda x: x.get("ultimo_checkout") or "", reverse=True)
-    return jsonify(out)
+    return jsonify({"pendentes": out, "auto": CFG["verif_auto"],
+                    "horas": CFG["verif_auto_horas"], "min_horas": VERIF_AUTO_MIN_H,
+                    "elegiveis": len(_verif_elegiveis())})
+
+
+def _verif_elegiveis(horas=None, agora=None):
+    """Pendências antigas o bastante para o veredito automático de 'não inscreveu'."""
+    horas = horas if horas is not None else CFG["verif_auto_horas"]
+    agora = agora or datetime.datetime.now()
+    fora = []
+    for p in GRW.verificacoes_pendentes():
+        try:
+            idade = (agora - datetime.datetime.fromisoformat(p["ultimo_checkout"])).total_seconds() / 3600
+        except (TypeError, ValueError):
+            continue
+        if idade >= horas:
+            fora.append({**p, "horas": round(idade, 1)})
+    return fora
+
+
+def _verificacao_auto(limite=15, agora=None):
+    """Aplica 'não inscreveu' nas pendências vencidas — o MESMO caminho do botão do
+    operador (grava verificacao_negativa e dispara o próximo toque da cadência, que
+    tem guardas próprias: teto de toques, opt-out, lead que já respondeu, curso
+    captável). Teto por passada para não virar disparo em massa ao ligar a chave."""
+    feitos = []
+    for p in _verif_elegiveis(agora=agora)[:limite]:
+        cid = p["card_id"]
+        lead = EST.get_lead(cid)
+        if not lead:
+            continue
+        GRW.add_evento(cid, lead.get("curso") or "", "verificacao_negativa")
+        r = growth_funil.ativar_um(GRW, EST, ONTO.ont, WA, cid)
+        EST.log_acao("auto", f"verificação automática: NÃO inscrito após "
+                             f"{p['horas']}h ({'toque enviado' if r.get('ok') else r.get('motivo', '-')})", cid)
+        feitos.append({"card_id": cid, "horas": p["horas"], "toque": r.get("ok", False)})
+    return feitos
+
+
+@app.route("/api/verificacao/auto", methods=["POST"])
+def verificacao_auto_agora():
+    """Roda a passada agora (o operador não precisa esperar o agendador)."""
+    if not CFG["verif_auto"]:
+        return jsonify({"erro": "a decisão automática está desligada"}), 409
+    return jsonify({"aplicados": _verificacao_auto()})
 
 
 @app.route("/api/leads/<card_id>/verificar", methods=["POST"])
@@ -401,7 +445,14 @@ def conversa_iniciar():
     return jsonify({"card_id": card_id, "envio": _primeiro_contato(card_id)})
 
 
-CFG = {"auto_aprovar": EST.get_config("auto_aprovar") == "1"}   # persistido: deploys reiniciam o serviço
+# Piso do limiar da verificação automática. Decidir "não inscreveu" cedo demais é
+# pior que não decidir: o lead que ACABOU de se inscrever receberia um "você não
+# terminou". 6h é o mínimo que a Extecamp leva para refletir boleto/pagamento.
+VERIF_AUTO_MIN_H = 6
+
+CFG = {"auto_aprovar": EST.get_config("auto_aprovar") == "1",   # persistido: deploys reiniciam o serviço
+       "verif_auto": EST.get_config("verif_auto") == "1",
+       "verif_auto_horas": int(EST.get_config("verif_auto_horas") or 48)}
 
 
 def _aprovar_e_enviar(card_id, texto=None, ator="humano"):
@@ -732,6 +783,18 @@ def config_ep():
             CFG["auto_aprovar"] = bool(b.get("auto_aprovar"))
             EST.set_config("auto_aprovar", "1" if CFG["auto_aprovar"] else "0")
             EST.log_acao("operador", f"auto_aprovar={CFG['auto_aprovar']}")
+        if "verif_auto" in b:
+            CFG["verif_auto"] = bool(b.get("verif_auto"))
+            EST.set_config("verif_auto", "1" if CFG["verif_auto"] else "0")
+            EST.log_acao(session.get("usuario", "operador"), f"verif_auto={CFG['verif_auto']}")
+        if "verif_auto_horas" in b:
+            try:
+                h = max(VERIF_AUTO_MIN_H, min(720, int(b["verif_auto_horas"])))
+            except (TypeError, ValueError):
+                return jsonify({"erro": "verif_auto_horas deve ser inteiro"}), 400
+            CFG["verif_auto_horas"] = h
+            EST.set_config("verif_auto_horas", str(h))
+            EST.log_acao(session.get("usuario", "operador"), f"verif_auto_horas={h}")
         if b.get("modelo"):
             prov = b["modelo"].partition(":")[0]
             if prov not in PROVEDORES or ":" not in b["modelo"]:
@@ -1114,6 +1177,14 @@ def _operacoes():
                 _canario()
             # reativação comercial: só dentro do horário, a cada ~2h. Nudge em texto livre p/
             # quem travou na janela de 24h; template escalonado p/ quem esfriou fora dela.
+            # veredito automático de "não inscreveu" (chave da aba Verificação).
+            # Só no horário comercial: o caminho envia template ao lead.
+            if CFG["verif_auto"] and G.dentro_janela() \
+                    and _t.time() - float(EST.get_config("op_verif_auto") or 0) > 900:
+                EST.set_config("op_verif_auto", str(_t.time()))
+                feitos = _verificacao_auto()
+                if feitos:
+                    print(f"[operacoes] verificação automática: {len(feitos)} decidido(s)", flush=True)
             if G.dentro_janela() and _t.time() - float(EST.get_config("op_reativacao") or 0) > 7200:
                 EST.set_config("op_reativacao", str(_t.time()))
                 res = nutricao.reativar(EST, ONTO.ont, WA, propor=ORQ.propor_reativacao)
