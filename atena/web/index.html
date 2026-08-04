@@ -104,6 +104,26 @@ input:focus,select:focus,textarea:focus{outline:none;box-shadow:3px 3px 0 var(--
 .conv-tpl select{width:100%;}
 .tpl-campo{display:block;margin-top:6px;}
 .tpl-campo span{display:block;font-size:11px;margin-bottom:2px;}
+/* Chave estilo iOS — liga o modo de mover leads no funil */
+.chave{display:inline-flex;align-items:center;gap:8px;cursor:pointer;user-select:none;font-size:12.5px;font-weight:600;}
+.chave input{position:absolute;opacity:0;width:0;height:0;}
+.chave .trilho{width:44px;height:26px;border-radius:999px;background:#cfcfcf;border:2px solid var(--b);
+ position:relative;transition:background .18s ease;flex-shrink:0;}
+.chave .btn-chave{position:absolute;top:1px;left:1px;width:20px;height:20px;border-radius:50%;
+ background:#fff;border:2px solid var(--b);transition:transform .18s ease;}
+.chave input:checked + .trilho{background:var(--guara);}
+.chave input:checked + .trilho .btn-chave{transform:translateX(18px);}
+.chave input:focus-visible + .trilho{box-shadow:0 0 0 3px var(--sun);}
+
+/* Modo mover: card vira alça de arraste; coluna vira alvo */
+.kb-board.movendo .kb-card{cursor:grab;touch-action:none;}
+.kb-board.movendo .kb-card:active{cursor:grabbing;}
+.kb-board.movendo .kb-col{border-style:dashed;}
+.kb-card.arrastando{opacity:.35;}
+.kb-fantasma{position:fixed;z-index:60;pointer-events:none;width:196px;opacity:.95;
+ transform:rotate(-1.5deg);box-shadow:6px 6px 0 var(--b);margin:0;}
+.kb-col.alvo{background:var(--laranjinha);border-color:var(--guara);border-style:solid;}
+
 /* Medição do funil — barras proporcionais + destaque do gargalo */
 .md-etapa{margin-bottom:11px;}
 .md-rot{font-size:12.5px;margin-bottom:3px;}
@@ -225,8 +245,13 @@ input:focus,select:focus,textarea:focus{outline:none;box-shadow:3px 3px 0 var(--
             <input id="kbBusca" placeholder="Buscar por nome ou telefone…" oninput="renderKanban()"
                    style="width:auto;flex:1;min-width:180px;max-width:320px;padding:5px 9px;font-size:12.5px;margin-left:auto;">
             <select id="kbFiltro" onchange="renderKanban()" style="width:auto;padding:5px 9px;font-size:12.5px;"><option value="">Todos os cursos</option></select>
+            <label class="chave" title="Ligado: arraste os cards entre as fases. Desligado: clicar abre a conversa.">
+              <input type="checkbox" id="kbMover" onchange="kbModoMover(this.checked)">
+              <span class="trilho"><span class="btn-chave"></span></span>
+              <span>Mover leads</span>
+            </label>
           </div>
-          <p class="muted" style="margin:6px 2px 10px;">Clique num card para abrir a conversa. A busca ignora acentos e a máscara do telefone; o filtro considera todos os cursos de interesse do lead.</p>
+          <p class="muted" style="margin:6px 2px 10px;"><span id="kbDica">Clique num card para abrir a conversa.</span> A busca ignora acentos e a máscara do telefone; o filtro considera todos os cursos de interesse do lead.</p>
           <div class="kb-board" id="kbBoard"></div>
         </div>
       </section>
@@ -785,6 +810,7 @@ function _busca(s){ return (s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'
 function _digitos(s){ return (s||'').replace(/\D/g,''); }
 
 async function renderKanban(){
+  if(KB_ARRASTE) return;          // polling não pode recriar o board no meio de um arraste
   const d = await api('/api/kanban');
   if(!d.colunas) return;
   const filtro = ($('#kbFiltro')||{}).value || '';
@@ -793,12 +819,14 @@ async function renderKanban(){
   const casa = c => !q || _busca(c.nome).includes(q) || _busca(c.id).includes(q)
     || (qNum && _digitos(c.telefone).includes(qNum));
   const passa = c => (!filtro || (c.cursos||[c.curso]).includes(filtro)) && casa(c);
-  $('#kbBoard').innerHTML = d.colunas.map(col=>{
+  const board = $('#kbBoard');
+  board.innerHTML = d.colunas.map(col=>{
     const leads = col.leads.filter(passa);
-    return `<div class="kb-col">
+    return `<div class="kb-col" data-fase="${escapeHtml(col.fase)}">
       <div class="kb-col-h"><span>${col.fase}</span><span class="kb-count">${leads.length}</span></div>
       ${leads.map(kbCard).join('') || '<div class="kb-empty">—</div>'}
     </div>`;}).join('');
+  board.classList.toggle('movendo', KB_MOVER);
 }
 function kbCard(c){
   const b = [];
@@ -809,12 +837,85 @@ function kbCard(c){
   if(c.curso_encerrado) b.push('<span class="chip t-bad" style="margin:0;">curso encerrado</span>');
   const extra = (c.cursos||[]).length - 1;   // além do ativo
   const cursoTxt = c.curso + (extra>0?` <span class="chip t-acc" style="margin:0;padding:1px 6px;" title="${escapeHtml((c.cursos||[]).join(', '))}">+${extra}</span>`:'');
-  return `<div class="kb-card" onclick="abrirDoKanban('${c.id}')">
+  return `<div class="kb-card" data-id="${escapeHtml(c.id)}" onclick="kbClique('${c.id}')">
     <div class="kb-nome"><span class="conv-ava" style="width:22px;height:22px;font-size:9.5px;">${c.iniciais}</span>${escapeHtml(c.nome)}</div>
     <div class="kb-sub">${cursoTxt} · ${c.ha}</div>
     ${b.length?`<div class="kb-badges">${b.join('')}</div>`:''}
   </div>`;
 }
+// ------------------------------------------------- funil: modo mover (arrastar)
+// Pointer Events em vez do drag-and-drop nativo do HTML5: um caminho só atende
+// mouse e toque. O nativo não dispara em tela sensível ao toque, e a Central é
+// usada também em tablet.
+let KB_MOVER = false;     // chave ligada?
+let KB_ARRASTE = null;    // {id, origem, fantasma, dx, dy} enquanto arrasta
+
+function kbModoMover(ligado){
+  KB_MOVER = !!ligado;
+  const b = $('#kbBoard'); if(b) b.classList.toggle('movendo', KB_MOVER);
+  const dica = $('#kbDica');
+  if(dica) dica.innerHTML = KB_MOVER
+    ? '<strong>Modo mover ligado:</strong> arraste os cards entre as fases (o clique não abre a conversa).'
+    : 'Clique num card para abrir a conversa.';
+  try{ localStorage.setItem('kbMover', KB_MOVER ? '1' : ''); }catch(e){}
+}
+function kbClique(id){
+  if(KB_MOVER) return;    // no modo mover, clicar não abre a conversa
+  abrirDoKanban(id);
+}
+function kbColunaEm(x, y){
+  const el = document.elementFromPoint(x, y);
+  return el && el.closest ? el.closest('.kb-col') : null;
+}
+function kbRealce(col){
+  document.querySelectorAll('.kb-col.alvo').forEach(c=>{ if(c!==col) c.classList.remove('alvo'); });
+  if(col) col.classList.add('alvo');
+}
+function kbInicio(ev){
+  if(!KB_MOVER || KB_ARRASTE) return;
+  if(ev.pointerType === 'mouse' && ev.button !== 0) return;
+  const card = ev.target.closest && ev.target.closest('.kb-card');
+  if(!card || !card.dataset.id) return;
+  const r = card.getBoundingClientRect();
+  const fantasma = card.cloneNode(true);
+  fantasma.className = 'kb-card kb-fantasma';
+  fantasma.style.left = r.left + 'px'; fantasma.style.top = r.top + 'px';
+  document.body.appendChild(fantasma);
+  card.classList.add('arrastando');
+  KB_ARRASTE = {id: card.dataset.id, card, fantasma,
+                origem: card.closest('.kb-col'),
+                dx: ev.clientX - r.left, dy: ev.clientY - r.top};
+  card.setPointerCapture(ev.pointerId);
+  ev.preventDefault();
+}
+function kbMove(ev){
+  if(!KB_ARRASTE) return;
+  KB_ARRASTE.fantasma.style.left = (ev.clientX - KB_ARRASTE.dx) + 'px';
+  KB_ARRASTE.fantasma.style.top  = (ev.clientY - KB_ARRASTE.dy) + 'px';
+  KB_ARRASTE.fantasma.style.display = 'none';        // não deixa o fantasma ser o alvo
+  const col = kbColunaEm(ev.clientX, ev.clientY);
+  KB_ARRASTE.fantasma.style.display = '';
+  kbRealce(col && col !== KB_ARRASTE.origem ? col : null);
+  ev.preventDefault();
+}
+async function kbFim(ev){
+  if(!KB_ARRASTE) return;
+  const {card, fantasma, origem, id} = KB_ARRASTE;
+  fantasma.style.display = 'none';
+  const col = kbColunaEm(ev.clientX, ev.clientY);
+  fantasma.remove(); card.classList.remove('arrastando');
+  kbRealce(null);
+  KB_ARRASTE = null;                                  // libera o polling
+  const fase = col && col.dataset ? col.dataset.fase : null;
+  if(!fase || col === origem) return;                 // soltou fora ou na mesma coluna
+  await moverFase(id, fase);
+  renderKanban();
+}
+document.addEventListener('pointerdown', kbInicio, true);
+document.addEventListener('pointermove', kbMove, true);
+document.addEventListener('pointerup', kbFim, true);
+document.addEventListener('pointercancel', kbFim, true);
+
 function abrirDoKanban(id){
   document.querySelector('.navi[data-sec="conversas"]').click();
   abrirConversa(id);
@@ -1186,6 +1287,10 @@ async function boot(){
   PAPEL = me.papel||'';
   const cfg=await api('/api/config'); AUTO=!!cfg.auto_aprovar; pintaAuto();
   CFGSRV = cfg; cfgRender(); usrListar();
+  try{                                    // a chave do funil sobrevive ao recarregar
+    const salvo = localStorage.getItem('kbMover') === '1';
+    const chk = $('#kbMover'); if(chk){ chk.checked = salvo; kbModoMover(salvo); }
+  }catch(e){}
   LOGADO=true; carregar();
 }
 setInterval(()=>{ if(LOGADO) carregar(); }, 5000);
