@@ -806,7 +806,9 @@ let VF_MEXENDO = false;   // trava o re-render do polling enquanto o operador aj
 
 function renderVerifAuto(vf){
   const cx = $('#vfAuto'); if(!cx) return;
-  const opcoes = [6, 12, 24, 48, 72, 168].filter(h => h >= (vf.min_horas||6));
+  const opcoes = [0, 6, 12, 24, 48, 72, 168].filter(h => h >= (vf.min_horas||0));
+  const rotulo = h => h === 0 ? 'imediatamente' : (h < 24 ? h+'h' : (h/24)+' dia'+(h>24?'s':''));
+  const imediato = vf.horas === 0;
   cx.innerHTML = `
     <div class="vf-auto ${vf.auto?'on':''}">
       <label class="chave" title="Decide sozinho 'não inscreveu' para pendências antigas, no mesmo caminho do botão.">
@@ -814,16 +816,18 @@ function renderVerifAuto(vf){
         <span class="trilho"><span class="btn-chave"></span></span>
         <span>Decidir "não inscreveu" automaticamente</span>
       </label>
-      <label class="muted" style="display:flex;align-items:center;gap:6px;">após
+      <label class="muted" style="display:flex;align-items:center;gap:6px;">
         <select id="vfAutoH" onchange="vfAutoSalvar()" style="width:auto;padding:4px 8px;font-size:12px;">
-          ${opcoes.map(h=>`<option value="${h}" ${h===vf.horas?'selected':''}>${h<24?h+'h':(h/24)+' dia'+(h>24?'s':'')}</option>`).join('')}
-        </select> sem confirmação
+          ${opcoes.map(h=>`<option value="${h}" ${h===vf.horas?'selected':''}>${rotulo(h)}</option>`).join('')}
+        </select> ${imediato ? 'ao chegar da LP' : 'sem confirmação'}
       </label>
       ${vf.auto?`<button class="btn btn-g" style="padding:5px 10px;" onclick="vfAutoAgora()"><i class="ti ti-player-play"></i> Aplicar agora (${vf.elegiveis})</button>`:''}
       <span class="muted" style="flex-basis:100%;font-size:11.5px;margin-top:2px;">
-        ${vf.auto
-          ? `<strong>${vf.elegiveis}</strong> de ${vf.pendentes.length} pendência(s) já passaram de ${vf.horas}h. A decisão automática roda a cada 15 min, só no horário comercial (ela dispara o toque de recuperação), no máximo 15 por vez.`
-          : 'Desligada: cada pendência espera o seu veredito. Ligue para limpar sozinho a fila de quem não concluiu.'}
+        ${!vf.auto
+          ? 'Desligada: cada pendência espera o seu veredito. Ligue para limpar sozinho a fila de quem não concluiu.'
+          : imediato
+            ? `<strong>Modo imediato:</strong> assim que o lead envia o formulário da LP, ele já sai da fila e recebe no WhatsApp o template de abertura com o link (<em>feq_lead</em>) — não é uma cobrança de "você não terminou". Em troca, não sobra janela para conferir na Extecamp antes. Quem falou com a gente nos últimos 15 min é pulado, para não repetir o mesmo template.`
+            : `<strong>${vf.elegiveis}</strong> de ${vf.pendentes.length} pendência(s) já passaram de ${rotulo(vf.horas)}. Roda a cada 15 min, só no horário comercial (dispara o toque de recuperação), no máximo 15 por vez.`}
       </span>
       <div id="vfAutoOut" style="flex-basis:100%;"></div>
     </div>`;

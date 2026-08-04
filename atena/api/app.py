@@ -296,16 +296,41 @@ def _verif_elegiveis(horas=None, agora=None):
     return fora
 
 
-def _verificacao_auto(limite=15, agora=None):
+def _falou_agora_ha_pouco(card_id, agora=None):
+    """Mandamos mensagem a este lead nos últimos minutos? Evita repetir o mesmo
+    template em segundos quando o lead veio do Meta (já recebeu a abertura) e logo
+    depois preenche o formulário da LP."""
+    agora = agora or datetime.datetime.now()
+    ult = None
+    for h in EST.historico(card_id):
+        if h.get("papel") == "agente" and h.get("ts"):
+            ult = h["ts"]
+    if not ult:
+        return False
+    try:
+        return (agora - datetime.datetime.fromisoformat(ult)).total_seconds() < VERIF_AUTO_SILENCIO_S
+    except (TypeError, ValueError):
+        return False
+
+
+def _verificacao_auto(limite=15, agora=None, apenas=None):
     """Aplica 'não inscreveu' nas pendências vencidas — o MESMO caminho do botão do
     operador (grava verificacao_negativa e dispara o próximo toque da cadência, que
     tem guardas próprias: teto de toques, opt-out, lead que já respondeu, curso
-    captável). Teto por passada para não virar disparo em massa ao ligar a chave."""
+    captável). Teto por passada para não virar disparo em massa ao ligar a chave.
+    `apenas`: restringe a um card (modo imediato, chamado pelo webhook da LP)."""
     feitos = []
-    for p in _verif_elegiveis(agora=agora)[:limite]:
+    alvos = _verif_elegiveis(agora=agora)
+    if apenas:
+        alvos = [p for p in alvos if p["card_id"] == apenas]
+    for p in alvos[:limite]:
         cid = p["card_id"]
         lead = EST.get_lead(cid)
         if not lead:
+            continue
+        if _falou_agora_ha_pouco(cid, agora):
+            EST.log_acao("auto", "verificação automática adiada: já falamos com o lead "
+                                 "há poucos minutos (evita template repetido)", cid)
             continue
         GRW.add_evento(cid, lead.get("curso") or "", "verificacao_negativa")
         r = growth_funil.ativar_um(GRW, EST, ONTO.ont, WA, cid)
@@ -445,10 +470,16 @@ def conversa_iniciar():
     return jsonify({"card_id": card_id, "envio": _primeiro_contato(card_id)})
 
 
-# Piso do limiar da verificação automática. Decidir "não inscreveu" cedo demais é
-# pior que não decidir: o lead que ACABOU de se inscrever receberia um "você não
-# terminou". 6h é o mínimo que a Extecamp leva para refletir boleto/pagamento.
-VERIF_AUTO_MIN_H = 6
+# Limiar da verificação automática. 0 = IMEDIATO: decide assim que o lead chega da LP
+# (não espera o tick). O que torna o imediato aceitável é o conteúdo do 1º toque: ele é
+# o `feq_lead`, template de ABERTURA com os botões de link/dúvidas — não uma cobrança
+# de "você não terminou". Na prática o lead preenche o formulário, é levado à Extecamp
+# e recebe o link no WhatsApp. O custo é perder a chance de conferir na Extecamp antes.
+VERIF_AUTO_MIN_H = 0
+# Segundos mínimos desde a última mensagem nossa antes de disparar o toque automático.
+# Sem isto, lead vindo do Meta (que já recebeu feq_lead na ingestão) e que depois
+# preenche a LP receberia o MESMO template duas vezes em segundos.
+VERIF_AUTO_SILENCIO_S = 900
 
 CFG = {"auto_aprovar": EST.get_config("auto_aprovar") == "1",   # persistido: deploys reiniciam o serviço
        "verif_auto": EST.get_config("verif_auto") == "1",
@@ -912,7 +943,20 @@ def webhook_ponte():
     dados = {**(request.get_json(silent=True) or {}),
              "ip": request.remote_addr, "ua": request.headers.get("User-Agent", "")}
     r = ponte.processar(dados, EST, GRW, ADS, ING, ont=_ont())
+    # Modo IMEDIATO (limiar 0): decide "não inscreveu" assim que o lead chega, sem
+    # esperar o tick de 15 min. Em thread para não segurar a resposta — o navegador
+    # do lead está aguardando este retorno para seguir à Extecamp.
+    if r.get("ok") and CFG["verif_auto"] and CFG["verif_auto_horas"] == 0:
+        threading.Thread(target=_verificacao_auto_imediata, args=(r["card_id"],),
+                         daemon=True).start()
     return jsonify(r), (200 if r.get("ok") else 400), _CORS_LP
+
+
+def _verificacao_auto_imediata(card_id):
+    try:
+        _verificacao_auto(apenas=card_id)
+    except Exception as e:
+        print(f"[verificacao-auto] imediata falhou para {card_id}: {e}", flush=True)
 
 
 @app.route("/webhook/lp", methods=["POST", "OPTIONS"])

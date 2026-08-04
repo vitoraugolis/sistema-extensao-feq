@@ -51,15 +51,38 @@ def test_limiar_protege_quem_acabou_de_iniciar():
     assert "p_velho" in eleg(48)
 
 
-def test_piso_do_limiar_nao_pode_ser_furado():
-    """6h é o mínimo que a Extecamp leva para refletir pagamento — abaixo disso a
-    decisão automática seria chute contra o lead."""
+def test_limites_do_prazo():
+    """0 = imediato (decisão do operador, ciente de que perde a janela de conferir na
+    Extecamp). Negativo vira 0 e o teto é 30 dias."""
     c = _cliente()
-    assert c.post("/api/config", json={"verif_auto_horas": 1}
-                  ).get_json()["verif_auto_horas"] == A.VERIF_AUTO_MIN_H
+    assert c.post("/api/config", json={"verif_auto_horas": 0}).get_json()["verif_auto_horas"] == 0
+    assert c.post("/api/config", json={"verif_auto_horas": -5}).get_json()["verif_auto_horas"] == 0
     assert c.post("/api/config", json={"verif_auto_horas": 999}
                   ).get_json()["verif_auto_horas"] == 720          # teto de 30 dias
     assert c.post("/api/config", json={"verif_auto_horas": "abc"}).status_code == 400
+
+
+def test_imediato_torna_tudo_elegivel():
+    """Com prazo 0, até quem acabou de chegar entra — é o que 'imediatamente' significa."""
+    _seed("i_agora", 0)
+    _seed("i_pouco", 0.2)
+    eleg = {x["card_id"] for x in A._verif_elegiveis(horas=0, agora=AGORA)}
+    assert {"i_agora", "i_pouco"} <= eleg
+
+
+def test_nao_repete_template_para_quem_acabou_de_receber():
+    """Lead do Meta já recebe feq_lead na ingestão. Se ele preencher a LP em seguida,
+    o modo imediato mandaria o MESMO template em segundos — a guarda de silêncio
+    impede isso e registra o adiamento."""
+    _seed("dup1", 0)
+    A.EST.add_conversa("dup1", "agente", "[template feq_lead] FEQ-0480", status="enviado")
+    c = _cliente()
+    c.post("/api/config", json={"verif_auto": True, "verif_auto_horas": 0})
+    decididos = {a["card_id"] for a in c.post("/api/verificacao/auto").get_json()["aplicados"]}
+    assert "dup1" not in decididos                    # pulado, não decidido
+    assert "dup1" in {p["card_id"] for p in A.GRW.verificacoes_pendentes()}   # segue na fila
+    linhas = A.EST.conn.execute("SELECT acao FROM auditoria WHERE alvo='dup1'").fetchall()
+    assert any("adiada" in r["acao"] for r in linhas)  # fica rastreável por que não decidiu
 
 
 def test_desligada_nao_decide_nada():
@@ -97,6 +120,40 @@ def test_payload_da_aba_traz_o_estado_da_chave():
     assert isinstance(v["pendentes"], list)          # a lista continua lá p/ o operador
     assert v["auto"] is True and v["horas"] == 72 and v["min_horas"] == A.VERIF_AUTO_MIN_H
     assert isinstance(v["elegiveis"], int)
+
+
+def test_modo_imediato_decide_no_webhook_da_lp():
+    """'Assim que o lead chega' de verdade: o gancho está no webhook da LP, não no
+    tick de 15 min. E a resposta ao navegador não pode esperar o envio — por isso a
+    decisão roda em thread (aqui só validamos o efeito)."""
+    import time
+    c = _cliente()
+    c.post("/api/config", json={"verif_auto": True, "verif_auto_horas": 0})
+    r = c.post("/webhook/ponte", json={"nome": "Imediato Um", "whatsapp": "19997770001",
+                                       "curso": "FEQ-0480", "event_id": "ev-imediato-1"})
+    assert r.status_code == 200
+    cid = r.get_json()["card_id"]
+    for _ in range(20):                      # espera a thread concluir
+        if cid not in {p["card_id"] for p in A.GRW.verificacoes_pendentes()}:
+            break
+        time.sleep(0.1)
+    tipos = [x[0] for x in A.GRW.conn.execute(
+        "SELECT tipo FROM eventos_funil WHERE card_id=?", (cid,))]
+    assert "inicio_inscricao" in tipos and "verificacao_negativa" in tipos
+    assert "recuperacao_enviada" in tipos                    # recebeu o toque
+    # o toque é a ABERTURA com link, não uma cobrança de "você não terminou"
+    msgs = [h["texto"] for h in A.EST.historico(cid) if h["papel"] == "agente"]
+    assert any("feq_lead" in m for m in msgs), msgs
+
+
+def test_imediato_desligado_nao_mexe_no_webhook():
+    """Com a chave desligada o webhook da LP não pode decidir nada sozinho."""
+    c = _cliente()
+    c.post("/api/config", json={"verif_auto": False})
+    r = c.post("/webhook/ponte", json={"nome": "Sem Auto", "whatsapp": "19997770002",
+                                       "curso": "FEQ-0480", "event_id": "ev-sem-auto"})
+    cid = r.get_json()["card_id"]
+    assert cid in {p["card_id"] for p in A.GRW.verificacoes_pendentes()}   # continua na fila
 
 
 def test_decisao_automatica_fica_auditada():
