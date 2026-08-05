@@ -214,14 +214,31 @@ class WhatsApp:
         return out
 
     def _processar_status(self, s, out):
-        """Webhook de status: atualiza a mensagem enviada; falha vira alerta na Central."""
+        """Webhook de status: atualiza a mensagem enviada; falha vira alerta na Central.
+        Guarda o CÓDIGO do erro — é ele que diz se a retentativa deve mudar o número
+        (131026) ou esperar e trocar de template (131049/130472). Ver transporte/reenvio."""
         st = _STATUS_PT.get(s.get("status"), s.get("status") or "")
-        cid = self.est.atualizar_status_msg(s.get("id"), st)
+        errs = s.get("errors") or [{}]
+        codigo = errs[0].get("code") if st == "falhou" else None
+        cid = self.est.atualizar_status_msg(s.get("id"), st, codigo)
         if st == "falhou" and cid:
-            errs = s.get("errors") or [{}]
             motivo = errs[0].get("title") or errs[0].get("message") or "erro desconhecido"
             self.est.add_alerta("envio_falhou", f"Mensagem ao lead {cid} NÃO foi entregue: {motivo}")
-            out.append({"card_id": cid, "acao": "envio_falhou", "motivo": motivo})
+            out.append({"card_id": cid, "acao": "envio_falhou", "motivo": motivo, "codigo": codigo})
+        elif st in ("entregue", "lido") and cid:
+            self._corrigir_numero(cid, s.get("id"))
+
+    def _corrigir_numero(self, card_id, wamid):
+        """Entregou numa VARIANTE do número (retentativa do 9º dígito)? Então é essa a
+        conta de WhatsApp do lead: corrige o cadastro para os próximos contatos irem
+        direto ao número certo, em vez de falharem de novo."""
+        env = self.est.envio_por_wamid(wamid) or {}
+        destino = env.get("destino")
+        lead = self.est.get_lead(card_id) or {}
+        if destino and lead.get("telefone") and destino != lead["telefone"]:
+            self.est.set_lead(card_id, telefone=destino)
+            self.est.log_acao("reenvio", f"número corrigido para {destino} (entregou na variante)",
+                              card_id)
 
     def _guarda_destinatario(self, telefone, forcar=False, agora=None):
         """Regra única de quem pode receber mensagem livre (texto OU mídia): opt-out e

@@ -41,6 +41,7 @@ from atena.core import auth
 from atena.agentes.ontologista import Ontologista
 from atena.agentes.ingestao import Ingestao, normalizar_meta, fetch_meta_lead
 from atena.agentes import nutricao, reconciliacao
+from atena.transporte import reenvio
 from atena.agentes.curador import Curador
 from atena.agentes.cerebro import cerebro_factory, modelo_atual, testar_modelo, PROVEDORES, chave_do
 from atena.transporte.whatsapp import (WhatsApp, TEMPLATES_ROL as WhatsApp_TEMPLATES,
@@ -480,7 +481,8 @@ def _primeiro_contato(card_id):
         r = WA.enviar_template(lead["telefone"], tpl, params=params)
         if r.get("ok"):
             EST.add_conversa(card_id, "agente", f"[template {tpl}] {curso}",
-                             wamid=r.get("wamid"), status="enviado", autor="template")
+                             wamid=r.get("wamid"), status="enviado", autor="template",
+                             destino=lead["telefone"])
             EST.set_lead(card_id, estado_conversa="aguardando_resposta")
             return r
     return r
@@ -566,7 +568,7 @@ def _reabrir_conversa(card_id):
     r = WA.enviar_template(lead["telefone"], "retomar_atendimento")
     if r.get("ok"):
         EST.add_conversa(card_id, "agente", "[template retomar_atendimento]", autor="template",
-                         wamid=r.get("wamid"), status="enviado")
+                         wamid=r.get("wamid"), status="enviado", destino=lead["telefone"])
         EST.log_acao("sistema", "retomada_enviada_duvida_represada", card_id)
     return r
 
@@ -839,7 +841,7 @@ def conversa_enviar_template(card_id):
     if r.get("ok"):
         rotulo = f"[template {tpl['nome']}]" + (f" {' · '.join(params)}" if params else "")
         EST.add_conversa(card_id, "agente", rotulo, wamid=r.get("wamid"), status="enviado",
-                         autor="template")
+                         autor="template", destino=lead["telefone"])
         if lead.get("estado_conversa") in ("aguardando_1o_contato", "escalado_humano", "manual_humano"):
             EST.set_lead(card_id, estado_conversa="aguardando_resposta")
         EST.log_acao(session.get("usuario", "operador"), f"template {tpl['nome']}", card_id)
@@ -1343,6 +1345,15 @@ def _operacoes():
                 feitos = _verificacao_auto()
                 if feitos:
                     print(f"[operacoes] verificação automática: {len(feitos)} decidido(s)", flush=True)
+            # retentativa de entrega: recupera quem a Meta recusou (número na variante do
+            # 9º dígito; pacing de marketing com espera + template complementar). A cada ~1h,
+            # no horário comercial — o caminho manda template ao lead.
+            if G.dentro_janela() and _t.time() - float(EST.get_config("op_reenvio") or 0) > 3600:
+                EST.set_config("op_reenvio", str(_t.time()))
+                rr = reenvio.rodar(EST, ONTO.ont, WA)
+                if rr["reenviados"] or rr["humano"]:
+                    print(f"[operacoes] reenvio: {len(rr['reenviados'])} retentativa(s), "
+                          f"{len(rr['humano'])} para humano", flush=True)
             if G.dentro_janela() and _t.time() - float(EST.get_config("op_reativacao") or 0) > 7200:
                 EST.set_config("op_reativacao", str(_t.time()))
                 res = nutricao.reativar(EST, ONTO.ont, WA, propor=ORQ.propor_reativacao)

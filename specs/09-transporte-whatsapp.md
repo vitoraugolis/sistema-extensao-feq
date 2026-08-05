@@ -58,3 +58,31 @@ escapado na UI (evita XSS). LGPD: `anonimizar_antigos` deve apagar as mídias do
 - AC3 Fora do horário comercial, a mensagem é enfileirada, não enviada.
 - AC4 Lead com `Opt-out=true` nunca recebe mensagem.
 - AC5 Nenhum envio em massa sem o fluxo de aprovação definido na governança.
+
+## Retentativa de entrega (✅ implementado — `transporte/reenvio.py`)
+A Meta aceita o POST e só depois recusa a entrega, pelo webhook de status. Medido em
+05/08/2026: 41 leads com falha, **29 que nunca receberam nada**. As causas pedem remédios
+opostos, então `conversas.erro_codigo` guarda o código da Meta e `conversas.destino` guarda
+para qual número mandamos.
+
+| código | causa | remédio |
+|---|---|---|
+| 131026 | o número não recebe naquela forma (72% dos casos) | retentar na **variante do 9º dígito** — é problema de número, não de template |
+| 131049 / 130472 | a Meta limita **MARKETING** para aquele usuário | esperar 24h e usar **template complementar**, preferindo UTILITY |
+| demais | desconhecida | esperar 6h e trocar de template |
+
+Regras: máx. 3 tentativas por lead; só leads elegíveis (mesmo critério da nutrição — curso
+captável, sem opt-out, quem nunca respondeu); esgotada a escada, vira alerta
+`entrega_impossivel` na Central em vez de o lead morrer em silêncio. **Quando a variante
+entrega, o telefone do lead é corrigido no cadastro** (`_corrigir_numero`), então os próximos
+contatos já vão ao número certo.
+
+Limitação conhecida: **todo template FEQ é MARKETING** na WABA, então contra o pacing a troca
+de template hoje vale pouco — quem resolve é a espera. `reenvio.UTILITY_SUGERIDO` traz o corpo
+de um template UTILITY pronto para o operador criar pela UI (a criação exige aprovação da Meta).
+
+Resultado da primeira passada em produção (05/08/2026): 12 retentativas, **10 entregues** e 10
+números corrigidos; 5 leads encaminhados ao operador com motivo.
+
+- AC6 Falha de entrega gera retentativa condicionada ao código do erro, nunca cega.
+- AC7 Esgotadas as tentativas, o lead aparece para o humano com o motivo e um canal alternativo.

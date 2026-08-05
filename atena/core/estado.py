@@ -120,7 +120,13 @@ class Estado:
                     # campanha. O e-mail JÁ chegava do formulário Meta e era descartado.
                     "ALTER TABLE leads ADD COLUMN email TEXT",
                     "ALTER TABLE leads ADD COLUMN notas TEXT",
-                    "ALTER TABLE leads ADD COLUMN utm TEXT"):      # JSON: source/medium/campaign...
+                    "ALTER TABLE leads ADD COLUMN utm TEXT",      # JSON: source/medium/campaign...
+                    # Retentativa de entrega: POR QUE a Meta recusou (131026 número não
+                    # recebe / 131049 pacing de marketing / 130472 experimento) e PARA QUAL
+                    # número mandamos — sem o destino não dá para saber qual variante do 9º
+                    # dígito funcionou e corrigir o cadastro do lead.
+                    "ALTER TABLE conversas ADD COLUMN erro_codigo INTEGER",
+                    "ALTER TABLE conversas ADD COLUMN destino TEXT"):
             try:
                 self.conn.execute(mig)
             except sqlite3.OperationalError:
@@ -361,15 +367,15 @@ class Estado:
 
     # ------------------------------------------------------------ conversas
     def add_conversa(self, card_id, papel, texto, tipo="texto", media_id=None,
-                     wamid=None, status=None, autor=None):
+                     wamid=None, status=None, autor=None, destino=None):
         """autor: quem produziu a fala do 'agente' — 'humano:<usuario>' (digitada na
         Central), 'llm' (cérebro), 'template', 'coordenacao'. É o que permite ao corpus
         aprender com as resoluções humanas (spec 18)."""
         with self._lock:
             self.conn.execute(
-                "INSERT INTO conversas(card_id,papel,texto,tipo,media_id,wamid,status,ts,autor)"
-                " VALUES(?,?,?,?,?,?,?,?,?)",
-                (card_id, papel, texto, tipo, media_id, wamid, status, _agora(), autor))
+                "INSERT INTO conversas(card_id,papel,texto,tipo,media_id,wamid,status,ts,autor,destino)"
+                " VALUES(?,?,?,?,?,?,?,?,?,?)",
+                (card_id, papel, texto, tipo, media_id, wamid, status, _agora(), autor, destino))
             self.conn.commit()
 
     def historico(self, card_id):
@@ -380,7 +386,7 @@ class Estado:
                 (card_id,)).fetchall()
         return [dict(r) for r in rows]
 
-    def atualizar_status_msg(self, wamid, status):
+    def atualizar_status_msg(self, wamid, status, codigo=None):
         """Webhook de status do WhatsApp -> atualiza o status da nossa mensagem enviada.
         Não rebaixa (lido não vira entregue). Retorna o card_id (ou None)."""
         if not wamid:
@@ -392,9 +398,40 @@ class Estado:
             if not r:
                 return None
             if ordem.get(status, 0) >= ordem.get(r["status"], 0):   # falhou sempre passa
-                self.conn.execute("UPDATE conversas SET status=? WHERE wamid=?", (status, wamid))
+                self.conn.execute("UPDATE conversas SET status=?, erro_codigo=? WHERE wamid=?",
+                                  (status, codigo, wamid))
                 self.conn.commit()
             return r["card_id"]
+
+    def envio_por_wamid(self, wamid):
+        with self._lock:
+            r = self.conn.execute(
+                "SELECT card_id, texto, status, destino, erro_codigo FROM conversas"
+                " WHERE wamid=?", (wamid,)).fetchone()
+        return dict(r) if r else None
+
+    def envios_do_lead(self, card_id):
+        """Tentativas de envio ao lead, em ordem — a base da escada de retentativa."""
+        with self._lock:
+            rows = self.conn.execute(
+                "SELECT texto, status, destino, erro_codigo, ts FROM conversas"
+                " WHERE card_id=? AND papel='agente' AND wamid IS NOT NULL ORDER BY id",
+                (card_id,)).fetchall()
+        return [dict(r) for r in rows]
+
+    def leads_sem_entrega(self):
+        """Leads em que TODA tentativa falhou e nenhuma chegou. São os que perdemos
+        de fato — quem já recebeu algo tem canal aberto e não precisa de retentativa."""
+        with self._lock:
+            rows = self.conn.execute(
+                "SELECT l.* FROM leads l WHERE l.optout=0"
+                " AND EXISTS(SELECT 1 FROM conversas c WHERE c.card_id=l.card_id"
+                "            AND c.papel='agente' AND c.status='falhou')"
+                " AND NOT EXISTS(SELECT 1 FROM conversas c WHERE c.card_id=l.card_id"
+                "                AND c.papel='agente' AND c.status IN ('entregue','lido'))"
+                " AND NOT EXISTS(SELECT 1 FROM conversas c WHERE c.card_id=l.card_id"
+                "                AND c.papel='lead')").fetchall()
+        return [dict(r) for r in rows]
 
     # --------------------------------------------------------------- mídias
     # ------------------------------------------------------------- LPs editadas
