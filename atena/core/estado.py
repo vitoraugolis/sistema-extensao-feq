@@ -71,6 +71,26 @@ def _tel_key(telefone):
     return d[-10:] if len(d) >= 10 else d   # DDD(2) + 8 dígitos
 
 
+def normalizar_e164(telefone):
+    """Telefone em formato internacional (só dígitos, começando pelo país).
+
+    Serve para o link wa.me funcionar: sem o código do país ele não abre a conversa.
+    A decisão é por COMPRIMENTO, não por prefixo — DDD 55 existe (Santa Maria/RS),
+    então "5599999999" é um fixo brasileiro SEM país, não um número já normalizado.
+
+      10 díg. = DDD + fixo(8)        -> 55 + número
+      11 díg. = DDD + celular(9)     -> 55 + número
+      12/13 díg. começando com 55    -> já está certo (o wa_id do WhatsApp cai aqui)
+      demais                         -> devolve como está: pode ser ESTRANGEIRO
+                                        (ex.: +351 de Portugal na base) e prefixar
+                                        55 destruiria o número.
+    """
+    d = re.sub(r"\D", "", telefone or "")
+    if len(d) in (10, 11):
+        return "55" + d
+    return d
+
+
 class Estado:
     def __init__(self, db=None):
         self.path = ":memory:" if db == ":memory:" else str(db or DEFAULT_DB)
@@ -109,6 +129,11 @@ class Estado:
 
     # ---------------------------------------------------------------- leads
     def upsert_lead(self, card_id, **campos):
+        # Telefone entra SEMPRE em formato internacional: é o que faz o link wa.me
+        # da Central abrir a conversa. Normalizar aqui (e não em cada chamador)
+        # garante que vale para ingestão, WhatsApp, LP e criação manual.
+        if campos.get("telefone"):
+            campos["telefone"] = normalizar_e164(campos["telefone"])
         with self._lock:
             existe = self.conn.execute("SELECT 1 FROM leads WHERE card_id=?", (card_id,)).fetchone()
             if existe:
@@ -132,6 +157,8 @@ class Estado:
         self.conn.commit()
 
     def set_lead(self, card_id, **campos):
+        if campos.get("telefone"):
+            campos["telefone"] = normalizar_e164(campos["telefone"])
         with self._lock:
             self._set(card_id, **campos)
 

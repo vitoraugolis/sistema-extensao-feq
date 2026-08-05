@@ -545,7 +545,7 @@ async function carregar(){
     $('#vfs').innerHTML = lst.length ? lst.map(v=>`
       <div class="row">
         <i class="ti ti-user-search"></i>
-        <span><strong>${v.nome||'(sem nome)'}</strong> · ${v.telefone||''} · ${v.curso}
+        <span><strong>${v.nome||'(sem nome)'}</strong> · ${fmtTel(v.telefone)} · ${v.curso}
           <span class="muted">iniciou em ${(v.ultimo_checkout||'').slice(0,16).replace('T',' ')}</span></span>
         <span style="margin-left:auto;display:flex;gap:6px;">
           <button class="btn btn-p" onclick="verificar('${v.card_id}',true)"><i class="ti ti-check"></i> Inscreveu</button>
@@ -938,6 +938,14 @@ async function atualizarLista(){
 // numérico, também a máscara do telefone ("19999" acha "+55 (19) 99999-0001").
 function _busca(s){ return (s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim(); }
 function _digitos(s){ return (s||'').replace(/\D/g,''); }
+// O banco guarda telefone em formato internacional só com dígitos (para o wa.me
+// funcionar). Aqui devolvemos legível. Só mexe no padrão brasileiro; estrangeiro
+// (ex.: +351...) sai como +<dígitos>, sem inventar máscara de outro país.
+function fmtTel(s){
+  const d = _digitos(s);
+  const m = /^55(\d{2})(\d{4,5})(\d{4})$/.exec(d);
+  return m ? `+55 (${m[1]}) ${m[2]}-${m[3]}` : (d ? '+' + d : '');
+}
 
 async function renderKanban(){
   if(KB_ARRASTE) return;          // polling não pode recriar o board no meio de um arraste
@@ -973,7 +981,7 @@ function kbCard(c){
   // Contato no card: é o que transforma "kanban de conversa" em card de CRM —
   // o operador vê com quem está falando sem precisar abrir a conversa.
   const contato = [
-    c.telefone ? `<div class="kb-contato"><i class="ti ti-phone"></i>${escapeHtml(c.telefone)}</div>` : '',
+    c.telefone ? `<div class="kb-contato"><i class="ti ti-phone"></i>${escapeHtml(fmtTel(c.telefone))}</div>` : '',
     c.email ? `<div class="kb-contato"><i class="ti ti-mail"></i>${escapeHtml(c.email)}</div>` : '',
   ].join('');
   if(origem) b.push(`<span class="chip" style="margin:0;background:var(--sky);" title="${escapeHtml(campanha||origem)}"><i class="ti ti-target-arrow"></i> ${escapeHtml(origem)}</span>`);
@@ -1194,7 +1202,7 @@ function renderFicha(d){
   const detalhe = [u.utm_content && 'conteúdo: '+u.utm_content, u.utm_term && 'termo: '+u.utm_term]
     .filter(Boolean).join(' · ');
   const tel = (d.telefone||'').trim();
-  const zap = tel ? `<a href="https://wa.me/${_digitos(tel)}" target="_blank" title="abrir no WhatsApp">${escapeHtml(tel)}</a>` : '—';
+  const zap = tel ? `<a href="https://wa.me/${_digitos(tel)}" target="_blank" title="abrir no WhatsApp">${escapeHtml(fmtTel(tel))}</a>` : '—';
   const email = (d.email||'').trim();
   cx.innerHTML = `
     <div class="conv-ficha-linha">

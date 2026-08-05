@@ -89,7 +89,9 @@ def test_card_do_funil_traz_contato_e_origem():
     cards = [l for col in c.get("/api/kanban").get_json()["colunas"]
              for l in col["leads"] if l["id"] == "crm1"]
     assert cards and cards[0]["email"] == "carlos@exemplo.com"
-    assert cards[0]["telefone"] == "+55 19 98888-0001"
+    # guardado em formato internacional (o link wa.me depende disso); a máscara
+    # de exibição é aplicada na tela, não no banco
+    assert cards[0]["telefone"] == "5519988880001"
     assert cards[0]["utm"]["utm_source"] == "meta"
     assert cards[0]["tem_notas"] is False
 
