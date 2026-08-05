@@ -20,6 +20,25 @@
     return (window.crypto && crypto.randomUUID) ? crypto.randomUUID()
       : "s-" + Date.now() + "-" + Math.random().toString(16).slice(2);
   }
+  // UTMs da campanha: lidos da URL de ENTRADA e guardados na sessão. Se o visitante
+  // navegar para outra página do site antes de converter, a querystring se perde —
+  // sem isto a atribuição do anúncio some justamente em quem leu mais e converteu.
+  var UTM_KEYS = ["utm_source","utm_medium","utm_campaign","utm_content","utm_term",
+                  "gclid","fbclid"];
+  function utmSalvos() {
+    var achados = {}, q;
+    try { q = new URLSearchParams(window.location.search); } catch (e) { q = null; }
+    if (q) UTM_KEYS.forEach(function (k) { if (q.get(k)) achados[k] = q.get(k).slice(0, 200); });
+    try {
+      if (Object.keys(achados).length) {
+        sessionStorage.setItem("atena_utm", JSON.stringify(achados));
+        return achados;
+      }
+      return JSON.parse(sessionStorage.getItem("atena_utm") || "{}");
+    } catch (e) { return achados; }   // navegador sem storage: usa só o que veio na URL
+  }
+  utmSalvos();                        // grava logo no carregamento, não só no envio
+
   function cookie(n) {
     var m = document.cookie.match("(^|;)\\s*" + n + "=([^;]*)");
     return m ? m[2] : "";
@@ -197,7 +216,8 @@
         whatsapp: digitos, curso_id: CFG.curso,
         event_id: eid, sessao_id: tele.sessao_id,
         fbp: cookie("_fbp"), fbc: cookie("_fbc"),
-        url: window.location.href
+        url: window.location.href,
+        utm: utmSalvos()          // origem da campanha, capturada em silêncio
       })
     }).then(irParaExtecamp, irParaExtecamp);
     setTimeout(irParaExtecamp, TIMEOUT_MS);   // backend lento/fora: a venda não espera

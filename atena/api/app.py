@@ -187,9 +187,40 @@ def conversa_detalhe(card_id):
                     "curso": lead["curso"], "cursos": EST.cursos_interesse(lead),
                     "estado": lead["estado_conversa"], "fase": lead["fase"],
                     "telefone": lead["telefone"], "optout": bool(lead.get("optout")),
+                    "email": lead.get("email") or "", "notas": lead.get("notas") or "",
+                    "utm": EST.utm_de(lead), "criado": lead.get("criado"),
                     "modo": lead.get("modo") or "auto",
                     "thread": EST.historico(card_id),
                     "proposta": prop["mensagem"] if prop else None})
+
+
+@app.route("/api/leads/<card_id>/notas", methods=["POST"])
+def lead_notas(card_id):
+    """Notas do operador sobre o lead — memória de CRM que a conversa não guarda."""
+    if not EST.get_lead(card_id):
+        return jsonify({"erro": "lead inexistente"}), 404
+    EST.set_notas(card_id, (request.get_json(silent=True) or {}).get("notas", ""))
+    EST.log_acao(session.get("usuario", "operador"), "notas do lead", card_id)
+    return jsonify({"ok": True})
+
+
+@app.route("/api/leads/<card_id>/contato", methods=["POST"])
+def lead_contato(card_id):
+    """Completa contato à mão (ex.: e-mail que o lead passou na conversa)."""
+    if not EST.get_lead(card_id):
+        return jsonify({"erro": "lead inexistente"}), 404
+    b = request.get_json(silent=True) or {}
+    campos = {}
+    if "email" in b:
+        email = (b.get("email") or "").strip()[:180]
+        if email and "@" not in email:
+            return jsonify({"erro": "e-mail inválido"}), 400
+        campos["email"] = email
+    if not campos:
+        return jsonify({"erro": "nada para atualizar"}), 400
+    EST.set_lead(card_id, **campos)
+    EST.log_acao(session.get("usuario", "operador"), f"contato atualizado: {list(campos)}", card_id)
+    return jsonify({"ok": True, **campos})
 
 
 @app.route("/api/conversas/<card_id>/modo", methods=["POST"])
@@ -219,6 +250,8 @@ def kanban():
         cols[fase].append({
             "id": l["card_id"], "nome": l["nome"] or l["card_id"],
             "telefone": l.get("telefone") or "",     # busca do funil aceita número
+            "email": l.get("email") or "",
+            "utm": EST.utm_de(l), "tem_notas": bool((l.get("notas") or "").strip()),
             "iniciais": _iniciais(l["nome"]), "curso": l["curso"],
             "cursos": EST.cursos_interesse(l),
             "estado": l["estado_conversa"], "ha": _ha(l["atualizado"]),

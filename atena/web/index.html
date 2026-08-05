@@ -96,6 +96,14 @@ input:focus,select:focus,textarea:focus{outline:none;box-shadow:3px 3px 0 var(--
 .conv-composer textarea{resize:none;max-height:110px;}
 .conv-blocked{font-size:12px;font-weight:500;color:var(--ink);background:var(--rosa);border:2px solid var(--b);
  border-radius:9px;padding:7px 10px;margin:0 11px 9px;}
+.conv-ficha{padding:8px 14px;border-bottom:2px solid var(--b);background:#fff;font-size:12px;
+ display:flex;flex-direction:column;gap:6px;flex-shrink:0;}
+.conv-ficha-linha{display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
+.conv-dado{display:flex;align-items:center;gap:5px;color:#3b3b3b;}
+.conv-dado i{font-size:14px;color:#6b6b6b;}
+.conv-dado a{color:inherit;}
+.conv-ficha textarea{width:100%;resize:vertical;min-height:34px;max-height:120px;font-size:12px;}
+.conv-notas-topo{display:flex;align-items:center;gap:8px;}
 .conv-manual-nota{font-size:11.5px;font-weight:600;color:#fff;background:var(--guara);border-top:2px solid var(--b);
  padding:6px 12px;display:flex;align-items:center;gap:6px;}
 .conv-tpl{border-top:2px solid var(--b);background:var(--paper);padding:10px 12px;font-size:12.5px;}
@@ -181,6 +189,8 @@ input:focus,select:focus,textarea:focus{outline:none;box-shadow:3px 3px 0 var(--
 .kb-card{background:#fff;border:2px solid var(--b);border-radius:9px;padding:9px 11px;margin-bottom:9px;cursor:pointer;
  transition:transform .06s,box-shadow .06s;}
 .kb-card:hover{transform:translate(-2px,-2px);box-shadow:3px 3px 0 var(--b);}
+.kb-contato{display:flex;align-items:center;gap:4px;font-size:10.5px;color:#5b5b5b;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.kb-contato i{font-size:12px;flex-shrink:0;}
 .kb-nome{font-size:13px;font-weight:700;display:flex;align-items:center;gap:7px;}
 .kb-sub{font-size:11px;color:var(--ink3);margin-top:3px;}
 .kb-badges{display:flex;flex-wrap:wrap;gap:4px;margin-top:7px;}
@@ -953,9 +963,21 @@ function kbCard(c){
   if(c.curso_encerrado) b.push('<span class="chip t-bad" style="margin:0;">curso encerrado</span>');
   const extra = (c.cursos||[]).length - 1;   // além do ativo
   const cursoTxt = c.curso + (extra>0?` <span class="chip t-acc" style="margin:0;padding:1px 6px;" title="${escapeHtml((c.cursos||[]).join(', '))}">+${extra}</span>`:'');
+  const utm = c.utm||{};
+  const origem = utm.utm_source || (utm.gclid ? 'google' : (utm.fbclid ? 'meta' : ''));
+  const campanha = utm.utm_campaign || '';
+  // Contato no card: é o que transforma "kanban de conversa" em card de CRM —
+  // o operador vê com quem está falando sem precisar abrir a conversa.
+  const contato = [
+    c.telefone ? `<div class="kb-contato"><i class="ti ti-phone"></i>${escapeHtml(c.telefone)}</div>` : '',
+    c.email ? `<div class="kb-contato"><i class="ti ti-mail"></i>${escapeHtml(c.email)}</div>` : '',
+  ].join('');
+  if(origem) b.push(`<span class="chip" style="margin:0;background:var(--sky);" title="${escapeHtml(campanha||origem)}"><i class="ti ti-target-arrow"></i> ${escapeHtml(origem)}</span>`);
+  if(c.tem_notas) b.push('<span class="chip" style="margin:0;background:var(--sun);" title="tem notas"><i class="ti ti-notes"></i></span>');
   return `<div class="kb-card" data-id="${escapeHtml(c.id)}" onclick="kbClique('${c.id}')">
     <div class="kb-nome"><span class="conv-ava" style="width:22px;height:22px;font-size:9.5px;">${c.iniciais}</span>${escapeHtml(c.nome)}</div>
     <div class="kb-sub">${cursoTxt} · ${c.ha}</div>
+    ${contato}
     ${b.length?`<div class="kb-badges">${b.join('')}</div>`:''}
   </div>`;
 }
@@ -1115,7 +1137,8 @@ function statusGlyph(t){   // ✓ enviado · ✓✓ entregue · ✓✓ azul lido
 function renderThread(d){
   // A "moldura" (cabeçalho + campo de escrita) é montada 1x por conversa; o polling só
   // atualiza as MENSAGENS. Assim o <textarea> nunca é recriado -> foco/cursor não se perdem.
-  const chromeKey = d.id + '|' + (d.optout ? 1 : 0) + '|' + (d.modo||'auto');   // opt-out/modo trocam a moldura
+  const chromeKey = d.id + '|' + (d.optout ? 1 : 0) + '|' + (d.modo||'auto')
+                   + '|' + (d.email||'') + '|' + ((d.notas||'').length);   // opt-out/modo trocam a moldura
   if(CONV_CHROME_ID !== chromeKey){ renderChrome(d); CONV_CHROME_ID = chromeKey; }
   renderMensagens(d);
 }
@@ -1138,6 +1161,7 @@ function renderChrome(d){
       </div>
     </div>
     <div id="convCursos" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:7px 14px;border-bottom:2px solid var(--b);background:var(--paper);font-size:12px;flex-shrink:0;"></div>
+    <div id="convFicha" class="conv-ficha"></div>
     <div class="conv-thread" id="convThread"></div>
     <div id="convErro"></div>
     ${d.optout
@@ -1151,7 +1175,56 @@ function renderChrome(d){
            <textarea id="convInput" rows="1" placeholder="Digite uma mensagem…" onkeydown="convKeydown(event)"></textarea>
            <button class="btn btn-p" onclick="convEnviar()" title="Enviar (Enter)"><i class="ti ti-send"></i></button>
          </div>`}`;
+  renderFicha(d);
   const inp = $('#convInput'); if(inp) inp.focus();   // pronto para digitar ao abrir
+}
+
+// Ficha do lead: contato, origem da campanha e notas — o que faz do painel um CRM
+// e não só um chat. A origem vem dos UTMs capturados no formulário da LP.
+function renderFicha(d){
+  const cx = $('#convFicha'); if(!cx) return;
+  const u = d.utm || {};
+  const origem = [u.utm_source, u.utm_medium, u.utm_campaign].filter(Boolean).join(' · ')
+    || (u.gclid ? 'google (gclid)' : (u.fbclid ? 'meta (fbclid)' : ''));
+  const detalhe = [u.utm_content && 'conteúdo: '+u.utm_content, u.utm_term && 'termo: '+u.utm_term]
+    .filter(Boolean).join(' · ');
+  const tel = (d.telefone||'').trim();
+  const zap = tel ? `<a href="https://wa.me/${_digitos(tel)}" target="_blank" title="abrir no WhatsApp">${escapeHtml(tel)}</a>` : '—';
+  const email = (d.email||'').trim();
+  cx.innerHTML = `
+    <div class="conv-ficha-linha">
+      <span class="conv-dado"><i class="ti ti-phone"></i>${zap}</span>
+      <span class="conv-dado"><i class="ti ti-mail"></i>${email
+        ? `<a href="mailto:${escapeHtml(email)}">${escapeHtml(email)}</a>`
+        : `<button class="btn btn-g" style="padding:2px 8px;font-size:11px;" onclick="pedirEmail('${d.id}')">+ e-mail</button>`}</span>
+      ${d.criado?`<span class="conv-dado muted"><i class="ti ti-calendar"></i>desde ${(d.criado||'').slice(0,10).split('-').reverse().join('/')}</span>`:''}
+      ${origem?`<span class="chip" style="margin:0;background:var(--sky);" title="${escapeHtml(detalhe||origem)}"><i class="ti ti-target-arrow"></i> ${escapeHtml(origem)}</span>`
+              :'<span class="muted" style="font-size:11px;">sem UTM (lead anterior à captura)</span>'}
+    </div>
+    <div>
+      <div class="conv-notas-topo">
+        <span class="muted" style="font-size:11px;"><i class="ti ti-notes"></i> Notas do lead</span>
+        <span id="convNotasEstado" class="muted" style="font-size:10.5px;"></span>
+      </div>
+      <textarea id="convNotas" placeholder="O que é útil lembrar deste lead…"
+                onblur="salvarNotas('${d.id}')">${escapeHtml(d.notas||'')}</textarea>
+    </div>`;
+}
+async function salvarNotas(id){
+  const ta = $('#convNotas'); if(!ta) return;
+  const est = $('#convNotasEstado');
+  const r = await api('/api/leads/'+id+'/notas',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({notas: ta.value})});
+  if(est) est.textContent = r.erro ? ('erro: '+r.erro) : 'salvo ✓';
+  if(!r.erro) setTimeout(()=>{ if(est) est.textContent=''; }, 2000);
+}
+async function pedirEmail(id){
+  const email = prompt('E-mail do lead:');
+  if(email === null) return;
+  const r = await api('/api/leads/'+id+'/contato',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({email})});
+  if(r.erro){ alert(r.erro); return; }
+  aposAcao();
 }
 
 function barraCursosHTML(d){

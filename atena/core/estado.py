@@ -95,7 +95,12 @@ class Estado:
                     # QUEM escreveu a mensagem do 'agente'. Sem isto, texto digitado por
                     # humano e texto gerado pelo LLM ficam indistinguíveis no banco — e é
                     # justamente a fala humana que ensina o sistema (corpus, spec 18).
-                    "ALTER TABLE conversas ADD COLUMN autor TEXT"):
+                    "ALTER TABLE conversas ADD COLUMN autor TEXT",
+                    # Card de CRM: contato completo, notas do operador e origem da
+                    # campanha. O e-mail JÁ chegava do formulário Meta e era descartado.
+                    "ALTER TABLE leads ADD COLUMN email TEXT",
+                    "ALTER TABLE leads ADD COLUMN notas TEXT",
+                    "ALTER TABLE leads ADD COLUMN utm TEXT"):      # JSON: source/medium/campaign...
             try:
                 self.conn.execute(mig)
             except sqlite3.OperationalError:
@@ -139,6 +144,18 @@ class Estado:
         with self._lock:
             rows = self.conn.execute("SELECT * FROM leads ORDER BY atualizado DESC").fetchall()
         return [dict(r) for r in rows]
+
+    @staticmethod
+    def utm_de(lead):
+        """UTMs do lead como dict (a coluna guarda JSON). Nunca estoura em dado sujo."""
+        try:
+            d = json.loads((lead or {}).get("utm") or "{}")
+            return d if isinstance(d, dict) else {}
+        except (ValueError, TypeError):
+            return {}
+
+    def set_notas(self, card_id, notas):
+        self.set_lead(card_id, notas=(notas or "").strip()[:4000])
 
     @staticmethod
     def cursos_interesse(lead):
@@ -292,7 +309,8 @@ class Estado:
             if l["fase"] == "Perdido" and (l["atualizado"] or "9999") < limite and l["telefone"]:
                 with self._lock:
                     self.conn.execute(
-                        "UPDATE leads SET nome='(anonimizado)', telefone='' WHERE card_id=?",
+                        "UPDATE leads SET nome='(anonimizado)', telefone='', email='',"
+                        " notas='' WHERE card_id=?",   # utm fica: é dado de campanha, não pessoal
                         (l["card_id"],))
                     self.conn.execute("DELETE FROM conversas WHERE card_id=?", (l["card_id"],))
                     self.conn.commit()

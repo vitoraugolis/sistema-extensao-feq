@@ -8,6 +8,7 @@ ponytail: sem cache de 15min (não há lag de indexação local); sem chamada FA
 """
 import re
 import sys
+import json
 import datetime
 import pathlib
 
@@ -35,6 +36,26 @@ def curso_de_texto(*textos):
 # chaves de nome conhecidas (os formulários variam: full_name / nome_completo / first_name…)
 NOME_KEYS = ("full_name", "nome_completo", "nome", "fullname", "first_name")
 # campos de contato conhecidos; o resto do form são perguntas qualificatórias
+# Parâmetros de campanha que interessam. Ficam no lead como JSON para permitir
+# analisar depois "qual anúncio traz lead que converte" (spec 19).
+UTM_KEYS = ("utm_source", "utm_medium", "utm_campaign", "utm_content", "utm_term",
+            "gclid", "fbclid")
+
+
+def extrair_utm(dados):
+    """UTMs vindos soltos no payload OU embutidos na `url` da página. A LP manda os
+    dois; o fallback pela URL cobre integração antiga que só mandava a url."""
+    from urllib.parse import urlparse, parse_qs
+    out = {k: str(dados[k])[:200] for k in UTM_KEYS if dados.get(k)}
+    if not out and dados.get("url"):
+        try:
+            q = parse_qs(urlparse(dados["url"]).query)
+            out = {k: q[k][0][:200] for k in UTM_KEYS if q.get(k)}
+        except Exception:
+            pass
+    return out
+
+
 CONTATO = set(NOME_KEYS) | {"phone_number", "telefone", "email", "consent",
                             "curso", "curso_de_interesse"}
 SUPERIOR_RE = re.compile(r"superior|gradua|bacharel|licenciat", re.I)
@@ -141,6 +162,17 @@ class Ingestao:
             novo = lead.get("curso")
             if novo:
                 self.est.add_curso_interesse(existente, novo, ativar=not atual.get("curso"))
+            # completa contato/origem que faltavam, sem sobrescrever o que já existe:
+            # o 1º toque é o que atribui a campanha, não o último.
+            faltando = {}
+            if not atual.get("email") and (lead.get("email") or "").strip():
+                faltando["email"] = lead["email"].strip()[:180]
+            if not atual.get("utm"):
+                u = extrair_utm(lead)
+                if u:
+                    faltando["utm"] = json.dumps(u, ensure_ascii=False)
+            if faltando:
+                self.est.set_lead(existente, **faltando)
             return {"ok": True, "acao": "atualizado", "card_id": existente}
         cap = self.ont.captavel(lead.get("curso", ""))
         # gate de captabilidade: curso não captável -> não engaja, vai p/ revisão
@@ -150,7 +182,10 @@ class Ingestao:
         optin = {} if str(lead.get("consentimento", "")).strip().lower() in ("false", "0", "nao", "não") \
             else {"optin_ts": datetime.datetime.now().isoformat(timespec="seconds"),
                   "optin_fonte": lead.get("fonte") or "meta_lead_ad"}
+        utm = extrair_utm(lead)
         self.est.upsert_lead(card_id, nome=lead.get("nome", ""), telefone=tel,
+                             email=(lead.get("email") or "").strip()[:180],
+                             utm=json.dumps(utm, ensure_ascii=False) if utm else None,
                              curso=lead.get("curso", ""), cursos_interesse=lead.get("curso", ""),
                              fase="Lead", estado_conversa=ec, escolaridade=lead.get("escolaridade"),
                              **optin)

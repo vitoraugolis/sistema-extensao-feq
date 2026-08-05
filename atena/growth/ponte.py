@@ -824,7 +824,11 @@ def processar(dados, est, g, ads, ing, ont=None):
     if not _EVENT_ID_RE.match(eid):
         eid = str(uuid.uuid4())          # id do navegador ausente/sujo: gera (sem dedup, mas rastreia)
     nome = (dados.get("nome") or "").strip()[:120]
+    # UTMs: a LP manda o dict pronto; `url` fica como fallback (extrair_utm cobre os dois)
+    utm = dados.get("utm") if isinstance(dados.get("utm"), dict) else {}
     r = ing.ingest({"nome": nome, "telefone": tel, "curso": curso,
+                    "email": (dados.get("email") or "").strip(),
+                    "url": dados.get("url"), **utm,
                     "consentimento": "true", "fonte": "ponte"})
     if not r.get("ok"):
         return {"ok": False, "motivo": r.get("motivo", "ingestão falhou")}
