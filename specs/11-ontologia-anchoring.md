@@ -56,3 +56,30 @@ reprovando no SHACL. Datas e inteiros podem ser nativos. O `validar.py` é a red
 - Mudou preço/data → editar `catalogo.jsonld` (decimais como string) e rodar `validar.py`.
 - Curso novo com gate diferente → muda o `nivelMinimo` no dado, **não** o prompt.
 - `validar.py` deve passar no CI antes de qualquer deploy (é o critério de aceitação da camada).
+
+## Promoções de campanha (✅ implementado)
+O modelo tinha UM preço por curso (`feq:planoPagamento`), e o Revisor bloqueia qualquer
+valor fora da ontologia — então campanha promocional precisou virar DADO, não texto solto.
+
+`feq:Promocao` = janela + lista de `feq:Oferta`. Cada oferta tem `rotulo`, `condicao` e
+parcelas e/ou à vista. O preço de tabela **não** é substituído: continua sendo a base sobre
+a qual o desconto é anunciado (e o que a LP mostra riscado).
+
+SHACL trava: (a) parcelas × valor fecham com o à vista da própria oferta; (b) a promoção
+**não pode terminar depois do fim das inscrições** — o lead chegaria na Extecamp e o preço
+não existiria; (c) toda oferta declara sua condição (anunciar "19x de R$ 736,18" sem dizer
+que exige grupo de 3+ seria propaganda enganosa).
+
+`Ontologia.promocao(codigo, hoje)` filtra por data **no serviço**, não em quem chama. Com isso
+a campanha some sozinha de todos os consumidores no dia seguinte ao fim: âncoras do Revisor,
+prompt do cérebro, LP e templates de recuperação.
+
+Consumidores: `ancoras()` (o Revisor passa a aceitar vários planos por curso),
+`cerebro._bloco_promo`, `ponte._investimento_itens`, `funil.valor_curso` (Purchase usa o
+valor promocional — reportar tabela numa venda com desconto infla o ROAS) e
+`whatsapp.template_promocional` (template de campanha, com duplo gate: promoção vigente
+E status APPROVED na Meta).
+
+- AC8 Valor promocional é aprovado pelo Revisor; valor inventado ou desconto somado por
+  conta própria continua bloqueado.
+- AC9 Encerrada a janela, nenhum consumidor consegue mais anunciar o preço da campanha.

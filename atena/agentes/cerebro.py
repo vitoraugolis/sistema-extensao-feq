@@ -236,6 +236,10 @@ def _bloco_promo(c):
         "lead se encaixa numa condição melhor (ex.: grupo), diga isso proativamente: é dinheiro "
         "no bolso dele. NÃO some a promoção com outros descontos (ex.: os 10% de ex-aluno "
         "Unicamp) nem prometa acúmulo — se ele perguntar, use consultar_coordenacao. "
+        "E não chame os 10% de ex-aluno de desconto 'adicional' ou 'extra' enquanto a "
+        "promoção estiver valendo: essas palavras já afirmam o acúmulo que não está "
+        "confirmado. Se for citá-los, diga que é outra política e que você confirma se "
+        "ela vale junto com a campanha. "
         f"Depois de {fim} a promoção acaba; não a mencione como se fosse eterna, e a urgência "
         "que você comunica deve ser essa data real, nunca uma pressão inventada.\n")
 
