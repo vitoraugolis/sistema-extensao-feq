@@ -80,6 +80,18 @@ valor promocional — reportar tabela numa venda com desconto infla o ROAS) e
 `whatsapp.template_promocional` (template de campanha, com duplo gate: promoção vigente
 E status APPROVED na Meta).
 
+### Contradição de prompt (incidente 06/08/2026)
+A seção DESCONTOS do prompt mandava "diga o valor CHEIO que está nos dados" — correta FORA
+de campanha — e vinha DEPOIS do bloco da promoção. O mesmo agente respondia 19x R$ 866,09
+às 17h41 e 19x R$ 799,00 às 17h44. Lição: instrução condicional não se resolve com uma
+"EXCEÇÃO" no meio do parágrafo; o trecho inteiro tem de ser condicional
+(`cerebro._bloco_descontos`), e a regra que deve vencer precisa dizer que vence.
+
+`feq:comoAplicar` (na promoção) carrega o mecanismo operacional: o formulário da Extecamp
+mostra o valor CHEIO, o desconto entra nos boletos e o lead precisa avisar após concluir a
+inscrição. Sem isso o lead via o preço cheio no formulário e concluía que fora enganado —
+o operador teve de explicar à mão. Como é campo da promoção, morre junto com a campanha.
+
 - AC8 Valor promocional é aprovado pelo Revisor; valor inventado ou desconto somado por
   conta própria continua bloqueado.
 - AC9 Encerrada a janela, nenhum consumidor consegue mais anunciar o preço da campanha.
