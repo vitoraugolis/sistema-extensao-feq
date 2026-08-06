@@ -98,7 +98,7 @@ check("line-through" not in sem, "curso sem promoção mantém a LP como era")
 
 b0480 = _bloco_promo(ONT.curso("FEQ-0480"))
 check("R$ 799,00" in b0480 and "R$ 13.987,39" in b0480, "prompt do cérebro traz os valores")
-check("nunca recalcule" in b0480 and "NÃO some a promoção" in b0480,
+check("nunca recalcule" in b0480 and "não some a campanha com outros descontos" in b0480.lower(),
       "prompt proíbe recalcular e acumular desconto")
 check(_bloco_promo(ONT.curso("FEQ-1000")) == "", "sem promoção, sem bloco no prompt")
 
@@ -208,5 +208,35 @@ check('<div class="barra-promo"' not in lp0670
       and '<div class="invest-destaque"' not in lp0670,
       "LP de curso sem campanha não recebe a marcação da campanha")
 check('<div class="barra-promo"' in lp, "LP em campanha recebe a marcação da tarja")
+
+# ------------------------------------------------------- 8) o preço que o agente ANUNCIA
+from atena.agentes.cerebro import _bloco_descontos
+
+# A causa da confusão de 06/08: a seção DESCONTOS mandava "diga o valor CHEIO" e vinha
+# DEPOIS do bloco da promoção no prompt, então vencia. O mesmo agente respondia ora
+# R$ 866,09 (tabela), ora R$ 799,00 (campanha), na mesma hora.
+d_promo = _bloco_descontos({"curso": ONT.curso("FEQ-0480")})
+d_sem = _bloco_descontos({"curso": ONT.curso("FEQ-0670")})
+check("CHEIO" not in d_promo, "curso EM CAMPANHA nunca recebe a ordem de dizer o valor cheio")
+check("CHEIO" in d_sem, "curso sem campanha mantém a regra do valor cheio (correta lá)")
+check("promocional" in d_promo, "curso em campanha é instruído a anunciar o preço promocional")
+check("10%" in d_promo and "10%" in d_sem, "os 10% de ex-aluno seguem informados nos dois casos")
+
+b0480 = _bloco_promo(ONT.curso("FEQ-0480"))
+check("prevalece sobre qualquer outra instrução" in b0480,
+      "a regra de preço da campanha se declara vencedora de conflitos no prompt")
+check("NUNCA abra a resposta pelo valor de tabela" in b0480, "proíbe abrir pelo preço cheio")
+
+# fato operacional que o operador precisou explicar à mão: o formulário mostra o cheio
+for cod in ("FEQ-0480", "FEQ-0331"):
+    pr_ = ONT.promocao(cod)
+    check(pr_.get("como_aplicar") and "boletos" in pr_["como_aplicar"],
+          f"{cod}: ontologia registra COMO o desconto chega ao aluno")
+check("formulário" in b0480 and "boletos" in b0480,
+      "agente sabe explicar por que o formulário mostra o valor cheio")
+check("como_aplicar" not in str(ONT.promocao("FEQ-1000") or {}),
+      "curso sem campanha não herda a explicação")
+check("boletos" in _investimento_itens(ONT.curso("FEQ-0480")),
+      "a LP também explica, para o visitante não achar que o preço mudou no formulário")
 
 print(f"\n{ok}/{ok} passaram.")

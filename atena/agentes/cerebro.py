@@ -228,20 +228,47 @@ def _bloco_promo(c):
         pct = f" ({o['desconto_pct']}% de desconto sobre o valor de tabela)" if o.get("desconto_pct") else ""
         linhas.append(f"  • {o['rotulo']}{pct} — {' ou '.join(partes)}. Condição: {o['condicao']}.")
     fim = "/".join(reversed((pr.get("fim") or "").split("-")))
+    aplic = (f"COMO O DESCONTO CHEGA AO ALUNO (diga isto sempre que falar de valor ou de "
+             f"inscrição, sem esperar o lead perguntar): {pr['como_aplicar']}\n"
+             if pr.get("como_aplicar") else "")
     return (
         f"PROMOÇÃO VIGENTE — {pr['rotulo']} (válida até {fim}):\n" + "\n".join(linhas) + "\n"
-        "Como usar: este é o preço que você anuncia agora. Cite o valor de tabela apenas para "
-        "mostrar a economia, deixando claro qual é qual. Os valores promocionais acima JÁ ESTÃO "
-        "CALCULADOS nos dados — reproduza-os exatamente, nunca recalcule nem arredonde. Se o "
-        "lead se encaixa numa condição melhor (ex.: grupo), diga isso proativamente: é dinheiro "
-        "no bolso dele. NÃO some a promoção com outros descontos (ex.: os 10% de ex-aluno "
-        "Unicamp) nem prometa acúmulo — se ele perguntar, use consultar_coordenacao. "
-        "E não chame os 10% de ex-aluno de desconto 'adicional' ou 'extra' enquanto a "
-        "promoção estiver valendo: essas palavras já afirmam o acúmulo que não está "
-        "confirmado. Se for citá-los, diga que é outra política e que você confirma se "
-        "ela vale junto com a campanha. "
-        f"Depois de {fim} a promoção acaba; não a mencione como se fosse eterna, e a urgência "
-        "que você comunica deve ser essa data real, nunca uma pressão inventada.\n")
+        + aplic +
+        "REGRA DE PREÇO (prevalece sobre qualquer outra instrução deste prompt): perguntou de "
+        "valor, você responde com o preço PROMOCIONAL acima. NUNCA abra a resposta pelo valor de "
+        "tabela — ele entra só depois, rotulado como 'valor de tabela', para mostrar a economia. "
+        "Responder o preço cheio existindo campanha é erro grave: o lead recebe informação pior "
+        "que a real e desiste.\n"
+        "Os valores acima já estão calculados nos dados — reproduza-os exatamente, nunca "
+        "recalcule nem arredonde. Se o lead se encaixa numa condição melhor (ex.: grupo), diga "
+        "isso proativamente: é dinheiro no bolso dele. Não some a campanha com outros descontos "
+        "nem prometa acúmulo — se perguntarem, consultar_coordenacao. "
+        f"Depois de {fim} a promoção acaba: a urgência que você comunica é essa data real, "
+        "nunca uma pressão inventada.\n")
+
+
+def _bloco_descontos(ctx):
+    """Regra de desconto, CONDICIONAL à campanha.
+
+    A versão sem promoção manda dizer o valor CHEIO — correta fora de campanha e
+    desastrosa dentro dela. Como este trecho vinha DEPOIS do bloco da promoção no
+    prompt, ele vencia a disputa: o mesmo agente respondia ora o preço de tabela,
+    ora o promocional (o que o operador viu como "agentes confusos" em 06/08)."""
+    base = ("DESCONTOS: TODOS os cursos da Extensão FEQ dão 10% para alunos e ex-alunos da "
+            "Unicamp (qualquer nível — graduação, pós, extensão etc.) — informe isso "
+            "diretamente quando perguntarem e confirme se o lead se enquadra. ")
+    if (ctx.get("curso") or {}).get("promocao"):
+        return base + (
+            "Este curso está EM CAMPANHA: o preço que você anuncia é o promocional, que já vem "
+            "pronto nos dados — não recalcule nem arredonde. Sobre os 10% de ex-aluno, não os "
+            "chame de desconto 'adicional' nem 'extra' enquanto a campanha valer: essas palavras "
+            "afirmam um acúmulo que não está confirmado. Diga que é outra política e que você "
+            "confirma se vale junto (consultar_coordenacao). ")
+    return base + (
+        "NUNCA CALCULE o valor com desconto aplicado (nem a parcela, nem o à vista): diga a "
+        "porcentagem e o valor CHEIO que está nos dados; o abatimento é aplicado pela Extecamp "
+        "na inscrição. Valor calculado por você não existe na base e é bloqueado antes de "
+        "chegar ao lead. ")
 
 
 def _bloco_curso(ctx):
@@ -327,15 +354,8 @@ def _system_prompt(ctx, lead_nome=None, precedentes=""):
         "correta, específica e conectada ao curso, SEM escalar. Seja genuinamente inteligente e "
         "útil, nunca evasivo. EXCEÇÃO: mensagem iniciada por [INFORMAÇÃO DA COORDENAÇÃO] é fonte "
         "autorizada — responda com ela.\n"
-        + _gate_instr(ctx.get("elegivel"), ctx) +
-        "DESCONTOS: TODOS os cursos da Extensão FEQ dão 10% para alunos e ex-alunos da Unicamp "
-        "(qualquer nível — graduação, pós, extensão etc.) — informe isso diretamente quando "
-        "perguntarem e confirme se o lead se enquadra. NUNCA CALCULE o valor com desconto "
-        "aplicado (nem a parcela, nem o à vista): diga a porcentagem e o valor CHEIO que está "
-        "nos dados; o abatimento é aplicado pela Extecamp na inscrição. Valor calculado por você "
-        "não existe na base e é bloqueado antes de chegar ao lead. EXCEÇÃO: os valores de uma "
-        "PROMOÇÃO VIGENTE já vêm prontos nos dados (não foram calculados por você) — esses podem "
-        "e devem ser anunciados exatamente como estão. "
+        + _gate_instr(ctx.get("elegivel"), ctx)
+        + _bloco_descontos(ctx) +
         "Se houver política específica do curso, ela "
         "estará no campo 'descontos' dos dados; use-a. Para OUTRAS categorias de desconto não "
         "listadas (ex.: servidor público) ou negociação de valor, use consultar_coordenacao. "

@@ -107,6 +107,10 @@ class Ontologia:
                 "desconto_pct": int(pct) if pct is not None else None,
             })
         return {"rotulo": str(self.g.value(promo, FEQ.rotulo) or ""),
+                # como o desconto chega ao aluno na prática. Sem isto o lead vê o valor
+                # cheio no formulário da Extecamp e acha que foi enganado — foi o que o
+                # operador precisou explicar à mão em 06/08.
+                "como_aplicar": str(self.g.value(promo, FEQ.comoAplicar) or "") or None,
                 "inicio": ini.isoformat() if ini else None,
                 "fim": fim.isoformat() if fim else None,
                 "ofertas": ofertas}

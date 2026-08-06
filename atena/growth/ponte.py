@@ -444,6 +444,10 @@ def _investimento_itens(c):
         if pr.get("fim"):
             fim = "/".join(reversed(pr["fim"].split("-")))
             itens.append(f'<span class="text-amber-400 font-semibold">Promoção válida até {fim}</span>')
+        if pr.get("como_aplicar"):
+            # sem isto o visitante vê o valor CHEIO no formulário da Extecamp e conclui
+            # que a página mentiu — foi a dúvida que o operador teve de responder à mão
+            itens.append(f'<span class="text-slate-300">{_esc(pr["como_aplicar"])}</span>')
     else:
         if p.get("n") and p.get("valor_parcela"):
             itens.append(f"Em até <strong>{p['n']}x de {_moeda(p['valor_parcela'])}</strong>")
