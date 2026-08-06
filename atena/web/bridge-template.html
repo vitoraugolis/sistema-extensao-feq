@@ -19,22 +19,33 @@
      por cima -> quase ilegível. .lp-canvas garante o fundo/cor certos sempre,
      não importa o que a página hospedeira faça. -->
 <div class="lp-canvas">
+{{BARRA_PROMO}}
 
 <!-- 1. Hero — imagem de fundo real do site (mesma do topo da home da FEQ) +
      logo oficial: a página já nasce dentro do tema (nav real + breadcrumb),
      então não repetimos cabeçalho — só reforçamos a marca aqui dentro. -->
 <section data-secao="hero" class="hero-bg text-center">
-  <div class="max-w-4xl mx-auto px-6 pt-10 pb-14">
+  <div class="max-w-4xl mx-auto px-6 pt-6 pb-10">
     <img src="{{LOGO_URL}}" alt="FEQ Unicamp" class="logo-topo">
-    <p class="mt-8 text-amber-400 text-sm font-semibold uppercase tracking-widest mb-3">{{TIPO_CURSO}} · {{MODALIDADE}}</p>
+    <p class="mt-5 text-amber-400 text-sm font-semibold uppercase tracking-widest mb-2">{{TIPO_CURSO}} · {{MODALIDADE}}</p>
     <h1 class="text-3xl sm:text-5xl font-bold leading-tight">{{NOME_CURSO}}</h1>
-    <p class="mt-5 text-lg text-slate-200 max-w-2xl mx-auto">{{OBJETIVO}}</p>
+    <p class="mt-4 text-lg text-slate-200 max-w-2xl mx-auto">{{OBJETIVO_CURTO}}</p>
+    <div class="hero-selos">{{HERO_SELOS}}</div>
+    {{HERO_PRECO}}
     <p class="mt-3 text-sm text-slate-300">{{PRAZO_LINHA}}</p>
-  <button data-cta class="mt-8 bg-amber-400 hover:bg-amber-300 text-slate-900 text-lg font-bold px-8 py-4 rounded-xl shadow-lg shadow-amber-400/20">
-    {{CTA_LABEL}}
-  </button>
+  <div class="hero-ctas">
+    <button data-cta class="bg-amber-400 hover:bg-amber-300 text-slate-900 text-lg font-bold px-8 py-4 rounded-xl shadow-lg shadow-amber-400/20">
+      {{CTA_LABEL}}
+    </button>
+    <a href="{{WA_LINK}}" target="_blank" rel="noopener" class="hero-cta-2">Tirar dúvidas no WhatsApp</a>
+  </div>
+  <p class="hero-reforco">{{HERO_REFORCO}}</p>
   </div>
 </section>
+
+<!-- Prova social IMEDIATA: os logos estavam na metade da página. Quem decide em
+     30s precisa ver antes do programa que o mercado reconhece a formação. -->
+{{EMPRESAS_TOPO_HTML}}
 
 <!-- Nav-âncora: sumário fixo (padrão de LP de curso premium — MBA USP/Esalq e
      PUCRS Online usam a mesma barra de atalhos). Sticky logo abaixo do topo
@@ -135,7 +146,6 @@
     <h2 class="text-2xl font-bold mb-3">Para quem é este curso</h2>
     <p class="text-slate-300 text-sm">{{REQUISITO}}</p>
   </div>
-  {{EMPRESAS_HTML}}
 </section>
 
 <!-- 7. Investimento -->
@@ -143,6 +153,7 @@
   <div class="bg-gradient-to-br from-amber-400/15 to-white/5 border border-amber-400/30 rounded-2xl p-8 text-center">
     <p class="text-xs uppercase tracking-widest text-amber-400 mb-2">{{INVEST_TARJA}}</p>
     <h2 class="text-2xl font-bold">Investimento</h2>
+    {{INVEST_DESTAQUE}}
     <ul class="mt-4 space-y-2 text-slate-200 checklist">
       {{INVESTIMENTO_ITENS}}
     </ul>

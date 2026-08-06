@@ -24,6 +24,8 @@ from atena.growth import funil
 _WEB = pathlib.Path(__file__).resolve().parents[1] / "web"
 _EVENT_ID_RE = re.compile(r"^[A-Za-z0-9._-]{8,64}$")
 _RAW_TOKENS = {"URL_CURSO", "CURSO", "TURMA", "CONTEUDO_HTML", "INVESTIMENTO_ITENS", "WA_LINK",
+               "BARRA_PROMO", "HERO_PRECO", "HERO_SELOS", "EMPRESAS_TOPO_HTML", "HERO_REFORCO",
+               "INVEST_DESTAQUE",
               "FOTO_PROFESSOR_HTML", "PROFESSOR_CREDENCIAL_HTML", "CURSOS_RELACIONADOS_HTML",
               "OUTROS_PROFESSORES_HTML", "SECAO_OBJETIVOS", "SECAO_HABILIDADES",
               "SECAO_DEPOIMENTOS", "EMPRESAS_HTML", "PROFESSORES_BIO_HTML", "GARANTIA_HTML",
@@ -260,6 +262,155 @@ def _conteudo_html(texto):
         f'<li class="bg-white/5 border border-white/10 rounded-xl p-4 text-sm text-slate-300">'
         f'<span class="text-amber-400 font-semibold mr-2">{i + 1:02d}</span>{_esc(t)}</li>'
         for i, t in enumerate(itens))
+
+
+def _objetivo_curto(c):
+    """Primeira frase do objetivo oficial. O texto inteiro (5 linhas de ementa
+    acadêmica) afogava a dobra; a íntegra continua na seção Objetivos."""
+    txt = (c or {}).get("objetivo") or ""
+    if not txt:
+        return _esc((c or {}).get("insight_venda") or
+                    "Curso oficial da Extensão FEQ Unicamp.")
+    corte = txt.find(":")
+    frase = txt[:corte] if 0 < corte < 220 else txt.split(". ")[0]
+    return _esc((frase.strip().rstrip(".:") + ".") if len(frase) < len(txt) else txt)
+
+
+def _hero_reforco(c, aberto):
+    """Linha de redução de risco logo abaixo do CTA — onde o visitante hesita."""
+    if not aberto:
+        return "Sem compromisso: avisamos assim que a próxima turma abrir."
+    partes = ["Inscrição pelo sistema oficial da Unicamp (Extecamp)"]
+    if c.get("garantia_7d"):
+        partes.append("7 dias de garantia")
+    if (c.get("vagas") or {}).get("max"):
+        partes.append(f"vagas limitadas a {c['vagas']['max']}")
+    return _esc(" · ".join(partes) + ".")
+
+
+def _invest_destaque(c, aberto):
+    """Cabeçalho do bloco de fechamento: quanto se economiza e até quando.
+    Sem promoção some — curso sem campanha não ganha urgência artificial."""
+    pr = (c or {}).get("promocao")
+    if not pr or not aberto:
+        return ""
+    melhor, tab = _melhor_oferta(pr), _total_tabela(c)
+    eco = ""
+    if melhor and tab:
+        alvo = float(melhor["a_vista"]) if melhor.get("a_vista") else melhor["n"] * float(melhor["valor_parcela"])
+        if tab - alvo > 0:
+            eco = (f'<p class="invest-eco">Você economiza até '
+                   f'<strong>{_moeda(f"{tab - alvo:.2f}")}</strong></p>')
+    return (f'<div class="invest-destaque"><p class="invest-destaque-tag">{_esc(pr["rotulo"])}</p>'
+            f'{eco}<p class="invest-destaque-prazo" data-prazo-dias data-fim="{pr["fim"]}">'
+            f'termina em {_ddmm(pr["fim"])}</p></div>')
+
+
+def _empresas_topo_html(empresas):
+    """Faixa compacta de prova social logo abaixo da dobra."""
+    if not empresas:
+        return ""
+    chips = "".join(f'<span class="chip-empresa">{_esc(e)}</span>' for e in empresas)
+    return ('<section data-secao="empresas-topo" class="faixa-empresas">'
+            '<p class="faixa-empresas-tit">Nossos alunos atuam em empresas como</p>'
+            f'<div class="faixa-empresas-lista">{chips}</div></section>')
+
+
+def _melhor_oferta(pr):
+    """Oferta de menor valor total — é a âncora de 'economia' que a página anuncia."""
+    def total(o):
+        if o.get("a_vista"):
+            return float(o["a_vista"])
+        if o.get("n") and o.get("valor_parcela"):
+            return o["n"] * float(o["valor_parcela"])
+        return float("inf")
+    ofertas = [o for o in (pr or {}).get("ofertas", []) if total(o) < float("inf")]
+    return min(ofertas, key=total) if ofertas else None
+
+
+def _total_tabela(c):
+    p = (c or {}).get("plano") or {}
+    try:
+        if p.get("a_vista"):
+            return float(p["a_vista"])
+        if p.get("n") and p.get("valor_parcela"):
+            return int(p["n"]) * float(p["valor_parcela"])
+    except (TypeError, ValueError):
+        pass
+    return None
+
+
+def _barra_promo(c, aberto):
+    """Tarja fixa no topo. A promoção estava na 11ª de 14 seções — o visitante
+    precisava rolar ~6.000px para descobrir que existe desconto. Aqui ela é a
+    primeira coisa que ele vê, com o prazo REAL (a contagem é client-side: a
+    página é publicada estática e um 'faltam X dias' do servidor congelaria)."""
+    pr = (c or {}).get("promocao")
+    if not pr or not aberto:
+        return ""
+    o = _melhor_oferta(pr)
+    if not o:
+        return ""
+    chamada = pr["ofertas"][0]
+    preco = (f"{chamada['n']}x de {_moeda(chamada['valor_parcela'])}"
+             if chamada.get("n") and chamada.get("valor_parcela")
+             else _moeda(chamada.get("a_vista") or o.get("a_vista")))
+    return (
+        f'<div class="barra-promo" data-secao="barra-promo">'
+        f'<div class="barra-promo-in">'
+        f'<span class="barra-promo-tag">{_esc(pr["rotulo"])}</span>'
+        f'<span class="barra-promo-txt"><strong>{preco}</strong>'
+        f'<span class="barra-promo-sep">·</span>'
+        f'<span data-prazo-dias data-fim="{pr["fim"]}">termina em {_ddmm(pr["fim"])}</span></span>'
+        f'<button data-cta class="barra-promo-btn">Garantir vaga</button>'
+        f'</div></div>')
+
+
+def _hero_preco(c, aberto):
+    """Preço na primeira dobra. Página de venda sem preço acima da dobra obriga o
+    visitante a caçar a informação que mais pesa na decisão."""
+    pr = (c or {}).get("promocao")
+    p = (c or {}).get("plano") or {}
+    if not aberto:
+        return ""
+    if pr and pr["ofertas"]:
+        o = pr["ofertas"][0]
+        principal = (f'{o["n"]}x de <strong>{_moeda(o["valor_parcela"])}</strong>'
+                     if o.get("n") and o.get("valor_parcela") else _moeda(o.get("a_vista")))
+        de = (f'<span class="hero-preco-de">de {p["n"]}x de {_moeda(p["valor_parcela"])}</span>'
+              if p.get("n") and p.get("valor_parcela") else "")
+        melhor, economia = _melhor_oferta(pr), None
+        tab = _total_tabela(c)
+        if melhor and tab:
+            alvo = float(melhor["a_vista"]) if melhor.get("a_vista") else melhor["n"] * float(melhor["valor_parcela"])
+            economia = tab - alvo
+        extra = (f'<p class="hero-preco-eco">Economia de até <strong>{_moeda(f"{economia:.2f}")}</strong> '
+                 f'— {_esc(melhor["rotulo"].lower())}</p>' if economia and economia > 0 else "")
+        return (f'<div class="hero-preco">{de}'
+                f'<p class="hero-preco-num">{principal}</p>{extra}</div>')
+    if p.get("n") and p.get("valor_parcela"):
+        return (f'<div class="hero-preco"><p class="hero-preco-num">'
+                f'{p["n"]}x de <strong>{_moeda(p["valor_parcela"])}</strong></p></div>')
+    return ""
+
+
+_SELO_RE = None
+
+
+def _hero_selos(c):
+    """Selos de confiança na dobra: o que o visitante checa antes de considerar
+    o preço. Só entra o que existe na ontologia — nada de badge inventado."""
+    selos = []
+    if c.get("carga_horas"):
+        selos.append(("⏱", f"{c['carga_horas']}h de curso"))
+    selos.append(("🎓", "Certificado Unicamp"))
+    if c.get("formato_aulas_resumo") or c.get("modalidade"):
+        selos.append(("💻", c.get("formato_aulas_resumo") or c["modalidade"]))
+    vagas = (c.get("vagas") or {}).get("max")
+    if vagas:
+        selos.append(("👥", f"Turma de até {vagas} alunos"))
+    return "".join(f'<span class="selo"><span class="selo-ic">{i}</span>{_esc(txt)}</span>'
+                   for i, txt in selos)
 
 
 def _promo_ofertas_html(pr):
@@ -619,14 +770,16 @@ def render_tokens(meta_row, c, aberto=True):
         n_p, vp_p = o.get("n"), o.get("valor_parcela")
         plano_curto = (f"{n_p}x de {_moeda(vp_p)}" if n_p and vp_p
                        else (_moeda(o["a_vista"]) if o.get("a_vista") else "Unicamp"))
-        melhores = " · ".join(
-            f'{oo["rotulo"]}: ' + " ou ".join(
-                ([f'{oo["n"]}x de {_moeda(oo["valor_parcela"])}'] if oo.get("n") and oo.get("valor_parcela") else [])
-                + ([f'{_moeda(oo["a_vista"])} à vista'] if oo.get("a_vista") else []))
-            for oo in promo["ofertas"])
-        plano_det = f"{promo['rotulo']} — {melhores}."
-        if taxa:
-            plano_det += f" Taxa de inscrição: {_moeda(taxa)}."
+        # card pequeno: só o essencial. O detalhe completo (todas as ofertas, condições,
+        # tabela riscada) fica na seção Investimento — repetir tudo aqui virava parágrafo.
+        melhor = _melhor_oferta(promo)
+        plano_det = f"{promo['rotulo']}, até {_ddmm(promo.get('fim'))}."
+        if melhor is not None and melhor is not o:
+            alt = " ou ".join(
+                ([f'{melhor["n"]}x de {_moeda(melhor["valor_parcela"])}']
+                 if melhor.get("n") and melhor.get("valor_parcela") else [])
+                + ([f'{_moeda(melhor["a_vista"])} à vista'] if melhor.get("a_vista") else []))
+            plano_det += f" {melhor['rotulo']}: {alt}."
         if n and vp:
             plano_det += f" Valor de tabela: {n}x de {_moeda(vp)}."
     elif n:
@@ -637,7 +790,7 @@ def render_tokens(meta_row, c, aberto=True):
         plano_det += "."
     else:
         plano_curto, plano_det = "Unicamp", "Condições de pagamento na página oficial da Extecamp."
-    if c.get("descontos"):
+    if c.get("descontos") and not promo:      # com campanha, isto já está no Investimento
         plano_det += " " + c["descontos"]
     formato_resumo = c.get("formato_aulas_resumo") or (
         "Sábados" if "sábado" in horario.lower() else (horario.split()[0].capitalize() if horario else "Flexível"))
@@ -686,6 +839,12 @@ def render_tokens(meta_row, c, aberto=True):
         "NAV_DEPOIMENTOS": ('<a href="#depoimentos">Depoimentos</a>'
                             if c.get("depoimentos") else ""),
         "EMPRESAS_HTML": _secao_empresas_html(c.get("empresas")),
+        "EMPRESAS_TOPO_HTML": _empresas_topo_html(c.get("empresas")),
+        "BARRA_PROMO": _barra_promo(c, aberto),
+        "HERO_PRECO": _hero_preco(c, aberto),
+        "HERO_SELOS": _hero_selos(c),
+        "OBJETIVO_CURTO": _objetivo_curto(c),
+        "HERO_REFORCO": _hero_reforco(c, aberto),
         "PROFESSORES_BIO_HTML": _professores_bio_html(c),
         "GARANTIA_HTML": _garantia_html(c),
         "SALARIO_HTML": _salario_html(c),
@@ -713,6 +872,7 @@ def render_tokens(meta_row, c, aberto=True):
         # A seção "Como se inscrever" (passos da Extecamp) só faz sentido com turma aberta.
         "SECAO_INSCRICAO": _secao_inscricao_html(c, aberto),
         "NAV_INSCRICAO": '<a href="#inscricao">Inscrição</a>' if aberto else "",
+        "INVEST_DESTAQUE": _invest_destaque(c, aberto),
         "INVEST_TARJA": (f"Inscrições abertas até {_ddmm(c.get('inscricoes_fim'))}" if aberto
                          else "Valores da última turma · sem inscrições abertas"),
         "INVEST_RODAPE": (

@@ -16,6 +16,26 @@
   var erroOptin = document.getElementById("erro-optin");
   var TIMEOUT_MS = 1500;
 
+  // Contagem regressiva da campanha. A página é publicada ESTÁTICA no WordPress,
+  // então "faltam X dias" calculado no servidor congelaria no dia da publicação —
+  // e passaria a mentir. Calcular no cliente mantém a urgência sempre verdadeira,
+  // e o texto vira o prazo puro quando a campanha acaba.
+  function prazoDias() {
+    Array.prototype.forEach.call(document.querySelectorAll("[data-prazo-dias]"), function (el) {
+      var fim = new Date(el.getAttribute("data-fim") + "T23:59:59");
+      if (isNaN(fim)) return;
+      var dias = Math.ceil((fim - new Date()) / 86400000);
+      if (dias > 1) el.textContent = "termina em " + dias + " dias";
+      else if (dias === 1) el.textContent = "último dia amanhã";
+      else if (dias === 0) el.textContent = "ÚLTIMO DIA";
+      else {
+        var barra = el.closest(".barra-promo");
+        if (barra) barra.style.display = "none";       // campanha encerrada: some
+      }
+    });
+  }
+  prazoDias();
+
   function uuid() {
     return (window.crypto && crypto.randomUUID) ? crypto.randomUUID()
       : "s-" + Date.now() + "-" + Math.random().toString(16).slice(2);

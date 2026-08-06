@@ -80,7 +80,7 @@ div:has(> #busca-feq) { display: none !important; }
 }
 /* respiro entre a marca do site (barra branca/azul, real, acima) e a nossa:
    sem isto o logo ficava colado embaixo do cabeçalho do tema. */
-.logo-topo { height: 56px; width: auto; margin-top: 1.5rem; }
+.logo-topo { height: 44px; width: auto; margin-top: .5rem; }
 .foto-professor {
   width: 96px; height: 96px; border-radius: 9999px; object-fit: cover;
   border: 2px solid rgb(251 191 36 / 0.4); flex-shrink: 0;
@@ -314,8 +314,11 @@ h1, h2, h3, p { margin: 0; }
 @media (min-width: 640px) {
   .sm\:text-3xl { font-size: 1.875rem; line-height: 2.25rem; }
   .sm\:text-5xl { font-size: 3rem; line-height: 1; }
-  .sm\:grid-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  .sm\:grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  /* MESMA especificidade da regra base (.grid.sm\:grid-cols-N, 2 classes): com só
+     uma classe aqui, a regra mobile de 1 coluna vencia e o layout de 3 colunas
+     NUNCA aplicava — as seções apareciam como cards gigantes empilhados. */
+  .grid.sm\:grid-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .grid.sm\:grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 /* ---- Seções ricas (conteúdo das páginas oficiais preexistentes, spec 17) ---- */
@@ -418,3 +421,82 @@ h1, h2, h3, p { margin: 0; }
 /* utilitário do JS: [flex] some quando .hidden está presente no #modal */
 #modal.hidden { display: none; }
 #modal.flex { display: flex; }
+
+/* ---------------------------------------------------------------- venda (campanha)
+   A promoção ficava na 11ª de 14 seções. Estes blocos a trazem para a primeira
+   dobra, que é onde a decisão de continuar lendo acontece. */
+.barra-promo { position: sticky; top: 0; z-index: 60;
+  background: linear-gradient(90deg, #b45309, #f59e0b); color: #1f1300; }
+.barra-promo-in { max-width: 56rem; margin: 0 auto; padding: 9px 20px;
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap; justify-content: center;
+  font-size: .9rem; font-weight: 600; }
+.barra-promo-tag { text-transform: uppercase; letter-spacing: .08em; font-size: .7rem;
+  background: rgba(0,0,0,.22); padding: 3px 9px; border-radius: 999px; }
+.barra-promo-txt strong { font-size: 1rem; }
+.barra-promo-sep { margin: 0 8px; opacity: .55; }
+.barra-promo-btn { background: #1f1300; color: #fde68a; border: 0; cursor: pointer;
+  font-weight: 700; font-size: .82rem; padding: 7px 15px; border-radius: 8px; }
+.barra-promo-btn:hover { background: #000; }
+
+.hero-selos { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 16px; }
+.selo { display: inline-flex; align-items: center; gap: 6px; font-size: .82rem; color: #e2e8f0;
+  background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.13);
+  padding: 6px 13px; border-radius: 999px; }
+.selo-ic { font-size: .95rem; }
+
+.hero-preco { margin-top: 18px; }
+.hero-preco-de { display: block; font-size: .85rem; color: #94a3b8; text-decoration: line-through; }
+.hero-preco-num { font-size: 2rem; font-weight: 700; color: #fff; line-height: 1.15; margin-top: 2px; }
+.hero-preco-num strong { color: #fbbf24; }
+.hero-preco-eco { margin-top: 6px; font-size: .87rem; color: #fbbf24; }
+
+.hero-ctas { margin-top: 20px; display: flex; gap: 12px; justify-content: center;
+  align-items: center; flex-wrap: wrap; }
+.hero-cta-2 { color: #e2e8f0; border: 1px solid rgba(255,255,255,.28); text-decoration: none;
+  font-weight: 600; padding: 15px 22px; border-radius: 12px; font-size: .95rem; }
+.hero-cta-2:hover { background: rgba(255,255,255,.08); }
+.hero-reforco { margin-top: 14px; font-size: .8rem; color: #94a3b8; }
+
+.faixa-empresas { border-top: 1px solid rgba(255,255,255,.08);
+  border-bottom: 1px solid rgba(255,255,255,.08); padding: 22px 20px; text-align: center; }
+.faixa-empresas-tit { font-size: .72rem; text-transform: uppercase; letter-spacing: .14em;
+  color: #64748b; margin-bottom: 12px; }
+.faixa-empresas-lista { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+.chip-empresa { font-size: .84rem; font-weight: 600; color: #cbd5e1;
+  background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.1);
+  padding: 6px 14px; border-radius: 8px; }
+
+/* Mobile é de onde vem a maior parte do tráfego da Meta. Sem estes ajustes o
+   preço só aparecia por volta de 1.500px — muito abaixo da primeira dobra, que é
+   justamente onde a decisão de continuar (ou sair) acontece. */
+@media (max-width: 640px) {
+  .barra-promo-in { font-size: .72rem; padding: 7px 9px; gap: 6px; flex-wrap: nowrap;
+    justify-content: space-between; }
+  .barra-promo-txt { white-space: nowrap; }
+  .barra-promo-tag { display: none; }             /* o preço já identifica a campanha */
+  .barra-promo-txt strong { font-size: .86rem; }
+  .barra-promo-sep { margin: 0 5px; }
+  .barra-promo-btn { font-size: .74rem; padding: 6px 10px; white-space: nowrap; }
+  .logo-topo { height: 34px; margin-top: .25rem; }
+  .hero-bg h1 { font-size: 1.6rem; line-height: 1.2; }
+  /* a íntegra do objetivo continua na seção Objetivos; aqui ele é isca, não ementa */
+  .hero-bg h1 + p { font-size: .95rem; display: -webkit-box; -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical; overflow: hidden; }
+  .hero-selos { gap: 6px; margin-top: 12px; }
+  .selo { font-size: .72rem; padding: 4px 9px; }
+  .hero-preco { margin-top: 14px; }
+  .hero-preco-num { font-size: 1.75rem; }
+  .hero-preco-eco { font-size: .78rem; }
+  .hero-ctas { margin-top: 16px; gap: 9px; }
+  .hero-ctas > * { width: 100%; text-align: center; }
+  .hero-cta-2 { padding: 12px 18px; font-size: .88rem; }
+}
+.invest-destaque { margin: 14px auto 4px; max-width: 26rem;
+  background: rgba(251,191,36,.12); border: 1px solid rgba(251,191,36,.35);
+  border-radius: 14px; padding: 14px 18px; }
+.invest-destaque-tag { font-size: .68rem; text-transform: uppercase; letter-spacing: .12em;
+  color: #fbbf24; font-weight: 700; }
+.invest-eco { font-size: 1.05rem; color: #f1f5f9; margin-top: 4px; }
+.invest-eco strong { color: #fbbf24; font-size: 1.25rem; }
+.invest-destaque-prazo { margin-top: 4px; font-size: .82rem; font-weight: 700; color: #fbbf24;
+  text-transform: uppercase; letter-spacing: .05em; }

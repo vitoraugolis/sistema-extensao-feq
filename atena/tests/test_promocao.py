@@ -165,4 +165,48 @@ check(p["template"] == "feq_promo_0480", "retentativa por pacing usa o template 
 p2 = R.plano({"card_id": "x", "telefone": "5519996027820", "curso": "FEQ-0480"}, env, promo_tpl=None)
 check(p2["template"] != "feq_promo_0480", "sem campanha vigente, volta aos templates genéricos")
 
+# ------------------------------------------------------- 7) a LP como página de venda
+from atena.growth import ponte as P
+from atena.growth.db import Growth
+
+c0480, c0670 = ONT.curso("FEQ-0480"), ONT.curso("FEQ-0670")
+
+barra = P._barra_promo(c0480, True)
+check("barra-promo" in barra and "R$ 799,00" in barra, "tarja fixa anuncia a campanha no topo")
+check('data-prazo-dias' in barra and 'data-fim="2026-08-16"' in barra,
+      "prazo da tarja é calculado no cliente (página publicada estática não congela a contagem)")
+check(P._barra_promo(c0670, True) == "", "curso sem campanha não ganha tarja")
+check(P._barra_promo(c0480, False) == "", "sem inscrição aberta não há tarja (nada a vender)")
+
+hp = P._hero_preco(c0480, True)
+check("R$ 799,00" in hp and "866,09" in hp, "preço e ancoragem ficam na primeira dobra")
+check("2.468,36" in hp, "economia calculada sobre a melhor oferta")
+check(P._hero_preco(c0480, False) == "", "curso fechado não exibe preço no topo")
+
+selos = P._hero_selos(c0480)
+check("368h" in selos and "Certificado Unicamp" in selos and "60 alunos" in selos,
+      "selos de confiança saem da ontologia (nada inventado)")
+
+check("Nossos alunos atuam em empresas" in P._empresas_topo_html(c0480["empresas"]),
+      "prova social sobe para logo abaixo da dobra, com o texto oficial")
+check(P._empresas_topo_html(None) == "", "sem empresas, a faixa some")
+
+idst = P._invest_destaque(c0480, True)
+check("economiza" in idst and "2.468,36" in idst, "bloco de fechamento repete a economia")
+check(P._invest_destaque(c0670, True) == "",
+      "curso sem campanha não recebe urgência artificial")
+
+lp = P.render(Growth(":memory:"), ONT, "FEQ-0480")
+for frag in ("barra-promo", "hero-preco", "hero-selos", "faixa-empresas", "invest-destaque",
+             "Tirar dúvidas no WhatsApp"):
+    check(frag in lp, f"LP renderizada contém {frag}")
+check("{{" not in lp, "nenhum placeholder ficou sem substituição")
+lp0670 = P.render(Growth(":memory:"), ONT, "FEQ-0670")
+# o CSS é inlinado em TODA página, então o nome da classe existe sempre:
+# o que prova a ausência da campanha é a MARCAÇÃO, não o seletor.
+check('<div class="barra-promo"' not in lp0670
+      and '<div class="invest-destaque"' not in lp0670,
+      "LP de curso sem campanha não recebe a marcação da campanha")
+check('<div class="barra-promo"' in lp, "LP em campanha recebe a marcação da tarja")
+
 print(f"\n{ok}/{ok} passaram.")
