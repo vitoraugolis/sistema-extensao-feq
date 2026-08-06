@@ -163,7 +163,8 @@ def rodar(est, ont, wa, agora=None, limite=20):
     candidatos = [l for l in est.leads_sem_entrega() if _elegivel(l, ont)]
     for lead in candidatos[:limite]:
         envios = est.envios_do_lead(lead["card_id"])
-        p = plano(lead, envios, agora, templates_meta, template_promocional(lead.get("curso"), ont))
+        p = plano(lead, envios, agora, templates_meta,
+                  template_promocional(lead.get("curso"), ont, wa))
         if p["acao"] == "esperar":
             esperando += 1
         elif p["acao"] == "humano":

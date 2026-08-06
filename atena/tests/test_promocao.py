@@ -138,6 +138,21 @@ class _OntSemPromo:
 check(template_promocional("FEQ-0480", _OntSemPromo()) is None,
       "campanha encerrada trava o template (não anuncia preço morto)")
 
+class _WA:
+    def __init__(self, st):
+        self._st = st
+
+    def templates_status(self, forcar=False):
+        return self._st
+
+
+check(template_promocional("FEQ-0480", ONT, _WA({"feq_promo_0480": "PENDING"})) is None,
+      "template ainda em revisão na Meta não é usado (não queima tentativa)")
+check(template_promocional("FEQ-0480", ONT, _WA({"feq_promo_0480": "APPROVED"})) == "feq_promo_0480",
+      "aprovado na Meta, passa a ser usado")
+check(template_promocional("FEQ-0480", ONT, _WA(None)) == "feq_promo_0480",
+      "sem conseguir consultar a Meta (dev/dry-run), não bloqueia")
+
 check(montar_params("feq_promo_0480", {"nome": "Ana", "curso": "FEQ-0480"}, ONT)
       == ["Ana", "16/08/2026"], "params do template de campanha: nome + prazo")
 

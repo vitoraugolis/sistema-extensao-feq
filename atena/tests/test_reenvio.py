@@ -92,6 +92,9 @@ class WAFake:
     def templates_listar(self):
         return None
 
+    def templates_status(self, forcar=False):
+        return None
+
     def enviar_template(self, telefone, nome, idioma="pt_BR", params=None):
         self.enviados.append((telefone, nome))
         return {"ok": True, "wamid": f"wamid.{len(self.enviados)}"}

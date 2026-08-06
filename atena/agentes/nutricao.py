@@ -100,7 +100,7 @@ def reativar(est, ont, wa, propor=None, agora=None):
         # FORA da janela -> cadência de templates escalonados
         if janela_h is None or janela_h >= 24:
             from atena.transporte.whatsapp import template_promocional
-            nome = _template_frio_devido(l, sil_dias, template_promocional(l["curso"], ont))
+            nome = _template_frio_devido(l, sil_dias, template_promocional(l["curso"], ont, wa))
             if nome and _enviar_template(est, ont, wa, l, nome).get("ok"):
                 templates += 1
     if templates or nudges:

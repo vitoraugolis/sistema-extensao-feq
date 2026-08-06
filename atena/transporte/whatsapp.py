@@ -139,12 +139,20 @@ def montar_params(nome_template, lead, ont):
     return None if any(not v.strip() for v in vals) else vals
 
 
-def template_promocional(curso, ont):
-    """Nome do template de campanha do curso, ou None se não houver promoção VIGENTE."""
+def template_promocional(curso, ont, wa=None):
+    """Nome do template de campanha do curso, ou None.
+
+    Dois gates, os dois necessários:
+      • promoção VIGENTE na ontologia — senão anunciaríamos preço morto;
+      • template APROVADO na Meta — recém-criado ele fica PENDING, e mandar um
+        template não aprovado só queima a tentativa de recuperação do lead.
+    Sem conseguir consultar a Meta (dry-run/dev), não bloqueia por aprovação.
+    """
     nome = TEMPLATES_PROMO.get((curso or "").upper())
-    if not nome or not ont:
+    if not nome or not ont or not ont.promocao(curso):
         return None
-    return nome if ont.promocao(curso) else None
+    st = wa.templates_status() if wa is not None else None
+    return nome if (st is None or st.get(nome) == "APPROVED") else None
 
 
 CATEGORIAS_TEMPLATE = [
