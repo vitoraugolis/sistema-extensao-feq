@@ -161,6 +161,7 @@ def conversas():
     """Lista leve (estilo WhatsApp: nome, preview, hora) — a thread completa só
     carrega quando a conversa é aberta (/api/conversas/<id>)."""
     out = []
+    nao_lidas = EST.nao_lidas()          # uma consulta só, não uma por conversa
     for l in EST.listar_leads():
         hist = EST.historico(l["card_id"])
         prop = EST.decisao_pendente(l["card_id"])
@@ -173,6 +174,7 @@ def conversas():
                     "preview": _preview(ult)[:80],
                     "preview_de_lead": bool(ult and ult["papel"] == "lead"),
                     "aguardando": bool(ult and ult["papel"] == "lead"),   # último turno foi do lead
+                    "nao_lidas": nao_lidas.get(l["card_id"], 0),
                     "pendente": bool(prop)})
     return jsonify(out)
 
@@ -184,7 +186,11 @@ def conversa_detalhe(card_id):
     if not lead:
         return jsonify({"erro": "lead inexistente"}), 404
     prop = EST.decisao_pendente(card_id)
+    # abrir a conversa É a leitura. Devolve a marca d'água ANTERIOR para a UI desenhar
+    # a linha de "não lidas" no ponto certo — depois de marcada, ela se perderia.
+    lido_ate = EST.marcar_lido(card_id)
     return jsonify({"id": card_id, "lead": lead["nome"], "iniciais": _iniciais(lead["nome"]),
+                    "lido_ate": lido_ate,
                     "curso": lead["curso"], "cursos": EST.cursos_interesse(lead),
                     "estado": lead["estado_conversa"], "fase": lead["fase"],
                     "telefone": lead["telefone"], "optout": bool(lead.get("optout")),

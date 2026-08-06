@@ -126,7 +126,11 @@ class Estado:
                     # número mandamos — sem o destino não dá para saber qual variante do 9º
                     # dígito funcionou e corrigir o cadastro do lead.
                     "ALTER TABLE conversas ADD COLUMN erro_codigo INTEGER",
-                    "ALTER TABLE conversas ADD COLUMN destino TEXT"):
+                    "ALTER TABLE conversas ADD COLUMN destino TEXT",
+                    # Marca d'água de leitura do OPERADOR (não do agente). cards_vistos
+                    # existia sem uso desde o início; ganha aqui a função de dizer até que
+                    # mensagem a conversa foi lida por um humano.
+                    "ALTER TABLE cards_vistos ADD COLUMN ultimo_id INTEGER"):
             try:
                 self.conn.execute(mig)
             except sqlite3.OperationalError:
@@ -381,10 +385,44 @@ class Estado:
     def historico(self, card_id):
         with self._lock:
             rows = self.conn.execute(
-                "SELECT papel,texto,tipo,media_id,wamid,status,ts,autor FROM conversas"
+                "SELECT id,papel,texto,tipo,media_id,wamid,status,ts,autor FROM conversas"
                 " WHERE card_id=? ORDER BY id",
                 (card_id,)).fetchall()
         return [dict(r) for r in rows]
+
+    # ------------------------------------------------------- leitura pelo operador
+    def marcar_lido(self, card_id):
+        """Conversa lida ATÉ a última mensagem existente agora. Devolve a marca d'água
+        ANTERIOR — é ela que diz à UI onde desenhar a linha de 'não lidas'."""
+        with self._lock:
+            r = self.conn.execute("SELECT ultimo_id FROM cards_vistos WHERE card_id=?",
+                                  (card_id,)).fetchone()
+            antes = (r["ultimo_id"] if r else None) or 0
+            m = self.conn.execute("SELECT MAX(id) m FROM conversas WHERE card_id=?",
+                                  (card_id,)).fetchone()
+            agora_id = m["m"] or 0
+            self.conn.execute(
+                "INSERT INTO cards_vistos(card_id, visto_em, ultimo_id) VALUES(?,?,?)"
+                " ON CONFLICT(card_id) DO UPDATE SET visto_em=excluded.visto_em,"
+                " ultimo_id=MAX(COALESCE(cards_vistos.ultimo_id,0), excluded.ultimo_id)",
+                (card_id, _agora(), agora_id))
+            self.conn.commit()
+        return antes
+
+    def nao_lidas(self):
+        """{card_id: qtd} de mensagens DO LEAD que o operador ainda não viu.
+
+        Conta só papel='lead' de propósito: o agente responder é ação NOSSA e não pode
+        zerar o contador — o operador precisa saber o que chegou mesmo com a IA atendendo.
+        Conversa nunca aberta tem marca d'água 0, então tudo dela conta como não lido.
+        """
+        with self._lock:
+            rows = self.conn.execute(
+                "SELECT c.card_id, COUNT(*) n FROM conversas c"
+                " LEFT JOIN cards_vistos v ON v.card_id=c.card_id"
+                " WHERE c.papel='lead' AND c.id > COALESCE(v.ultimo_id, 0)"
+                " GROUP BY c.card_id").fetchall()
+        return {r["card_id"]: r["n"] for r in rows}
 
     def atualizar_status_msg(self, wamid, status, codigo=None):
         """Webhook de status do WhatsApp -> atualiza o status da nossa mensagem enviada.
