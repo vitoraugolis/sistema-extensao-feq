@@ -79,7 +79,72 @@ TEMPLATES_ROL = [
                 {"k": "prazo", "rotulo": "Prazo de inscrição"}]},
     {"nome": "retomar_atendimento", "idioma": "pt_BR", "titulo": "Retomar atendimento",
      "descricao": "Convida o lead a reabrir a conversa (sem variáveis).", "params": []},
+    {"nome": "feq_promo_0480", "idioma": "pt_BR", "titulo": "Campanha FEQ-0480",
+     "descricao": "Recuperação com o preço da campanha do FEQ-0480 (só enquanto vigente).",
+     "params": [{"k": "nome", "rotulo": "Nome"}, {"k": "prazo", "rotulo": "Prazo de inscrição"}]},
+    {"nome": "feq_promo_0331", "idioma": "pt_BR", "titulo": "Campanha FEQ-0331",
+     "descricao": "Recuperação com o preço da campanha do FEQ-0331 (só enquanto vigente).",
+     "params": [{"k": "nome", "rotulo": "Nome"}, {"k": "prazo", "rotulo": "Prazo de inscrição"}]},
 ]
+
+
+# Templates de RECUPERAÇÃO dedicados a uma campanha. O preço vai literal no corpo
+# (é a identidade da oferta), então eles só podem ser usados enquanto a promoção do
+# curso estiver vigente — `template_promocional` faz esse gate contra a ontologia.
+# Sem isso, um template aprovado sobreviveria à campanha e anunciaria preço morto.
+TEMPLATES_PROMO = {"FEQ-0480": "feq_promo_0480", "FEQ-0331": "feq_promo_0331"}
+
+CORPOS_PROMO = {
+    "feq_promo_0480": (
+        "Oi, {{1}}! Aqui é da Extensão FEQ Unicamp. As inscrições do curso Técnicas de "
+        "Inteligência Artificial Aplicadas às Engenharias de Processos (FEQ-0480) vão até "
+        "{{2}} e, nesta campanha, o investimento está em 19x de R$ 799,00. "
+        "Pagando à vista ou fechando em grupo de 3 ou mais pessoas, são 15% de desconto: "
+        "19x de R$ 736,18 ou R$ 13.987,39 à vista. "
+        "Quer que eu te envie o programa completo e o link de inscrição?"),
+    "feq_promo_0331": (
+        "Oi, {{1}}! Aqui é da Extensão FEQ Unicamp. As inscrições do curso Análise "
+        "Quantitativa de Riscos combinada à Fluidodinâmica Computacional e Aprendizagem de "
+        "Máquina (FEQ-0331) vão até {{2}} e, nesta campanha, há 10% de desconto com "
+        "parcelamento em 6x: 6x de R$ 872,39 ou R$ 5.234,36 à vista. "
+        "Quer que eu te envie o programa completo e o link de inscrição?"),
+}
+
+
+# Forma dos parâmetros de cada template, em UM lugar só: antes cada caminho de envio
+# (nutrição, reenvio) montava a sua e bastava um deles divergir do WABA para o envio
+# falhar silenciosamente. Templates de campanha usam nome+prazo (o curso já está no corpo).
+PARAMS_TEMPLATE = {
+    "feq_abertura_curso": ("nome", "curso"),
+    "feq_lead": ("nome", "curso"),
+    "feq_reengajamento": ("nome", "curso", "prazo"),
+    "feq_lembrete_inscricao": ("nome", "curso", "prazo"),
+    "retomar_atendimento": (),
+    "feq_promo_0480": ("nome", "prazo"),
+    "feq_promo_0331": ("nome", "prazo"),
+}
+
+
+def montar_params(nome_template, lead, ont):
+    """Parâmetros do template na ordem que o WABA espera. Devolve None quando algum
+    campo sairia VAZIO — a Meta recusa variável em branco, e é melhor não enviar do
+    que gastar a tentativa num 400."""
+    c = (ont.curso(lead.get("curso")) or {}) if ont else {}
+    fonte = {
+        "nome": (lead.get("nome") or "").strip() or "olá",
+        "curso": f"{c.get('nome', lead.get('curso') or '')} ({c.get('codigo', '')})".strip(),
+        "prazo": "/".join(reversed((c.get("inscricoes_fim") or "").split("-"))),
+    }
+    vals = [fonte.get(k, "") for k in PARAMS_TEMPLATE.get(nome_template, ("nome", "curso"))]
+    return None if any(not v.strip() for v in vals) else vals
+
+
+def template_promocional(curso, ont):
+    """Nome do template de campanha do curso, ou None se não houver promoção VIGENTE."""
+    nome = TEMPLATES_PROMO.get((curso or "").upper())
+    if not nome or not ont:
+        return None
+    return nome if ont.promocao(curso) else None
 
 
 CATEGORIAS_TEMPLATE = [

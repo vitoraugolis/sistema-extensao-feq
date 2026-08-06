@@ -105,8 +105,25 @@ def classificar(pontos):
 
 def valor_curso(c):
     """Valor da conversão (Purchase) a partir do plano da ontologia:
-    à vista quando existe; senão parcelas×valor; senão 0."""
+    à vista quando existe; senão parcelas×valor; senão 0.
+
+    Com promoção vigente o valor é o PROMOCIONAL — reportar o preço de tabela numa
+    venda com desconto infla o ROAS e faz o Growth Engine investir errado. Usa a
+    oferta mais barata (a mais provável de fechar) para não superestimar."""
     p = (c or {}).get("plano") or {}
+    promo = (c or {}).get("promocao")
+    if promo and promo.get("ofertas"):
+        vals = []
+        for o in promo["ofertas"]:
+            try:
+                if o.get("a_vista"):
+                    vals.append(round(float(o["a_vista"]), 2))
+                elif o.get("n") and o.get("valor_parcela"):
+                    vals.append(round(int(o["n"]) * float(o["valor_parcela"]), 2))
+            except (TypeError, ValueError):
+                pass
+        if vals:
+            return min(vals)
     try:
         if p.get("a_vista"):
             return round(float(p["a_vista"]), 2)

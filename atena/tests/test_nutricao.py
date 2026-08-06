@@ -15,6 +15,7 @@ def check(c, msg):
 
 class FakeOnt:
     def __init__(self, captavel=True): self._cap = captavel
+    def promocao(self, curso, hoje=None): return None   # sem campanha nos testes
     def captavel(self, curso): return {"captavel": self._cap}
     def curso(self, curso): return {"codigo": curso, "nome": "Curso X", "inscricoes_fim": "2026-12-31"}
 

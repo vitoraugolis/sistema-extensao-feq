@@ -258,6 +258,8 @@ h1, h2, h3, p { margin: 0; }
 .text-slate-300 { color: #cbd5e1; }
 .text-slate-400 { color: #94a3b8; }
 .text-slate-500 { color: #64748b; }
+/* preço de tabela riscado ao lado do promocional (campanha) */
+.line-through { text-decoration: line-through; }
 .text-slate-900 { color: #0f172a; }
 .text-amber-400 { color: #fbbf24; }
 .text-red-400 { color: #f87171; }

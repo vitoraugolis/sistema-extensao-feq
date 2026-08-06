@@ -79,6 +79,38 @@ class Ontologia:
         fim = self.g.value(j, FEQ.fim)
         return (ini.toPython() if ini else None, fim.toPython() if fim else None)
 
+    def promocao(self, codigo, hoje=None):
+        """Promoção VIGENTE do curso, ou None. A filtragem por data é aqui, e não em
+        quem chama, porque promoção fora da janela não pode chegar a lead nenhum: o
+        preço não existe mais na Extecamp e o Revisor deixaria passar (é âncora)."""
+        u = self._uri(codigo)
+        if not u:
+            return None
+        promo = self.g.value(u, FEQ.promocao)
+        if not promo:
+            return None
+        hoje = hoje or datetime.date.today()
+        ini, fim = self._janela(promo, FEQ.janela)
+        if (ini and hoje < ini) or (fim and hoje > fim):
+            return None
+        ofertas = []
+        lst = self.g.value(promo, FEQ.ofertas)
+        for o in (self.g.items(lst) if lst else []):
+            n = self.g.value(o, FEQ.numParcelas)
+            pct = self.g.value(o, FEQ.percentualDesconto)
+            ofertas.append({
+                "rotulo": str(self.g.value(o, FEQ.rotulo) or ""),
+                "condicao": str(self.g.value(o, FEQ.condicao) or ""),
+                "n": int(n) if n is not None else None,
+                "valor_parcela": str(self.g.value(o, FEQ.valorParcela) or "") or None,
+                "a_vista": str(self.g.value(o, FEQ.aVista) or "") or None,
+                "desconto_pct": int(pct) if pct is not None else None,
+            })
+        return {"rotulo": str(self.g.value(promo, FEQ.rotulo) or ""),
+                "inicio": ini.isoformat() if ini else None,
+                "fim": fim.isoformat() if fim else None,
+                "ofertas": ofertas}
+
     # ------------------------------------------------------------------ público
     def curso(self, codigo):
         u = self._uri(codigo)
@@ -140,6 +172,7 @@ class Ontologia:
             "salario_ref": str(self.g.value(u, FEQ.salarioRef) or "") or None,
             "garantia_7d": str(self.g.value(u, FEQ.garantia7dias) or "") == "true",
             "plataforma": str(self.g.value(u, FEQ.plataformaAula) or "") or None,
+            "promocao": self.promocao(codigo),
         }
 
     def _json(self, u, prop, default):
@@ -209,6 +242,17 @@ class Ontologia:
         av = self.g.value(plano, FEQ.aVista)
         n = self.g.value(plano, FEQ.numParcelas)
         money = {_dig(taxa), _dig(vp), _dig(av)}
+        planos = [{"n": int(n) if n is not None else None, "valor_digits": _dig(vp)}]
+        # Promoção vigente entra como âncora: sem isso o Revisor bloquearia o próprio
+        # preço promocional que a campanha manda o agente anunciar. Fora da janela ela
+        # some daqui e volta a ser bloqueada — que é o comportamento correto.
+        promo = self.promocao(codigo)
+        for o in (promo or {}).get("ofertas", []):
+            money |= {_dig(o.get("valor_parcela")), _dig(o.get("a_vista"))}
+            if o.get("n") and o.get("valor_parcela"):
+                planos.append({"n": o["n"], "valor_digits": _dig(o["valor_parcela"])})
+                # total do parcelado: o agente pode citá-lo ("19x de 799, R$ 15.181 no total")
+                money.add(_dig(f"{o['n'] * float(o['valor_parcela']):.2f}"))
         money.discard("")
         datas = set()
         for jp in (FEQ.janelaInscricao, FEQ.janelaOferecimento):
@@ -230,6 +274,7 @@ class Ontologia:
             "datas": datas,
             "carga_horas": horas,
             "plano": {"n": int(n) if n is not None else None, "valor_digits": _dig(vp), "av_digits": _dig(av)},
+            "planos": planos,
         }
 
 

@@ -68,3 +68,54 @@ feq:PlanoPagamentoShape a sh:NodeShape ;
                 BIND( (?n * 0.01) + 0.05 AS ?tol )
                 FILTER( ?erro > ?tol )
             }""" ] .
+
+# ------------------------------------------------------------------ Promoção (campanha)
+#  Uma promoção é um conjunto de OFERTAS alternativas válidas numa janela. Ela não
+#  substitui o planoPagamento (preço de tabela), que continua sendo a base sobre a
+#  qual o desconto é anunciado.
+feq:PromocaoShape a sh:NodeShape ;
+    sh:targetClass feq:Promocao ;
+    sh:property [ sh:path feq:rotulo ; sh:minCount 1 ; sh:maxCount 1 ] ;
+    sh:property [ sh:path feq:janela ; sh:class feq:JanelaTemporal ; sh:minCount 1 ; sh:maxCount 1 ] ;
+    sh:property [ sh:path feq:ofertas ; sh:minCount 1 ] .
+
+#  Promoção que sobrevive à inscrição é oferta que não pode ser honrada: o lead
+#  chega na Extecamp e o preço não existe mais. Trava aqui, não em produção.
+feq:PromocaoNaJanelaShape a sh:NodeShape ;
+    sh:targetClass feq:Curso ;
+    sh:sparql [
+        a sh:SPARQLConstraint ;
+        sh:message "Promoção termina depois do fim das inscrições do curso." ;
+        sh:prefixes feq:prefixos ;
+        sh:select """
+            SELECT $this WHERE {
+                $this feq:promocao ?p ; feq:janelaInscricao ?ji .
+                ?p feq:janela ?jp .
+                ?jp feq:fim ?fp .
+                ?ji feq:fim ?fi .
+                FILTER( ?fp > ?fi )
+            }""" ] .
+
+#  Mesma trava de coerência do plano de tabela: quando a oferta anuncia parcelas E
+#  valor à vista, os dois têm de fechar. Oferta só-parcelada (sem aVista) é válida:
+#  é o caso de "19x de R$ 799" cujo à vista cai na outra oferta, com desconto maior.
+feq:OfertaShape a sh:NodeShape ;
+    sh:targetClass feq:Oferta ;
+    sh:property [ sh:path feq:rotulo ; sh:minCount 1 ; sh:maxCount 1 ] ;
+    sh:property [ sh:path feq:condicao ; sh:minCount 1 ; sh:maxCount 1 ] ;
+    sh:property [ sh:path feq:numParcelas ; sh:datatype xsd:integer ; sh:minInclusive 1 ; sh:maxCount 1 ] ;
+    sh:property [ sh:path feq:valorParcela ; sh:datatype xsd:decimal ; sh:maxCount 1 ] ;
+    sh:property [ sh:path feq:aVista ; sh:datatype xsd:decimal ; sh:maxCount 1 ] ;
+    sh:property [ sh:path feq:percentualDesconto ; sh:datatype xsd:integer ;
+                  sh:minInclusive 1 ; sh:maxInclusive 90 ; sh:maxCount 1 ] ;
+    sh:sparql [
+        a sh:SPARQLConstraint ;
+        sh:message "Oferta incoerente: numParcelas × valorParcela difere de aVista além da tolerância." ;
+        sh:prefixes feq:prefixos ;
+        sh:select """
+            SELECT $this WHERE {
+                $this feq:numParcelas ?n ; feq:valorParcela ?v ; feq:aVista ?av .
+                BIND( ABS( (?n * ?v) - ?av ) AS ?erro )
+                BIND( (?n * 0.01) + 0.05 AS ?tol )
+                FILTER( ?erro > ?tol )
+            }""" ] .

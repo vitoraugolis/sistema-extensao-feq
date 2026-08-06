@@ -58,7 +58,9 @@ def revisar_estrutural(codigo, texto, ont, fonte_extra=None):
     money = set().union(*(a["money"] for a in ancs))
     datas = set().union(*(a["datas"] for a in ancs))
     cargas = {a["carga_horas"] for a in ancs if a["carga_horas"] is not None}
-    planos = {(a["plano"]["n"], a["plano"]["valor_digits"]) for a in ancs if a["plano"]["n"]}
+    # lista, não um só: com promoção vigente o curso passa a ter mais de um plano
+    # válido (tabela + ofertas), e o Revisor tem de aceitar qualquer um deles.
+    planos = {(pl["n"], pl["valor_digits"]) for a in ancs for pl in a["planos"] if pl["n"]}
     if fonte_extra:
         escopo += "+coordenação"
         money |= {re.sub(r"\D", "", m) for m in MONEY_RE.findall(fonte_extra)}

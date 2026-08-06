@@ -208,6 +208,38 @@ def _gate_instr(elegivel, ctx=None):
             "'continuar'. NÃO exija escolaridade maior que a do curso.\n")
 
 
+def _moeda_br(v):
+    return f"R$ {float(v):,.2f}".replace(",", "_").replace(".", ",").replace("_", ".")
+
+
+def _bloco_promo(c):
+    """Instrução da promoção vigente. Só existe quando a ontologia diz que a campanha
+    está no ar hoje — expirada, o bloco some e o agente volta ao preço de tabela."""
+    pr = (c or {}).get("promocao")
+    if not pr:
+        return ""
+    linhas = []
+    for o in pr["ofertas"]:
+        partes = []
+        if o.get("n") and o.get("valor_parcela"):
+            partes.append(f"{o['n']}x de {_moeda_br(o['valor_parcela'])}")
+        if o.get("a_vista"):
+            partes.append(f"{_moeda_br(o['a_vista'])} à vista")
+        pct = f" ({o['desconto_pct']}% de desconto sobre o valor de tabela)" if o.get("desconto_pct") else ""
+        linhas.append(f"  • {o['rotulo']}{pct} — {' ou '.join(partes)}. Condição: {o['condicao']}.")
+    fim = "/".join(reversed((pr.get("fim") or "").split("-")))
+    return (
+        f"PROMOÇÃO VIGENTE — {pr['rotulo']} (válida até {fim}):\n" + "\n".join(linhas) + "\n"
+        "Como usar: este é o preço que você anuncia agora. Cite o valor de tabela apenas para "
+        "mostrar a economia, deixando claro qual é qual. Os valores promocionais acima JÁ ESTÃO "
+        "CALCULADOS nos dados — reproduza-os exatamente, nunca recalcule nem arredonde. Se o "
+        "lead se encaixa numa condição melhor (ex.: grupo), diga isso proativamente: é dinheiro "
+        "no bolso dele. NÃO some a promoção com outros descontos (ex.: os 10% de ex-aluno "
+        "Unicamp) nem prometa acúmulo — se ele perguntar, use consultar_coordenacao. "
+        f"Depois de {fim} a promoção acaba; não a mencione como se fosse eterna, e a urgência "
+        "que você comunica deve ser essa data real, nunca uma pressão inventada.\n")
+
+
 def _bloco_curso(ctx):
     """Trecho do prompt sobre o curso do lead. Em DESCOBERTA (lead ainda não disse
     qual curso quer — típico de quem chega pelo botão de WhatsApp da LP) troca o
@@ -229,6 +261,7 @@ def _bloco_curso(ctx):
     c = ctx["curso"]
     return (
         f"CURSO DE INTERESSE DO LEAD (registro completo):\n{json.dumps(c, ensure_ascii=False)}\n"
+        + _bloco_promo(c) +
         f"Elegibilidade já avaliada: {ctx.get('elegivel')}. "
         f"Captável agora: {ctx['captavel'].get('captavel')} "
         f"(status da inscrição: {ctx['captavel'].get('status')}).\n"
@@ -296,7 +329,9 @@ def _system_prompt(ctx, lead_nome=None, precedentes=""):
         "perguntarem e confirme se o lead se enquadra. NUNCA CALCULE o valor com desconto "
         "aplicado (nem a parcela, nem o à vista): diga a porcentagem e o valor CHEIO que está "
         "nos dados; o abatimento é aplicado pela Extecamp na inscrição. Valor calculado por você "
-        "não existe na base e é bloqueado antes de chegar ao lead. "
+        "não existe na base e é bloqueado antes de chegar ao lead. EXCEÇÃO: os valores de uma "
+        "PROMOÇÃO VIGENTE já vêm prontos nos dados (não foram calculados por você) — esses podem "
+        "e devem ser anunciados exatamente como estão. "
         "Se houver política específica do curso, ela "
         "estará no campo 'descontos' dos dados; use-a. Para OUTRAS categorias de desconto não "
         "listadas (ex.: servidor público) ou negociação de valor, use consultar_coordenacao. "

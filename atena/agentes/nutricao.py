@@ -46,20 +46,27 @@ def _elegivel(l, ont):
     return bool(ont.captavel(l["curso"]).get("captavel"))
 
 
-def _template_frio_devido(l, sil_dias):
-    """Toque frio na vez? Retorna o nome do template ou None."""
+def _template_frio_devido(l, sil_dias, promo_tpl=None):
+    """Toque frio na vez? Retorna o nome do template ou None.
+    Com campanha vigente, o PRIMEIRO toque usa o template dedicado do curso: é a
+    oferta mais forte disponível para reacender um lead frio."""
     toque = l.get("reengajos") or 0
     if toque >= len(TEMPLATES_FRIOS):
         return None
     nome, dias_min = TEMPLATES_FRIOS[toque]
+    if toque == 0 and promo_tpl:
+        nome = promo_tpl
     return nome if sil_dias >= dias_min else None
 
 
 def _enviar_template(est, ont, wa, l, nome):
+    from atena.transporte.whatsapp import montar_params      # fonte única dos parâmetros
     c = ont.curso(l["curso"])
     prazo = "/".join(reversed((c.get("inscricoes_fim") or "").split("-")))
-    r = wa.enviar_template(l["telefone"], nome,
-                           params=[l.get("nome") or "olá", f"{c['nome']} ({c['codigo']})", prazo])
+    params = montar_params(nome, l, ont)
+    if params is None:
+        return {"ok": False, "motivo": f"template {nome}: parâmetro vazio, não enviado"}
+    r = wa.enviar_template(l["telefone"], nome, params=params)
     if r.get("ok"):
         est.set_lead(l["card_id"], reengajos=(l.get("reengajos") or 0) + 1)
         est.add_conversa(l["card_id"], "agente", f"[template {nome}] prazo {prazo}",
@@ -92,7 +99,8 @@ def reativar(est, ont, wa, propor=None, agora=None):
             continue
         # FORA da janela -> cadência de templates escalonados
         if janela_h is None or janela_h >= 24:
-            nome = _template_frio_devido(l, sil_dias)
+            from atena.transporte.whatsapp import template_promocional
+            nome = _template_frio_devido(l, sil_dias, template_promocional(l["curso"], ont))
             if nome and _enviar_template(est, ont, wa, l, nome).get("ok"):
                 templates += 1
     if templates or nudges:

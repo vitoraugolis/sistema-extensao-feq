@@ -26,6 +26,7 @@ def check(c, msg):
 
 class FakeOnt:
     def captavel(self, curso, hoje=None): return {"captavel": True}
+    def promocao(self, curso, hoje=None): return None   # sem campanha nos testes
     def curso(self, curso):
         return {"codigo": curso, "nome": "Curso X", "inscricoes_fim": "2026-08-16"}
 
@@ -449,9 +450,12 @@ check("Professores:" not in (_c0480["conteudo_programatico"] or ""),
       "ementa não tem mais o texto travado de professores desatualizado")
 lp_real = ponte.render(g5, _ont_real, "FEQ-0480")
 check("Aulas online ao vivo + gravadas" in lp_real
-      and "19x de R$ 866,09" in lp_real
-      and "taxa de inscrição de R$ 69,00" in lp_real,
+      and "19x de R$ 866,09" in lp_real          # tabela: fica como referência do desconto
+      and "R$ 69,00" in lp_real,
       "LP renderizada com ontologia real: cards 2 e 3 no formato novo")
+# com a campanha de agosto no ar, o destaque passa a ser o preço promocional
+check("19x de R$ 799,00" in lp_real and "R$ 13.987,39" in lp_real,
+      "LP destaca a promoção vigente sem esconder o valor de tabela")
 check("Mais professores do curso" in lp_real and "lattes.cnpq.br/0419561926689242" in lp_real,
       "LP renderizada com ontologia real: seção de outros professores presente")
 

@@ -52,8 +52,6 @@ UTILITY_SUGERIDO = {
 }
 
 _TPL_RE = re.compile(r"\[template ([a-z0-9_]+)")
-_PARAMS = {"feq_lead": 2, "feq_abertura_curso": 2, "feq_reengajamento": 3,
-           "feq_lembrete_inscricao": 3, "retomar_atendimento": 0}
 
 
 def familia(codigo):
@@ -95,7 +93,7 @@ def _codigo_da_falha(envios):
     return 0
 
 
-def plano(lead, envios, agora=None, templates_meta=None):
+def plano(lead, envios, agora=None, templates_meta=None, promo_tpl=None):
     """O que fazer com este lead agora. Devolve dict com acao:
        'reenviar' (destino + template) · 'esperar' (falta tempo) · 'humano' (escada esgotada).
     """
@@ -127,7 +125,9 @@ def plano(lead, envios, agora=None, templates_meta=None):
         return {"acao": "reenviar", "destino": alvo, "template": tpl, "familia": fam,
                 "motivo": "variante do 9º dígito"}
 
-    tpl = _proximo_template(tpls, templates_meta)
+    # campanha vigente: o template dedicado do curso vem primeiro — é a oferta mais
+    # forte que temos para recuperar esse lead, e some sozinho quando a promoção acaba
+    tpl = promo_tpl if (promo_tpl and promo_tpl not in tpls) else _proximo_template(tpls, templates_meta)
     if not tpl:
         return {"acao": "humano", "motivo": "todos os templates aprovados já foram tentados"}
     return {"acao": "reenviar", "destino": lead.get("telefone"), "template": tpl, "familia": fam,
@@ -151,27 +151,19 @@ def _proximo_template(usados, templates_meta=None):
     return None
 
 
-def _params(nome, lead, ont):
-    n = _PARAMS.get(nome, 2)
-    if not n:
-        return []
-    c = ont.curso(lead.get("curso")) or {}
-    p = [lead.get("nome") or "olá", f"{c.get('nome', lead.get('curso'))} ({c.get('codigo', '')})".strip()]
-    if n >= 3:
-        p.append("/".join(reversed((c.get("inscricoes_fim") or "").split("-"))))
-    return p[:n]
 
 
 def rodar(est, ont, wa, agora=None, limite=20):
     """Uma passada de retentativas. Chamada pelo agendador; idempotente."""
     from atena.agentes.nutricao import _elegivel     # mesmo critério da reativação
+    from atena.transporte.whatsapp import montar_params, template_promocional
     feitos, humanos, esperando = [], [], 0
     templates_meta = wa.templates_listar() if hasattr(wa, "templates_listar") else None
     # curso encerrado não tem oferta a fazer: retentar mandaria template de turma fechada
     candidatos = [l for l in est.leads_sem_entrega() if _elegivel(l, ont)]
     for lead in candidatos[:limite]:
         envios = est.envios_do_lead(lead["card_id"])
-        p = plano(lead, envios, agora, templates_meta)
+        p = plano(lead, envios, agora, templates_meta, template_promocional(lead.get("curso"), ont))
         if p["acao"] == "esperar":
             esperando += 1
         elif p["acao"] == "humano":
@@ -184,8 +176,8 @@ def rodar(est, ont, wa, agora=None, limite=20):
                                f"Vale tentar por e-mail ou telefone.")
                 humanos.append(lead["card_id"])
         elif p["acao"] == "reenviar":
-            params = _params(p["template"], lead, ont)
-            if any(not str(x).strip() for x in params):
+            params = montar_params(p["template"], lead, ont)
+            if params is None:
                 # a Meta recusa variável vazia (curso sem data de inscrição na ontologia):
                 # cai no template sem variável em vez de queimar a tentativa num 400
                 p["template"], params = "retomar_atendimento", []

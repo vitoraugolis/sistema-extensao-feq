@@ -262,13 +262,42 @@ def _conteudo_html(texto):
         for i, t in enumerate(itens))
 
 
+def _promo_ofertas_html(pr):
+    """Ofertas da promoção como itens de lista. Cada oferta traz a CONDIÇÃO junto:
+    anunciar '19x de R$ 736,18' sem dizer que exige grupo de 3+ seria propaganda enganosa."""
+    out = []
+    for o in pr["ofertas"]:
+        partes = []
+        if o.get("n") and o.get("valor_parcela"):
+            partes.append(f"{o['n']}x de {_moeda(o['valor_parcela'])}")
+        if o.get("a_vista"):
+            partes.append(f"{_moeda(o['a_vista'])} à vista")
+        pct = f' <span class="text-amber-400">−{o["desconto_pct"]}%</span>' if o.get("desconto_pct") else ""
+        # UM só filho: o <li> da lista é flex, então dois filhos virariam duas COLUNAS e
+        # o preço quebraria no meio. O <div> segura preço e condição em fluxo normal.
+        out.append(f'<div><strong>{" ou ".join(partes)}</strong>{pct}<br>'
+                   f'<span class="text-slate-400 text-sm">{_esc(o["rotulo"])} — {_esc(o["condicao"])}</span></div>')
+    return out
+
+
 def _investimento_itens(c):
     p = (c or {}).get("plano") or {}
+    pr = (c or {}).get("promocao")
     itens = []
-    if p.get("n") and p.get("valor_parcela"):
-        itens.append(f"Em até <strong>{p['n']}x de {_moeda(p['valor_parcela'])}</strong>")
-    if p.get("a_vista"):
-        itens.append(f"À vista: <strong>{_moeda(p['a_vista'])}</strong>")
+    if pr:
+        # o valor de tabela vira referência riscada: é o que dá tamanho ao desconto
+        if p.get("n") and p.get("valor_parcela"):
+            itens.append(f'<span class="line-through text-slate-500">De {p["n"]}x de '
+                         f'{_moeda(p["valor_parcela"])}</span>')
+        itens += _promo_ofertas_html(pr)
+        if pr.get("fim"):
+            fim = "/".join(reversed(pr["fim"].split("-")))
+            itens.append(f'<span class="text-amber-400 font-semibold">Promoção válida até {fim}</span>')
+    else:
+        if p.get("n") and p.get("valor_parcela"):
+            itens.append(f"Em até <strong>{p['n']}x de {_moeda(p['valor_parcela'])}</strong>")
+        if p.get("a_vista"):
+            itens.append(f"À vista: <strong>{_moeda(p['a_vista'])}</strong>")
     if p.get("taxa"):
         itens.append(f"Taxa de inscrição: {_moeda(p['taxa'])}")
     if (c or {}).get("descontos"):
@@ -583,7 +612,24 @@ def render_tokens(meta_row, c, aberto=True):
     horario = c.get("horario") or ""
     plano = c.get("plano") or {}
     n, vp, taxa = plano.get("n"), plano.get("valor_parcela"), plano.get("taxa")
-    if n:
+    promo = c.get("promocao")
+    if promo and promo["ofertas"]:
+        # o destaque do topo passa a ser o preço da campanha: é o que o lead compara
+        o = promo["ofertas"][0]
+        n_p, vp_p = o.get("n"), o.get("valor_parcela")
+        plano_curto = (f"{n_p}x de {_moeda(vp_p)}" if n_p and vp_p
+                       else (_moeda(o["a_vista"]) if o.get("a_vista") else "Unicamp"))
+        melhores = " · ".join(
+            f'{oo["rotulo"]}: ' + " ou ".join(
+                ([f'{oo["n"]}x de {_moeda(oo["valor_parcela"])}'] if oo.get("n") and oo.get("valor_parcela") else [])
+                + ([f'{_moeda(oo["a_vista"])} à vista'] if oo.get("a_vista") else []))
+            for oo in promo["ofertas"])
+        plano_det = f"{promo['rotulo']} — {melhores}."
+        if taxa:
+            plano_det += f" Taxa de inscrição: {_moeda(taxa)}."
+        if n and vp:
+            plano_det += f" Valor de tabela: {n}x de {_moeda(vp)}."
+    elif n:
         plano_curto = f"{n}x" + (f" de {_moeda(vp)}" if vp else "")
         plano_det = f"Pagamento em até {n} parcelas" + (f" de {_moeda(vp)}" if vp else "")
         if taxa:
