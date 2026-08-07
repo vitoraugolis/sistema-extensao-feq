@@ -79,6 +79,15 @@ class Ontologia:
         fim = self.g.value(j, FEQ.fim)
         return (ini.toPython() if ini else None, fim.toPython() if fim else None)
 
+    def _urls_ancora(self, u):
+        """Links legítimos do curso, normalizados — o Revisor aprova só estes."""
+        raw = str(self.g.value(u, FEQ.urlExtecamp) or "")
+        if not raw:
+            return set()
+        base = raw.strip().lower().rstrip("/")
+        base = re.sub(r"^https?://(www\.)?", "", base)
+        return {base.replace("/curso/dados/", "/curso/inscricao/")}
+
     def politica(self, nome):
         """Texto de uma política comercial global (nó feq:Politica no catálogo).
         Fica na ontologia, e não no código, para o agente só afirmar o que está ancorado
@@ -167,6 +176,12 @@ class Ontologia:
             "aulas_inicio": ini_o.isoformat() if ini_o else None,
             "aulas_fim": fim_o.isoformat() if fim_o else None,
             "url_extecamp": str(self.g.value(u, FEQ.urlExtecamp) or ""),
+            # Link PRONTO para mandar ao lead. Antes só existia a URL /curso/dados/ e o
+            # agente tinha de convertê-la para /curso/inscricao/ — nessa transformação ele
+            # errou a TURMA e 6 leads receberam FEQ-0480/001 em vez de /009. Nada de pedir
+            # ao LLM o que uma substituição de string resolve.
+            "url_inscricao": str(self.g.value(u, FEQ.urlExtecamp) or "").replace(
+                "/curso/dados/", "/curso/inscricao/"),
             "objetivo": str(self.g.value(u, FEQ.objetivo) or "") or None,
             "conteudo_programatico": str(self.g.value(u, FEQ.conteudoProgramatico) or "") or None,
             "descontos": str(self.g.value(u, FEQ.descontos) or "") or None,
@@ -296,6 +311,7 @@ class Ontologia:
             "carga_horas": horas,
             "plano": {"n": int(n) if n is not None else None, "valor_digits": _dig(vp), "av_digits": _dig(av)},
             "planos": planos,
+            "urls": self._urls_ancora(u),
         }
 
 

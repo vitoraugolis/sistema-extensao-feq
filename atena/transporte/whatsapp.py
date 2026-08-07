@@ -85,6 +85,11 @@ TEMPLATES_ROL = [
     {"nome": "feq_promo_0331", "idioma": "pt_BR", "titulo": "Campanha FEQ-0331",
      "descricao": "Recuperação com o preço da campanha do FEQ-0331 (só enquanto vigente).",
      "params": [{"k": "nome", "rotulo": "Nome"}, {"k": "prazo", "rotulo": "Prazo de inscrição"}]},
+    {"nome": "feq_link_corrigido", "idioma": "pt_BR", "titulo": "Correção de link",
+     "descricao": "Reenvia o link CORRETO de inscrição a quem recebeu um link errado.",
+     "params": [{"k": "nome", "rotulo": "Nome"}, {"k": "curso", "rotulo": "Curso"},
+                {"k": "url_inscricao", "rotulo": "Link de inscrição"},
+                {"k": "prazo", "rotulo": "Prazo de inscrição"}]},
 ]
 
 
@@ -93,6 +98,15 @@ TEMPLATES_ROL = [
 # curso estiver vigente — `template_promocional` faz esse gate contra a ontologia.
 # Sem isso, um template aprovado sobreviveria à campanha e anunciaria preço morto.
 TEMPLATES_PROMO = {"FEQ-0480": "feq_promo_0480", "FEQ-0331": "feq_promo_0331"}
+
+# Correção de link errado. Existe porque 6 leads do FEQ-0480 receberam a turma /001 em
+# vez de /009 (o LLM converteu a URL à mão). Mandar o link certo por template é a única
+# forma de alcançá-los fora da janela de 24h.
+CORPO_LINK_CORRIGIDO = (
+    "Oi, {{1}}! Aqui é da Extensão FEQ Unicamp. Passamos para você um link de inscrição com "
+    "um erro de digitação — desculpe pelo transtorno. O link correto do curso {{2}} é: "
+    "{{3}} — as inscrições vão até {{4}}. "
+    "Se tiver qualquer dificuldade para concluir, me chama por aqui que eu te ajudo.")
 
 CORPOS_PROMO = {
     "feq_promo_0480": (
@@ -122,6 +136,7 @@ PARAMS_TEMPLATE = {
     "retomar_atendimento": (),
     "feq_promo_0480": ("nome", "prazo"),
     "feq_promo_0331": ("nome", "prazo"),
+    "feq_link_corrigido": ("nome", "curso", "url_inscricao", "prazo"),
 }
 
 
@@ -134,6 +149,8 @@ def montar_params(nome_template, lead, ont):
         "nome": (lead.get("nome") or "").strip() or "olá",
         "curso": f"{c.get('nome', lead.get('curso') or '')} ({c.get('codigo', '')})".strip(),
         "prazo": "/".join(reversed((c.get("inscricoes_fim") or "").split("-"))),
+        # SEMPRE da ontologia: é justamente a montagem manual do link que causou o erro
+        "url_inscricao": c.get("url_inscricao") or "",
     }
     vals = [fonte.get(k, "") for k in PARAMS_TEMPLATE.get(nome_template, ("nome", "curso"))]
     return None if any(not v.strip() for v in vals) else vals

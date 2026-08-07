@@ -391,6 +391,11 @@ def _system_prompt(ctx, lead_nome=None, precedentes=""):
         "intenção de fechar/dúvida fora da base.\n"
         "TROCA DE INTERESSE: se o lead demonstrar que o curso que quer é OUTRO do portfólio, "
         'retorne o código dele em dados.curso (ex.: "FEQ-0580") e siga a conversa nesse curso.\n'
+        "LINK DE INSCRIÇÃO: use o campo 'url_inscricao' dos dados COPIADO CARACTERE POR "
+        "CARACTERE. Ele já vem pronto — não monte, não converta, não troque o número da turma "
+        "e não use o 'url_extecamp' (esse é a página de detalhes). Link com a turma errada leva "
+        "o lead ao formulário de outra turma e a inscrição se perde; o Revisor bloqueia "
+        "qualquer URL que não seja exatamente a dos dados.\n"
         "PROCESSO DE INSCRIÇÃO (padrão Extecamp — use quando o lead quiser prosseguir ou "
         "perguntar como funciona): (1) você envia o link de inscrição do curso (formulário com "
         "os dados de matrícula); (2) ao final o lead aceita a taxa de inscrição e recebe o link "

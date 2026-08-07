@@ -27,7 +27,19 @@ DATE_RE = re.compile(r"\b(\d{2})/(\d{2})/(\d{4})\b")
 DATE_CURTA_RE = re.compile(r"\b(\d{2})/(\d{2})\b(?!\s*/)")
 HOUR_RE = re.compile(r"(\d{1,4})\s*(?:h\b|horas\b)", re.I)
 CODE_RE = re.compile(r"FEQ[-\s]?(\d{3,4})", re.I)
+# Link da Extecamp. Precisou existir quando 6 leads do FEQ-0480 receberam a turma
+# ERRADA (/001 em vez de /009): o Revisor barrava preço e data inventados, mas deixava
+# passar qualquer URL — e link quebrado mata a conversão tão bem quanto preço errado.
+URL_EXTECAMP_RE = re.compile(r"https?://[^\s<>\])]*extecamp\.unicamp\.br/curso/[^\s<>\])]*", re.I)
 LIMIAR_RELOGIO = 24  # ≤ 24h = hora-de-relógio; > 24h = carga horária
+
+
+def _url_norm(u):
+    """Compara links ignorando o que não muda o destino: esquema, www, barra final e
+    /curso/dados/ vs /curso/inscricao/ (as duas são páginas legítimas do MESMO curso)."""
+    u = (u or "").strip().lower().rstrip("/")
+    u = re.sub(r"^https?://(www\.)?", "", u)
+    return u.replace("/curso/dados/", "/curso/inscricao/")
 
 
 def _ancoras_escopo(codigo, texto, ont):
@@ -61,6 +73,7 @@ def revisar_estrutural(codigo, texto, ont, fonte_extra=None):
     # lista, não um só: com promoção vigente o curso passa a ter mais de um plano
     # válido (tabela + ofertas), e o Revisor tem de aceitar qualquer um deles.
     planos = {(pl["n"], pl["valor_digits"]) for a in ancs for pl in a["planos"] if pl["n"]}
+    urls = {u for a in ancs for u in a.get("urls", ())}
     if fonte_extra:
         escopo += "+coordenação"
         money |= {re.sub(r"\D", "", m) for m in MONEY_RE.findall(fonte_extra)}
@@ -112,6 +125,15 @@ def revisar_estrutural(codigo, texto, ont, fonte_extra=None):
             usadas.append(f"data {d}/{mn}")
         else:
             bloq.append(f"Data fora da base ({escopo}): {d}/{mn}.")
+
+    # 3c) Links da Extecamp: turma errada leva o lead a um formulário que não é o dele.
+    for m in URL_EXTECAMP_RE.finditer(texto):
+        u = m.group(0).rstrip(").,;*]")
+        if _url_norm(u) in urls:
+            usadas.append("link da Extecamp")
+        else:
+            bloq.append(f"Link da Extecamp fora da base ({escopo}): {u}. "
+                        f"Use exatamente a URL de inscrição que está nos dados do curso.")
 
     # 4) Carga horária × hora-de-relógio (fail-closed p/ carga desconhecida).
     for m in HOUR_RE.finditer(texto):
