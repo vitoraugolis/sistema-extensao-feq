@@ -84,10 +84,27 @@ check(lst[0]["errados"] == [ERRADO], "registra o link errado que foi enviado")
 est.add_conversa("errado", "agente", f"{MARCA} {CERTO}", autor="template")
 check(afetados(est, ONT) == [], "quem já recebeu a correção sai da fila")
 
+# FALSO POSITIVO conferido em produção: link de OUTRO curso pode ser legítimo — o agente
+# faz cross-sell e o curso do card muda quando o lead troca de interesse. O que define o
+# bug é a URL apontar para curso+turma que NÃO EXISTE no catálogo.
+est.upsert_lead("crosssell", nome="Isaias", telefone="5519988770794", curso="FEQ-0480")
+est.add_conversa("crosssell", "agente",
+                 "Segue: https://ins.extecamp.unicamp.br/curso/inscricao/FEQ-0360/007", autor="llm")
+check([a["card_id"] for a in afetados(est, ONT)] == [],
+      "link real de OUTRO curso não é acusado (era falso positivo em produção)")
+
 # opt-out é sinalizado (o envio pula, mas o operador precisa saber que existe)
 est.upsert_lead("saiu", nome="Dina", telefone="5519999990004", curso="FEQ-0480", optout=1)
 est.add_conversa("saiu", "agente", f"link: {ERRADO}", autor="llm")
 lst = afetados(est, ONT)
 check(len(lst) == 1 and lst[0]["optout"] is True, "lead em opt-out aparece marcado")
+
+# o link certo vem do curso que o link QUEBRADO tentava alcançar, não do card
+est.upsert_lead("outro", nome="Eva", telefone="5519999990005", curso="FEQ-1000")
+est.add_conversa("outro", "agente",
+                 "link: https://ins.extecamp.unicamp.br/curso/inscricao/FEQ-0480/001", autor="llm")
+alvo = next(a for a in afetados(est, ONT) if a["card_id"] == "outro")
+check(alvo["curso"] == "FEQ-0480" and alvo["correto"] == CERTO,
+      "corrige para o curso do link quebrado, mesmo se o card estiver em outro")
 
 print(f"\n{ok}/{ok} passaram.")

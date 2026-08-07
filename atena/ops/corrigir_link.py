@@ -6,8 +6,10 @@ Origem: 6 leads do FEQ-0480 receberam .../curso/inscricao/FEQ-0480/001 em vez de
 O agente recebia a URL /curso/dados/ e tinha de convertê-la à mão — errou a turma. O link
 manda o lead ao formulário de OUTRA turma, então a inscrição simplesmente não acontece.
 
-A varredura é GENÉRICA: compara toda URL da Extecamp enviada contra a âncora do curso
-(mesma normalização do Revisor). Serve para qualquer curso, não só para este incidente.
+A varredura é GENÉRICA: acusa toda URL da Extecamp que aponte para uma combinação
+curso+turma INEXISTENTE no catálogo. Não basta divergir do curso do card — o agente faz
+cross-sell e o curso do card muda quando o lead troca de interesse (2 de 8 'afetados' na
+primeira versão eram falso positivo, incluindo um link enviado à mão pelo operador).
 
   python3 -m atena.ops.corrigir_link              # dry-run: só lista quem foi afetado
   python3 -m atena.ops.corrigir_link --aplicar    # envia o template de correção
@@ -28,15 +30,20 @@ MARCA = "[template feq_link_corrigido]"
 TEMPLATE = "feq_link_corrigido"
 
 
+def _urls_validas(ont):
+    """TODAS as URLs reais do catálogo. O link errado é o que aponta para uma combinação
+    curso+turma que NÃO EXISTE — não basta divergir do curso atual do card: o agente pode
+    ter linkado outro curso do portfólio legitimamente (cross-sell), e o curso do card
+    muda quando o lead troca de interesse. Comparar só com o curso atual acusaria links
+    corretos (conferido em produção: 2 dos 8 'afetados' eram falso positivo)."""
+    return {u for c in ont.cursos() for u in (ont.ancoras(c) or {}).get("urls", ())}
+
+
 def afetados(est, ont):
-    """[{card_id, lead, curso, errados, correto}] — quem recebeu link fora da base."""
+    """[{card_id, lead, curso, errados, correto}] — quem recebeu link inexistente."""
+    validas = _urls_validas(ont)
     out = []
     for l in est.listar_leads():
-        curso = l.get("curso") or ""
-        alvo = ont.ancoras(curso) if curso else None
-        if not alvo or not alvo.get("urls"):
-            continue
-        correto = (ont.curso(curso) or {}).get("url_inscricao") or ""
         errados, ja_corrigido = [], False
         for m in est.historico(l["card_id"]):
             if m.get("papel") != "agente":
@@ -46,13 +53,20 @@ def afetados(est, ont):
                 ja_corrigido = True
             for u in URL_EXTECAMP_RE.finditer(txt):
                 url = u.group(0).rstrip(").,;*]")
-                if _url_norm(url) not in alvo["urls"]:
+                if _url_norm(url) not in validas:
                     errados.append(url)
-        if errados and not ja_corrigido:
-            out.append({"card_id": l["card_id"], "lead": l.get("nome") or l["card_id"],
-                        "telefone": l.get("telefone"), "curso": curso,
-                        "errados": sorted(set(errados)), "correto": correto,
-                        "optout": bool(l.get("optout"))})
+        if not errados or ja_corrigido:
+            continue
+        # o link certo é o do curso que o link QUEBRADO tentava alcançar; sem código
+        # reconhecível, cai no curso do card
+        alvo_cod = next((c for e in errados for c in ont.cursos()
+                         if c.lower() in e.lower()), l.get("curso") or "")
+        info = ont.curso(alvo_cod) or {}
+        out.append({"card_id": l["card_id"], "lead": l.get("nome") or l["card_id"],
+                    "telefone": l.get("telefone"), "curso": alvo_cod,
+                    "errados": sorted(set(errados)),
+                    "correto": info.get("url_inscricao") or "",
+                    "optout": bool(l.get("optout"))})
     return out
 
 
@@ -86,7 +100,8 @@ def main(aplicar=False, db=None):
         if a["optout"]:
             continue
         lead = est.get_lead(a["card_id"])
-        params = montar_params(TEMPLATE, lead, ont)
+        # o curso do template é o do LINK quebrado, não o do card (podem divergir)
+        params = montar_params(TEMPLATE, {**lead, "curso": a["curso"]}, ont)
         if not params:
             print(f"  ! {a['lead']}: parâmetro vazio, não enviado")
             continue
