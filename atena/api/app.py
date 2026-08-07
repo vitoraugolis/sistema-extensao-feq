@@ -1351,6 +1351,20 @@ def _operacoes():
                 feitos = _verificacao_auto()
                 if feitos:
                     print(f"[operacoes] verificação automática: {len(feitos)} decidido(s)", flush=True)
+            # Correção de link quebrado: varre as conversas atrás de URL da Extecamp que
+            # aponte para curso+turma inexistente e reenvia o link certo. Fica ARMADO —
+            # se o template ainda estiver em revisão na Meta, não envia e tenta depois;
+            # quando não há ninguém para corrigir, é uma consulta e nada mais. Vale para
+            # links futuros, não só para o incidente do FEQ-0480/001.
+            if G.dentro_janela() and _t.time() - float(EST.get_config("op_link") or 0) > 3600:
+                EST.set_config("op_link", str(_t.time()))
+                try:
+                    from atena.ops import corrigir_link as _cl
+                    afet = _cl.afetados(EST, ONTO.ont)
+                    if afet:
+                        _cl.main(aplicar=True, est=EST, ont=ONTO.ont)
+                except Exception as e:
+                    print(f"[operacoes] correcao de link falhou: {e}", flush=True)
             # retentativa de entrega: recupera quem a Meta recusou (número na variante do
             # 9º dígito; pacing de marketing com espera + template complementar). A cada ~1h,
             # no horário comercial — o caminho manda template ao lead.

@@ -70,9 +70,9 @@ def afetados(est, ont):
     return out
 
 
-def main(aplicar=False, db=None):
-    est = Estado(db) if db else Estado()
-    ont = Ontologia()
+def main(aplicar=False, db=None, est=None, ont=None):
+    est = est or (Estado(db) if db else Estado())
+    ont = ont or Ontologia()
     from atena.transporte.whatsapp import WhatsApp, montar_params
     wa = WhatsApp(est, None)
 
