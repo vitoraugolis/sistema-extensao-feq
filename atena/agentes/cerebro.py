@@ -247,6 +247,39 @@ def _bloco_promo(c):
         "nunca uma pressão inventada.\n")
 
 
+def _bloco_janela(ctx):
+    """O que dizer quando a inscrição não está aberta. São DOIS casos, e tratá-los
+    igual custa matrícula: turma que já começou não tem volta, mas prazo vencido com
+    aulas ainda por começar é recuperável (vagas remanescentes + link fora do prazo)."""
+    cap = ctx.get("captavel") or {}
+    if cap.get("captavel"):
+        return ""
+    if cap.get("recuperavel"):
+        pol = (ctx.get("politica_fora_do_prazo") or "").strip()
+        inicio = "/".join(reversed((cap.get("aulas_inicio") or "").split("-")))
+        return (
+            "SITUAÇÃO ESPECIAL — PRAZO VENCIDO, MAS A TURMA AINDA NÃO COMEÇOU"
+            + (f" (as aulas começam em {inicio})" if inicio else "") + ".\n"
+            + (f"Política da coordenação: {pol}\n" if pol else "") +
+            "Conduza assim, nesta ordem:\n"
+            "  1. Seja honesto: o prazo oficial de inscrição já encerrou.\n"
+            "  2. Em seguida, ofereça a saída — ainda há vagas remanescentes e a coordenação "
+            "consegue gerar um link de inscrição fora do prazo para ele.\n"
+            "  3. Peça o E-MAIL, que é o que permite gerar esse link, e avise que o link vale "
+            "24 horas.\n"
+            "  4. Assim que o lead mandar o e-mail, use proxima_acao='escalar_humano' com o "
+            "e-mail no escalonamento_motivo. QUEM GERA O LINK É UMA PESSOA, não você: nunca "
+            "diga que já gerou, não invente URL e não mande o link normal de inscrição (ele "
+            "não funciona depois do prazo).\n"
+            "NÃO ofereça lista de espera nem 'aviso quando reabrir' neste caso: a vaga é "
+            "AGORA, e mandar o lead esperar joga fora uma matrícula possível.\n")
+    return ("ATENÇÃO: a inscrição deste curso NÃO está aberta agora e a turma já começou. "
+            "Seja honesto sobre isso já na primeira resposta, ofereça avisar o lead quando a "
+            "próxima turma abrir (lista de espera) e sugira alternativas ABERTAS do portfólio "
+            "que sirvam ao objetivo dele. NUNCA mande link de inscrição deste curso nem "
+            "prometa data de reabertura.\n")
+
+
 def _bloco_descontos(ctx):
     """Regra de desconto, CONDICIONAL à campanha.
 
@@ -296,12 +329,7 @@ def _bloco_curso(ctx):
         f"Elegibilidade já avaliada: {ctx.get('elegivel')}. "
         f"Captável agora: {ctx['captavel'].get('captavel')} "
         f"(status da inscrição: {ctx['captavel'].get('status')}).\n"
-        + ("ATENÇÃO: a inscrição deste curso NÃO está aberta agora. Seja honesto sobre "
-           "isso já na primeira resposta, ofereça avisar o lead quando a próxima turma "
-           "abrir (lista de espera) e sugira alternativas ABERTAS do portfólio que "
-           "sirvam ao objetivo dele. NUNCA mande link de inscrição deste curso nem "
-           "prometa data de reabertura.\n"
-           if not ctx["captavel"].get("captavel") else ""))
+        + _bloco_janela(ctx))
 
 
 def _system_prompt(ctx, lead_nome=None, precedentes=""):

@@ -38,6 +38,9 @@ feq:PlanoPagamento     a rdfs:Class .
 # Promoção = conjunto de OFERTAS alternativas válidas numa janela. Não substitui o
 # feq:planoPagamento (preço de tabela): é sobre ele que o desconto é anunciado.
 feq:Promocao           a rdfs:Class .
+# Política comercial global (não pertence a um curso). Sem feq:codigo, então não entra
+# no índice de cursos do serviço.
+feq:Politica           a rdfs:Class .
 feq:Oferta             a rdfs:Class ; rdfs:comment "Alternativa de pagamento de uma promoção (condição + parcelas e/ou à vista)." .
 feq:Duracao            a rdfs:Class ; rdfs:comment "Carga horária do curso — NUNCA confundir com hora-de-relógio (feq:horarioAula)." .
 feq:NivelEscolaridade  a rdfs:Class ; rdfs:comment "Ordinal: comparável por feq:ordem." .

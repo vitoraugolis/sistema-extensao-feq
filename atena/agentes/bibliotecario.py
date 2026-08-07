@@ -45,6 +45,9 @@ class Bibliotecario:
             "curso": info,
             "captavel": cap,
             "elegivel": eleg,
+            # só carrega a política quando ela é aplicável: prompt não é depósito de regras
+            "politica_fora_do_prazo": (self.ont.politica("politicaForaDoPrazo")
+                                       if cap.get("recuperavel") else None),
             "portfolio": self.ont.portfolio(),
             "cursos_citados": citados,
         }

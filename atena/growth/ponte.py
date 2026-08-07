@@ -756,7 +756,7 @@ def _cursos_relacionados_html(g, ont, curso_atual, limite=3, hoje=None):
     return "\n    ".join(itens)
 
 
-def render_tokens(meta_row, c, aberto=True):
+def render_tokens(meta_row, c, aberto=True, recuperavel=False):
     """Tokens da LP a partir do cursos_metas + ontologia (c = ont.curso(...) ou {}).
     Regra anti-alucinação: todo fato vem da ontologia; sem âncora -> texto neutro
     apontando para a página oficial da Extecamp.
@@ -856,34 +856,54 @@ def render_tokens(meta_row, c, aberto=True):
         "PERIODO_OFERECIMENTO": _periodo_html(c, aberto),
         "FAQ_EXTRA_HTML": _faq_extra_html(c),
         # --- inscrição aberta × lista de espera (spec 17 §2b) ---------------------
-        "CTA_LABEL": "Inscreva-se →" if aberto else "Quero ser avisado →",
+        # recuperavel = prazo vencido MAS a turma ainda não começou: a mecânica de captura
+        # é a mesma da lista de espera (precisamos do contato), só a copy muda — prometer
+        # "aviso quando reabrir" aqui jogaria fora uma vaga que ainda existe HOJE.
+        "CTA_LABEL": ("Inscreva-se →" if aberto else
+                      ("Quero uma vaga remanescente →" if recuperavel else "Quero ser avisado →")),
         "PRAZO_LINHA": (
             f"Inscrições abertas até <strong class=\"text-white\">{_ddmm(c.get('inscricoes_fim')) or 'a data publicada na Extecamp'}</strong> · turma {meta_row['turma']}"
             if aberto else
-            "Inscrições <strong class=\"text-white\">encerradas no momento</strong> — entre na "
-            "lista de espera e avisamos assim que a próxima turma abrir."),
+            ("Prazo de inscrição <strong class=\"text-white\">encerrado</strong> — mas a turma "
+             "ainda não começou e há <strong class=\"text-white\">vagas remanescentes</strong>. "
+             "Deixe seu contato que a coordenação gera um link de inscrição fora do prazo."
+             if recuperavel else
+             "Inscrições <strong class=\"text-white\">encerradas no momento</strong> — entre na "
+             "lista de espera e avisamos assim que a próxima turma abrir.")),
         "MODAL_TITULO": ("Para iniciar sua inscrição no sistema da Unicamp, informe seu contato rápido:"
                          if aberto else
-                         "Entre na lista de espera deste curso. Assim que a próxima turma abrir, "
-                         "a gente te avisa pelo WhatsApp:"),
-        "MODAL_BOTAO": "Continuar para Extecamp →" if aberto else "Entrar na lista de espera",
+                         ("Ainda dá para entrar: informe seu contato que a coordenação gera um "
+                          "link de inscrição fora do prazo para você (o link vale 24 horas):"
+                          if recuperavel else
+                          "Entre na lista de espera deste curso. Assim que a próxima turma abrir, "
+                          "a gente te avisa pelo WhatsApp:")),
+        "MODAL_BOTAO": ("Continuar para Extecamp →" if aberto else
+                        ("Quero meu link fora do prazo" if recuperavel else "Entrar na lista de espera")),
         "CTA_FINAL_TITULO": (f"Garanta sua vaga na turma {meta_row['turma']}" if aberto
-                             else "Fique sabendo em primeira mão"),
+                             else ("Ainda há vagas remanescentes" if recuperavel
+                                   else "Fique sabendo em primeira mão")),
         "CTA_FINAL_SUB": (
             f"Inscrições até {_ddmm(c.get('inscricoes_fim')) or 'a data publicada'} no sistema oficial da Unicamp."
             if aberto else
-            "Sem turma aberta agora. Deixe seu contato e avisamos assim que as inscrições reabrirem."),
+            ("O prazo oficial encerrou, mas as aulas ainda não começaram. Deixe seu contato "
+             "que a coordenação gera um link de inscrição fora do prazo."
+             if recuperavel else
+             "Sem turma aberta agora. Deixe seu contato e avisamos assim que as inscrições reabrirem.")),
         # A seção "Como se inscrever" (passos da Extecamp) só faz sentido com turma aberta.
         "SECAO_INSCRICAO": _secao_inscricao_html(c, aberto),
         "NAV_INSCRICAO": '<a href="#inscricao">Inscrição</a>' if aberto else "",
         "INVEST_DESTAQUE": _invest_destaque(c, aberto),
         "INVEST_TARJA": (f"Inscrições abertas até {_ddmm(c.get('inscricoes_fim'))}" if aberto
-                         else "Valores da última turma · sem inscrições abertas"),
+                         else ("Prazo encerrado · vagas remanescentes" if recuperavel
+                               else "Valores da última turma · sem inscrições abertas")),
         "INVEST_RODAPE": (
             "Pagamento e emissão de boletos direto no sistema oficial da Unicamp (Extecamp)."
             if aberto else
-            "Valores praticados na última turma, para você se planejar — podem ser reajustados "
-            "quando a próxima abrir. Entre na lista de espera para receber as condições oficiais."),
+            ("Valores desta turma. O prazo oficial encerrou, mas ainda dá para entrar pelo link "
+             "de inscrição fora do prazo — deixe seu contato que a coordenação gera o seu."
+             if recuperavel else
+             "Valores praticados na última turma, para você se planejar — podem ser reajustados "
+             "quando a próxima abrir. Entre na lista de espera para receber as condições oficiais.")),
         "FAQ_COMO_INSCREVER": (
             '<details class="bg-white/5 border border-white/10 rounded-xl p-5">'
             '<summary class="cursor-pointer font-semibold">Como funciona a inscrição?</summary>'
@@ -893,16 +913,27 @@ def render_tokens(meta_row, c, aberto=True):
             'concluída — com taxa de inscrição, envio de documentos e boletos gerados por lá.'
             '</p></details>'
             if aberto else
-            '<details class="bg-white/5 border border-white/10 rounded-xl p-5">'
-            '<summary class="cursor-pointer font-semibold">Como entro na lista de espera?</summary>'
-            '<p class="mt-2 text-sm text-slate-300">Basta deixar nome e WhatsApp no botão desta '
-            'página. Assim que a próxima turma for confirmada na Extecamp, avisamos você com as '
-            'datas e o link oficial de inscrição — sem compromisso e sem custo.</p></details>'),
+            ('<details class="bg-white/5 border border-white/10 rounded-xl p-5">'
+             '<summary class="cursor-pointer font-semibold">O prazo acabou. Ainda dá para entrar?</summary>'
+             '<p class="mt-2 text-sm text-slate-300">Sim. A turma ainda não começou e costumam '
+             'sobrar vagas remanescentes: deixe seu contato no botão desta página que a '
+             'coordenação gera um link de inscrição fora do prazo no seu e-mail. O link é '
+             'individual e vale 24 horas.</p></details>'
+             if recuperavel else
+             '<details class="bg-white/5 border border-white/10 rounded-xl p-5">'
+             '<summary class="cursor-pointer font-semibold">Como entro na lista de espera?</summary>'
+             '<p class="mt-2 text-sm text-slate-300">Basta deixar nome e WhatsApp no botão desta '
+             'página. Assim que a próxima turma for confirmada na Extecamp, avisamos você com as '
+             'datas e o link oficial de inscrição — sem compromisso e sem custo.</p></details>')),
         "FAQ_PRAZO": (
             f"As inscrições desta turma vão até {_ddmm(c.get('inscricoes_fim')) or 'a data publicada na Extecamp'}."
             if aberto else
-            "Não há turma com inscrições abertas neste momento. Deixe seu contato na lista de "
-            "espera que avisamos assim que a próxima for confirmada."),
+            (f"O prazo oficial encerrou em {_ddmm(c.get('inscricoes_fim'))}, mas as aulas ainda "
+             "não começaram: há vagas remanescentes e a coordenação consegue gerar um link de "
+             "inscrição fora do prazo. Deixe seu contato nesta página."
+             if recuperavel else
+             "Não há turma com inscrições abertas neste momento. Deixe seu contato na lista de "
+             "espera que avisamos assim que a próxima for confirmada.")),
     }
 
 
@@ -934,11 +965,14 @@ def render(g, ont, curso, webhook_url="/webhook/ponte", hoje=None):
         c = ont.curso(curso)
     except Exception:
         c = None
+    recuperavel = False
     try:
-        aberto = bool(ont.captavel(curso, hoje).get("captavel"))
+        cap = ont.captavel(curso, hoje)
+        aberto = bool(cap.get("captavel"))
+        recuperavel = bool(cap.get("recuperavel"))
     except Exception:
         aberto = True    # sem ontologia (ex.: FakeOnt nos testes): comporta como aberto
-    tokens = render_tokens(alvo, c, aberto=aberto)
+    tokens = render_tokens(alvo, c, aberto=aberto, recuperavel=recuperavel)
     pagina = (_WEB / "bridge-template.html").read_text()
     for k, v in tokens.items():
         pagina = pagina.replace("{{%s}}" % k, str(v) if k in _RAW_TOKENS else _esc(v))

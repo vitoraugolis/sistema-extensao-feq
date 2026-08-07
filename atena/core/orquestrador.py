@@ -129,6 +129,18 @@ def _brain_deterministico(ont, lead, mensagem_lead, historico=None, hoje=None):
             return C.DecisaoAgente(C.CONTINUAR, "lead sem curso definido — descoberta",
                                    mensagem_ao_lead=msg)
     cap = ont.captavel(cod, hoje)
+    if cap.get("recuperavel"):
+        # prazo vencido com a turma ainda por começar: escala para um humano gerar o link
+        # fora do prazo, mas JÁ inicia o roteiro. Antes o lead ficava sem resposta até
+        # alguém abrir a Central — e a vaga que ainda existia esfriava.
+        return C.DecisaoAgente(
+            C.ESCALAR, f"curso {cod} fora do prazo — vaga remanescente",
+            escalonamento_motivo="gerar link de inscrição fora do prazo (pedir e-mail ao lead)",
+            mensagem_ao_lead=(
+                "Oi! O prazo oficial de inscrição deste curso já encerrou, mas a turma ainda "
+                "não começou e costumam sobrar vagas remanescentes — a coordenação consegue "
+                "gerar um link de inscrição fora do prazo para você. Me manda seu e-mail que "
+                "eu peço a geração do link; ele vale 24 horas."))
     if not cap.get("captavel"):
         return C.DecisaoAgente(C.ESCALAR, f"curso {cod} não captável ({cap.get('status')})",
                                escalonamento_motivo=f"captabilidade: {cap.get('status')}")

@@ -94,7 +94,8 @@
    "@id": "feq:percentualDesconto",
    "@type": "xsd:integer"
   },
-  "comoAplicar": "feq:comoAplicar"
+  "comoAplicar": "feq:comoAplicar",
+  "texto": "feq:texto"
  },
  "@graph": [
   {
@@ -671,6 +672,12 @@
     "inicio": "2027-02-01",
     "fim": "2027-06-01"
    }
+  },
+  {
+   "@id": "feq:politicaForaDoPrazo",
+   "@type": "feq:Politica",
+   "rotulo": "Inscrição fora do prazo",
+   "texto": "Quando o prazo de inscrição já venceu mas o curso ainda NÃO começou, costumam sobrar vagas remanescentes e a coordenação consegue gerar um link de inscrição fora do prazo. O link é individual: é gerado a partir do e-mail do interessado e vale 24 horas."
   }
  ]
 }

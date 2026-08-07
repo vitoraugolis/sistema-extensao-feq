@@ -79,6 +79,14 @@ class Ontologia:
         fim = self.g.value(j, FEQ.fim)
         return (ini.toPython() if ini else None, fim.toPython() if fim else None)
 
+    def politica(self, nome):
+        """Texto de uma política comercial global (nó feq:Politica no catálogo).
+        Fica na ontologia, e não no código, para o agente só afirmar o que está ancorado
+        — e para a coordenação poder mudar a regra pelo Injetor."""
+        s = FEQ[nome]
+        txt = self.g.value(s, FEQ.texto)
+        return str(txt) if txt is not None else None
+
     def promocao(self, codigo, hoje=None):
         """Promoção VIGENTE do curso, ou None. A filtragem por data é aqui, e não em
         quem chama, porque promoção fora da janela não pode chegar a lead nenhum: o
@@ -206,17 +214,26 @@ class Ontologia:
             return {"curso": codigo, "existe": False}
         hoje = hoje or datetime.date.today()
         ini, fim = self._janela(u, FEQ.janelaInscricao)
+        aulas_ini, _ = self._janela(u, FEQ.janelaOferecimento)
         if ini and hoje < ini:
             status = "futura"
         elif fim and hoje > fim:
-            status = "encerrada"
+            # Prazo vencido mas a turma ainda não começou: sobram vagas remanescentes e a
+            # coordenação consegue gerar link de inscrição fora do prazo. Estado PRÓPRIO —
+            # tratar como "encerrada" faz o agente mandar o lead para a lista de espera e
+            # perder uma matrícula que ainda era possível.
+            status = "fora_do_prazo" if (aulas_ini and hoje < aulas_ini) else "encerrada"
         else:
             status = "aberta"
         return {
             "curso": codigo, "existe": True, "status": status,
+            # segue False: inscrição pública fechada. Quem decide o que fazer com o
+            # 'fora_do_prazo' é quem lê o status, não quem lê este booleano.
             "captavel": status == "aberta",
+            "recuperavel": status == "fora_do_prazo",
             "inicio": ini.isoformat() if ini else None,
             "fim": fim.isoformat() if fim else None,
+            "aulas_inicio": aulas_ini.isoformat() if aulas_ini else None,
         }
 
     def elegivel(self, nivel_lead, codigo):
