@@ -92,6 +92,27 @@ mostra o valor CHEIO, o desconto entra nos boletos e o lead precisa avisar após
 inscrição. Sem isso o lead via o preço cheio no formulário e concluía que fora enganado —
 o operador teve de explicar à mão. Como é campo da promoção, morre junto com a campanha.
 
+### Inscrição fora do prazo (✅ implementado)
+`captavel()` tinha só "aberta" e "encerrada". Faltava o caso do meio: **prazo vencido com a
+turma ainda por começar** — há vagas remanescentes e a coordenação gera um link de inscrição
+fora do prazo. Mandar esse lead para a lista de espera descarta uma matrícula possível.
+
+Status novo `fora_do_prazo` (+ `recuperavel`, `aulas_inicio`). `captavel` continua **False**:
+a inscrição pública segue fechada e nada muda de comportamento por tabela — quem decide o que
+fazer é quem lê o status (cérebro, fallback determinístico e LP).
+
+A regra comercial mora em `feq:Politica` → `feq:politicaForaDoPrazo` (nó sem `feq:codigo`,
+portanto fora do índice de cursos). O agente só afirma o que está ancorado, e a coordenação
+muda a regra pelo Injetor sem tocar em código.
+
+Limite duro do agente: **quem gera o link é uma pessoa**. Ele coleta o e-mail e escala
+(`escalar_humano`); nunca diz que gerou, não inventa URL e não manda o link normal de
+inscrição, que não funciona depois do prazo.
+
+- AC10 Curso com prazo vencido e aulas por começar recebe o roteiro de recuperação,
+  não a lista de espera; curso já em andamento continua na lista de espera.
+- AC11 O agente nunca afirma ter gerado o link de inscrição fora do prazo.
+
 - AC8 Valor promocional é aprovado pelo Revisor; valor inventado ou desconto somado por
   conta própria continua bloqueado.
 - AC9 Encerrada a janela, nenhum consumidor consegue mais anunciar o preço da campanha.
