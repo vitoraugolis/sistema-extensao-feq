@@ -130,7 +130,10 @@ class Estado:
                     # Marca d'água de leitura do OPERADOR (não do agente). cards_vistos
                     # existia sem uso desde o início; ganha aqui a função de dizer até que
                     # mensagem a conversa foi lida por um humano.
-                    "ALTER TABLE cards_vistos ADD COLUMN ultimo_id INTEGER"):
+                    "ALTER TABLE cards_vistos ADD COLUMN ultimo_id INTEGER",
+                    # Reação (emoji) sobre uma mensagem existente — não é linha nova na
+                    # thread, é uma marca sobre uma já enviada/recebida (ver marcar_reacao).
+                    "ALTER TABLE conversas ADD COLUMN reacao TEXT"):
             try:
                 self.conn.execute(mig)
             except sqlite3.OperationalError:
@@ -385,10 +388,24 @@ class Estado:
     def historico(self, card_id):
         with self._lock:
             rows = self.conn.execute(
-                "SELECT id,papel,texto,tipo,media_id,wamid,status,ts,autor FROM conversas"
+                "SELECT id,papel,texto,tipo,media_id,wamid,status,ts,autor,reacao FROM conversas"
                 " WHERE card_id=? ORDER BY id",
                 (card_id,)).fetchall()
         return [dict(r) for r in rows]
+
+    def marcar_reacao(self, wamid, emoji):
+        """emoji vazio/None = reação removida (a Meta manda esse evento quando o lead
+        desfaz). Não cria linha nova — anexa à mensagem existente. Devolve o card_id
+        (para o webhook poder notificar), ou None se o wamid não é conhecido."""
+        if not wamid:
+            return None
+        with self._lock:
+            r = self.conn.execute("SELECT card_id FROM conversas WHERE wamid=?", (wamid,)).fetchone()
+            if not r:
+                return None
+            self.conn.execute("UPDATE conversas SET reacao=? WHERE wamid=?", (emoji or None, wamid))
+            self.conn.commit()
+        return r["card_id"]
 
     # ------------------------------------------------------- leitura pelo operador
     def marcar_lido(self, card_id):

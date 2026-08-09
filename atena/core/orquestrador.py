@@ -223,11 +223,17 @@ class Orquestrador:
             self.est.add_alerta("manual", f"Lead {card_id} em modo manual: nova mensagem aguardando resposta humana")
             return {"modo_manual": True}
 
-        # mídia sem legenda: o cérebro não "ouve"/"vê" -> recebe um rótulo p/ não misfire
-        entrada = mensagem_lead or {
-            "audio": "[o lead enviou um áudio]", "image": "[o lead enviou uma imagem]",
-            "video": "[o lead enviou um vídeo]", "document": "[o lead enviou um documento]",
-            "sticker": "[o lead enviou uma figurinha]"}.get(tipo, mensagem_lead)
+        # mídia sem legenda: o cérebro não "ouve"/"vê" -> recebe um rótulo p/ não misfire.
+        # 'contatos' vem SEMPRE primeiro e ignora o texto: ali "mensagem_lead" é o JSON
+        # estruturado que a Central usa para desenhar o cartão (bolhaConteudo), não fala
+        # do lead — mandar esse JSON cru ao LLM seria pior que um rótulo genérico.
+        if tipo == "contatos":
+            entrada = "[o lead compartilhou um contato]"
+        else:
+            entrada = mensagem_lead or {
+                "audio": "[o lead enviou um áudio]", "image": "[o lead enviou uma imagem]",
+                "video": "[o lead enviou um vídeo]", "document": "[o lead enviou um documento]",
+                "sticker": "[o lead enviou uma figurinha]"}.get(tipo, mensagem_lead)
         dec = self.brain(lead, entrada, historico)
         # Trava final de opt-out: só o LEAD pode se descadastrar, com as próprias
         # palavras. Qualquer cérebro (LLM ou futuro) que devolva OPTOUT sem isso é

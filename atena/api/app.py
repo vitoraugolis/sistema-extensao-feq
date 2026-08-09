@@ -614,6 +614,43 @@ def conversa_enviar(card_id):
     return jsonify({"envio": r})
 
 
+@app.route("/api/conversas/<card_id>/reagir", methods=["POST"])
+def conversa_reagir(card_id):
+    """Operador reage a UMA mensagem da thread (nossa ou do lead) — um jeito rápido de
+    confirmar/reconhecer sem escrever nada. Não passa pelo Revisor: emoji não afirma
+    preço/data/carga, é o mesmo tipo de conteúdo que já não passa por lá."""
+    lead = EST.get_lead(card_id)
+    if not lead:
+        return jsonify({"erro": "lead inexistente"}), 404
+    b = request.get_json(silent=True) or {}
+    wamid = (b.get("wamid") or "").strip()
+    if not wamid:
+        return jsonify({"erro": "wamid da mensagem-alvo é obrigatório"}), 400
+    r = WA.enviar_reacao(lead["telefone"], wamid, (b.get("emoji") or "").strip())
+    return jsonify(r)
+
+
+@app.route("/api/conversas/<card_id>/contato", methods=["POST"])
+def conversa_enviar_contato(card_id):
+    """Operador compartilha um contato oficial (secretaria/WhatsApp) como cartão."""
+    lead = EST.get_lead(card_id)
+    if not lead:
+        return jsonify({"erro": "lead inexistente"}), 404
+    chave = (request.get_json(silent=True) or {}).get("chave", "")
+    from atena.core.contatos import CONTATOS_OFICIAIS
+    info = CONTATOS_OFICIAIS.get(chave)
+    if not info:
+        return jsonify({"erro": "contato desconhecido"}), 400
+    r = WA.enviar_contato(lead["telefone"], chave)
+    if r.get("ok"):
+        texto = json.dumps([{"nome": info["rotulo"], "telefone": info["telefone_exibicao"]}],
+                           ensure_ascii=False)
+        EST.add_conversa(card_id, "agente", texto, tipo="contatos", wamid=r.get("wamid"),
+                         status="enviado", autor=f"humano:{session.get('usuario','humano')}")
+        EST.log_acao(session.get("usuario", "humano"), f"compartilhou contato {chave}", card_id)
+    return jsonify(r)
+
+
 @app.route("/api/conversas/<card_id>/midia", methods=["POST"])
 def conversa_enviar_midia(card_id):
     """Operador envia arquivo/áudio/foto ao lead (multipart: arquivo + legenda opcional).

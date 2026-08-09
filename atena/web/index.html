@@ -59,7 +59,28 @@ body{margin:0;min-height:100vh;color:var(--ink);
 .t-bad{background:var(--rosa);color:var(--ink);}
 .t-acc{background:var(--sky);color:var(--ink);}
 .t-warn{background:var(--sun);color:var(--ink);}
-.bubble{max-width:80%;padding:9px 12px;font-size:13.5px;border:2px solid var(--b);box-shadow:3px 3px 0 var(--b);}
+.bubble{max-width:80%;padding:9px 12px;font-size:13.5px;border:2px solid var(--b);box-shadow:3px 3px 0 var(--b);position:relative;}
+/* Reagir: ícone só aparece no hover da bolha (como no WhatsApp Web) — sem isso a thread
+   fica poluída de ícone em toda mensagem o tempo todo. */
+.bubble-reagir{position:absolute;top:-11px;right:-11px;width:22px;height:22px;border-radius:50%;
+ background:#fff;border:2px solid var(--b);display:flex;align-items:center;justify-content:center;
+ cursor:pointer;opacity:0;transition:opacity .1s;padding:0;font-size:12px;}
+.bubble:hover .bubble-reagir{opacity:1;}
+.bubble-reacao{position:absolute;bottom:-10px;left:10px;background:#fff;border:2px solid var(--b);
+ border-radius:999px;padding:1px 5px;font-size:12px;line-height:1.4;}
+.b-ag .bubble-reacao{left:auto;right:10px;}
+.reacao-picker{position:absolute;z-index:20;top:-40px;right:0;background:#fff;border:2px solid var(--b);
+ border-radius:10px;box-shadow:3px 3px 0 var(--b);padding:4px 6px;display:flex;gap:2px;}
+.reacao-picker button{border:0;background:none;font-size:17px;cursor:pointer;padding:3px 4px;
+ border-radius:6px;}
+.reacao-picker button:hover{background:var(--paper);}
+.contato-card{display:flex;align-items:center;gap:9px;background:rgba(0,0,0,.04);
+ border:1.5px solid var(--b);border-radius:9px;padding:7px 10px;}
+.contato-card:not(:last-child){margin-bottom:6px;}
+.contato-card i{font-size:20px;}
+.emoji-grid{display:grid;grid-template-columns:repeat(9,1fr);gap:2px;max-width:280px;}
+.emoji-grid button{border:0;background:none;font-size:19px;cursor:pointer;padding:5px;border-radius:6px;}
+.emoji-grid button:hover{background:var(--paper);}
 .b-lead{align-self:flex-start;background:#fff;border-radius:12px 12px 12px 2px;}
 .b-ag{align-self:flex-end;background:var(--laranjinha);border-radius:12px 12px 2px 12px;}
 input,select,textarea{width:100%;border-radius:8px;border:2px solid var(--b);background:#fff;
@@ -1196,6 +1217,13 @@ async function refrescarAberta(){
 
 function escapeHtml(s){ return (s||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function bolhaConteudo(t){
+  if(t.tipo === 'contatos'){
+    // texto é JSON estruturado (ver extrair_mensagem em whatsapp.py), não fala do lead
+    let lista = []; try { lista = JSON.parse(t.texto || '[]'); } catch(e) {}
+    return lista.map(c => `<div class="contato-card"><i class="ti ti-id-badge-2"></i>
+      <div><strong>${escapeHtml(c.nome)}</strong>${c.telefone?`<div class="muted" style="font-size:12px;">${escapeHtml(c.telefone)}</div>`:''}</div></div>`
+    ).join('') || '<i class="muted">(contato sem dados)</i>';
+  }
   const cap = t.texto ? `<div style="margin-top:${t.media_id?'5px':'0'};">${escapeHtml(t.texto)}</div>` : '';
   if(t.media_id){
     const src='/api/media/'+encodeURIComponent(t.media_id);
@@ -1205,6 +1233,24 @@ function bolhaConteudo(t){
     return `<a href="${src}" target="_blank"><i class="ti ti-paperclip"></i> ${t.tipo==='document'?'documento':'anexo'}</a>${cap}`;
   }
   return t.texto ? escapeHtml(t.texto) : '<i class="muted">(sem conteúdo)</i>';
+}
+const REACOES_RAPIDAS = ['👍','❤️','😂','😮','😢','🙏'];   // mesmo conjunto fixo do WhatsApp/Slack
+
+function toggleReacaoPicker(btn, cardId, wamid){
+  const existente = document.querySelector('.reacao-picker');
+  if(existente) existente.remove();
+  if(existente && existente.dataset.wamid === wamid) return;   // clicou de novo no mesmo -> só fecha
+  const box = document.createElement('div');
+  box.className = 'reacao-picker'; box.dataset.wamid = wamid;
+  box.innerHTML = REACOES_RAPIDAS.map(e=>`<button onclick="event.stopPropagation();enviarReacao('${cardId}','${wamid}','${e}')">${e}</button>`).join('');
+  btn.parentElement.appendChild(box);
+  setTimeout(()=>document.addEventListener('click', function fechar(){ box.remove(); document.removeEventListener('click', fechar); }), 0);
+}
+async function enviarReacao(cardId, wamid, emoji){
+  document.querySelector('.reacao-picker')?.remove();
+  const r = await api('/api/conversas/'+cardId+'/reagir',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({wamid, emoji})});
+  if(r.ok) refrescarAberta(); else if(r.motivo) alert(r.motivo);
 }
 function statusGlyph(t){   // ✓ enviado · ✓✓ entregue · ✓✓ azul lido · ! falhou (só msgs do agente)
   if(t.papel!=='agente'||!t.status) return '';
@@ -1246,10 +1292,14 @@ function renderChrome(d){
       ? '<div class="conv-blocked" style="margin:0 11px 11px;"><i class="ti ti-ban"></i> Lead em opt-out — não é possível enviar mensagens.</div>'
       : `${d.modo==='manual'?'<div class="conv-manual-nota"><i class="ti ti-hand-stop"></i> Modo manual — o agente não responde nesta conversa. Você conduz pelo campo abaixo.</div>':''}
          <div id="convTpl" class="conv-tpl hidden"></div>
+         <div id="convContato" class="conv-tpl hidden"></div>
+         <div id="convEmoji" class="conv-tpl hidden"></div>
          <div class="conv-composer">
            <input type="file" id="convArquivo" class="hidden" onchange="convEnviarMidia('${d.id}')">
            <button class="btn btn-g" id="convClipe" onclick="$('#convArquivo').click()" title="Enviar arquivo, áudio ou foto (o texto digitado vai como legenda)"><i class="ti ti-paperclip"></i></button>
            <button class="btn btn-g" onclick="toggleTpl('${d.id}')" title="Enviar template aprovado (reabre fora da janela de 24h)"><i class="ti ti-mail-fast"></i></button>
+           <button class="btn btn-g" onclick="toggleContato('${d.id}')" title="Compartilhar contato oficial"><i class="ti ti-id-badge-2"></i></button>
+           <button class="btn btn-g" onclick="toggleEmoji()" title="Inserir emoji"><i class="ti ti-mood-smile"></i></button>
            <textarea id="convInput" rows="1" placeholder="Digite uma mensagem…" onkeydown="convKeydown(event)"></textarea>
            <button class="btn btn-p" onclick="convEnviar()" title="Enviar (Enter)"><i class="ti ti-send"></i></button>
          </div>`}`;
@@ -1362,7 +1412,9 @@ function renderMensagens(d){
   const fs = $('#convFaseSel'); if(fs && document.activeElement!==fs) fs.value = d.fase; // sem interromper o dropdown
   const cs = $('#convCursos'); const csig = d.curso + '|' + (d.cursos||[]).join(',');    // ativo + conjunto
   if(cs && cs.dataset.sig !== csig){ cs.innerHTML = barraCursosHTML(d); cs.dataset.sig = csig; }
-  const sig = (d.thread||[]).map(t=>(t.status||'')).join('') + '|' + (d.thread||[]).length
+  // reação entra no sig: ela muda uma mensagem JÁ existente (sem linha nova, sem status
+  // novo) — sem isto, uma reação chegando pelo webhook não disparava re-render nenhum.
+  const sig = (d.thread||[]).map(t=>(t.status||'')+(t.reacao||'')).join('') + '|' + (d.thread||[]).length
             + '|' + (d.proposta||'') + '|' + CONV_LIDO_ATE;
   if(th.dataset.sig === sig) return;   // muda com nova msg OU novo status -> re-render; senão nada
   // O CONTADOR conta só mensagens do lead (o que exige sua atenção), mas a LINHA marca
@@ -1375,8 +1427,11 @@ function renderMensagens(d){
     const eu = t.papel==='agente';
     const falhou = t.status==='falhou';
     const sep = (corte && t.id === corte.id) ? '<div class="thread-corte">não lidas</div>' : '';
+    // reagir exige wamid (mensagem que passou pela Meta) — propostas locais/dry-run não têm
+    const reagirBtn = t.wamid ? `<button class="bubble-reagir" onclick="event.stopPropagation();toggleReacaoPicker(this,'${d.id}','${t.wamid}')" title="Reagir"><i class="ti ti-mood-plus"></i></button>` : '';
+    const badge = t.reacao ? `<span class="bubble-reacao" title="reação">${escapeHtml(t.reacao)}</span>` : '';
     return sep + `<div class="bubble ${eu?'b-ag':'b-lead'}" style="align-self:${eu?'flex-end':'flex-start'};${falhou?'border:1.5px solid #ef4444;':''}">
-      ${bolhaConteudo(t)}<div class="conv-ts">${eu?'Vinícius · ':''}${(t.ts||'').slice(11,16)}${statusGlyph(t)}</div></div>`;
+      ${bolhaConteudo(t)}<div class="conv-ts">${eu?'Vinícius · ':''}${(t.ts||'').slice(11,16)}${statusGlyph(t)}</div>${reagirBtn}${badge}</div>`;
   }).join('');
   const prop = d.proposta?`
     <div class="bubble b-ag" style="align-self:flex-end;border-style:dashed;">
@@ -1395,6 +1450,28 @@ function renderMensagens(d){
 
 function convKeydown(e){
   if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); convEnviar(); }
+}
+
+// Grade fixa, sem CDN (mesmo padrão zero-dependência-externa das bridge pages) — não é
+// o conjunto completo de emoji Unicode, é uma curadoria do que cabe numa conversa
+// comercial (nada de emoji fora de contexto). Fácil de ajustar o tom depois.
+const EMOJI_GRID = ['😀','😊','🙂','😉','😍','🥳','🙌','👏','👍','🤝','🙏','💪',
+  '✅','☑️','🎉','🎓','📚','💡','⏰','📅','📌','📎','📄','📷',
+  '💬','📞','📧','🔗','💳','💰','🚀','⭐','❤️','🔥','👋','🤔'];
+
+function toggleEmoji(){
+  const box = $('#convEmoji'); if(!box) return;
+  if(!box.classList.contains('hidden')){ box.classList.add('hidden'); box.innerHTML=''; return; }
+  box.innerHTML = `<div class="conv-tpl-top"><strong>Emoji</strong>
+      <button class="conv-tpl-x" onclick="toggleEmoji()" title="Fechar">✕</button></div>
+    <div class="emoji-grid">${EMOJI_GRID.map(e=>`<button onclick="inserirEmoji('${e}')">${e}</button>`).join('')}</div>`;
+  box.classList.remove('hidden');
+}
+function inserirEmoji(e){
+  const inp = $('#convInput'); if(!inp) return;
+  const ini = inp.selectionStart ?? inp.value.length, fim = inp.selectionEnd ?? inp.value.length;
+  inp.value = inp.value.slice(0, ini) + e + inp.value.slice(fim);
+  inp.focus(); inp.selectionStart = inp.selectionEnd = ini + e.length;
 }
 
 function marcarErro(id, r, motivoFallback){
@@ -1484,6 +1561,29 @@ async function enviarTemplate(id){
   if(r.envio && !r.envio.ok){ marcarErro(id, {}, r.envio.motivo || ('não enviado — '+r.envio.status)); return; }
   CONV_ERRO = null;
   const box = $('#convTpl'); if(box){ box.classList.add('hidden'); box.innerHTML=''; }
+  await aposAcao();
+}
+
+// Espelha atena/core/contatos.py::CONTATOS_OFICIAIS — só 2 itens fixos e
+// institucionais; não vale um round-trip ao servidor para uma lista que não muda
+// por lead. Se a lista lá mudar de chave/rótulo, atualizar aqui também.
+const CONTATOS_UI = [{chave:'secretaria', rotulo:'Secretaria da Extensão FEQ', sub:'(19) 3521-4132'},
+                     {chave:'whatsapp', rotulo:'WhatsApp da Extensão FEQ', sub:'(19) 98262-0072'}];
+
+function toggleContato(id){
+  const box = $('#convContato'); if(!box) return;
+  if(!box.classList.contains('hidden')){ box.classList.add('hidden'); box.innerHTML=''; return; }
+  box.innerHTML = `<div class="conv-tpl-top"><strong>Compartilhar contato</strong>
+      <button class="conv-tpl-x" onclick="toggleContato('${id}')" title="Fechar">✕</button></div>
+    ${CONTATOS_UI.map(c=>`<div class="row" style="cursor:pointer;" onclick="enviarContato('${id}','${c.chave}')">
+      <i class="ti ti-id-badge-2"></i><span><strong>${c.rotulo}</strong><br><span class="muted">${c.sub}</span></span></div>`).join('')}`;
+  box.classList.remove('hidden');
+}
+async function enviarContato(id, chave){
+  const r = await api('/api/conversas/'+id+'/contato',{method:'POST',
+    headers:{'Content-Type':'application/json'}, body:JSON.stringify({chave})});
+  if(!r.ok){ marcarErro(id, {}, r.motivo || 'não enviado'); return; }
+  const box = $('#convContato'); if(box){ box.classList.add('hidden'); box.innerHTML=''; }
   await aposAcao();
 }
 

@@ -86,3 +86,27 @@ números corrigidos; 5 leads encaminhados ao operador com motivo.
 
 - AC6 Falha de entrega gera retentativa condicionada ao código do erro, nunca cega.
 - AC7 Esgotadas as tentativas, o lead aparece para o humano com o motivo e um canal alternativo.
+
+## Reações, contatos e emoji (✅ implementado)
+`extrair_mensagem` tratava `reaction`/`contacts` como qualquer tipo desconhecido — viravam
+o rótulo genérico `"[reaction]"`/`"[contacts]"`, perdendo toda a informação.
+
+**Reação**: interceptada em `WhatsApp.receber()` **antes** de `extrair_mensagem`/
+`processar_mensagem` — não é uma nova fala para o cérebro responder, é uma marca sobre uma
+mensagem existente (identificada pelo `wamid` alvo). `Estado.marcar_reacao(wamid, emoji)`
+anexa direto na linha existente (`conversas.reacao`), não cria linha nova; emoji vazio =
+reação removida. Mesmo mecanismo nos dois sentidos — `WhatsApp.enviar_reacao` (operador →
+lead) chama o mesmo `marcar_reacao` no sucesso, então o badge aparece igual em ambos.
+
+**Contato**: `extrair_mensagem` serializa nome+telefone em JSON no campo `texto`
+(`tipo="contatos"`) para a Central desenhar um cartão — mas esse JSON **nunca** pode chegar
+ao cérebro como se fosse fala do lead (`Orquestrador._processar_mensagem` intercepta
+`tipo=="contatos"` e manda um rótulo fixo, igual ao já feito para mídia sem legenda).
+Envio usa `atena/core/contatos.py::CONTATOS_OFICIAIS` (fonte única, também usada pelo guia
+em PDF — spec 08) — cartão profissional em vez de ditar telefone em texto corrido.
+
+**Emoji**: puro front-end (grade fixa, zero dependência externa), insere na posição do
+cursor em `#convInput`.
+
+- AC8 Reação recebida nunca aciona o cérebro nem vira mensagem nova na thread.
+- AC9 Conteúdo estruturado (JSON de contato) nunca vaza cru para o LLM como fala do lead.

@@ -10,12 +10,14 @@ dev; em produção, fora de 24h exige template (TODO marcado).
 import os
 import re
 import sys
+import json
 import datetime
 import pathlib
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2]))
 
 from atena.core import guardrails as G
+from atena.core.contatos import CONTATOS_OFICIAIS, payload_contato
 from atena.agentes.ingestao import curso_de_texto
 
 
@@ -224,7 +226,17 @@ def extrair_mensagem(m):
     if t in _TIPOS_MIDIA:
         md = m.get(t) or {}
         return t, md.get("caption", ""), md.get("id"), md.get("mime_type")
-    return t, f"[{t}]", None, None          # location/contacts/etc.: rótulo
+    if t == "contacts":
+        # antes virava o rótulo genérico "[contacts]" — nome e telefone eram perdidos.
+        # Serializa em texto porque não existe outro carreador estruturado em conversas;
+        # bolhaConteudo() (Central) faz o parse de volta para desenhar o cartão.
+        cs = []
+        for c in (m.get("contacts") or []):
+            nome = (c.get("name") or {}).get("formatted_name") or "(sem nome)"
+            tel = ((c.get("phones") or [{}])[0]).get("phone", "")
+            cs.append({"nome": nome, "telefone": tel})
+        return "contatos", json.dumps(cs, ensure_ascii=False), None, None
+    return t, f"[{t}]", None, None          # location/etc.: rótulo
 
 
 class WhatsApp:
@@ -276,6 +288,16 @@ class WhatsApp:
                 for m in v.get("messages", []):
                     if self.est.msg_ja_vista(m.get("id")):
                         continue   # reentrega da Meta — já processada, não duplicar resposta
+                    if m.get("type") == "reaction":
+                        # Reação NÃO é uma mensagem para o cérebro responder — é uma marca
+                        # sobre uma mensagem existente. Intercepta ANTES de extrair_mensagem/
+                        # processar_mensagem: se caísse no fluxo normal, o lead reagindo com
+                        # 👍 a uma pergunta antiga viraria "nova fala" e confundiria o agente.
+                        r = m.get("reaction") or {}
+                        cid = self.est.marcar_reacao(r.get("message_id"), r.get("emoji"))
+                        if cid:
+                            out.append({"card_id": cid, "acao": "reacao", "emoji": r.get("emoji")})
+                        continue
                     tel = m.get("from", "")
                     tipo, texto, media_id, mime = extrair_mensagem(m)
                     if media_id:
@@ -363,6 +385,56 @@ class WhatsApp:
                                    "Content-Type": "application/json"},
                           json={"messaging_product": "whatsapp", "to": telefone,
                                 "type": "text", "text": {"body": texto}})
+        j = r.json() if r.text else {}
+        return {"ok": r.status_code == 200, "status": r.status_code,
+                "wamid": _wamid(j) if r.status_code == 200 else None,
+                "motivo": None if r.status_code == 200 else str(j.get("error", {}).get("message", ""))[:120]}
+
+    def enviar_reacao(self, telefone, wamid_alvo, emoji, forcar=True):
+        """Reage a UMA mensagem existente (nossa ou do lead). Mesmo guard de enviar():
+        é uma mensagem de sessão como outra qualquer para a Meta, não some sozinha.
+        Não cria linha na thread — anexa direto via marcar_reacao (mesmo mecanismo do
+        lado inbound), então o operador vê o mesmo badge nos dois sentidos.
+        `forcar=True` por padrão: só existe caminho humano/operador hoje (como
+        conversa_enviar/conversa_enviar_midia) — o gate de horário comercial é para a
+        cadência AUTOMÁTICA, não para um humano acordado clicando reagir."""
+        recusa = self._guarda_destinatario(telefone, forcar=forcar)
+        if recusa:
+            return recusa
+        if not self.token:
+            self.est.marcar_reacao(wamid_alvo, emoji)
+            return {"ok": True, "status": "dry_run", "para": telefone, "emoji": emoji}
+        import requests
+        r = requests.post(f"{_GRAPH}/{self.phone_id}/messages", timeout=30,
+                          headers={"Authorization": f"Bearer {self.token}",
+                                   "Content-Type": "application/json"},
+                          json={"messaging_product": "whatsapp", "to": telefone, "type": "reaction",
+                                "reaction": {"message_id": wamid_alvo, "emoji": emoji or ""}})
+        j = r.json() if r.text else {}
+        ok = r.status_code == 200
+        if ok:
+            self.est.marcar_reacao(wamid_alvo, emoji)
+        return {"ok": ok, "status": r.status_code,
+                "motivo": None if ok else str(j.get("error", {}).get("message", ""))[:120]}
+
+    def enviar_contato(self, telefone, chave, forcar=True):
+        """Compartilha um dos CONTATOS_OFICIAIS (secretaria/whatsapp) como cartão —
+        mais profissional que ditar um telefone em texto corrido. `forcar=True` por
+        padrão pelo mesmo motivo de enviar_reacao: é sempre ação humana explícita."""
+        contato = payload_contato(chave)
+        if not contato:
+            return {"ok": False, "motivo": f"contato '{chave}' desconhecido"}
+        recusa = self._guarda_destinatario(telefone, forcar=forcar)
+        if recusa:
+            return recusa
+        if not self.token:
+            return {"ok": True, "status": "dry_run", "para": telefone, "contato": chave}
+        import requests
+        r = requests.post(f"{_GRAPH}/{self.phone_id}/messages", timeout=30,
+                          headers={"Authorization": f"Bearer {self.token}",
+                                   "Content-Type": "application/json"},
+                          json={"messaging_product": "whatsapp", "to": telefone,
+                                "type": "contacts", "contacts": [contato]})
         j = r.json() if r.text else {}
         return {"ok": r.status_code == 200, "status": r.status_code,
                 "wamid": _wamid(j) if r.status_code == 200 else None,
