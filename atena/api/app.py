@@ -10,6 +10,7 @@ Rodar:
 """
 import os
 import sys
+import json
 import time
 import datetime
 import pathlib
@@ -686,7 +687,8 @@ def lps_listar():
                     "slug": slug, "link": f"{base}/{slug}/" if base else "",
                     "previa": f"/ponte?curso={m['curso']}",
                     "inscricao": cap.get("status"), "aberto": bool(cap.get("captavel")),
-                    "editada": m["curso"] in editadas, "editada_em": editadas.get(m["curso"])})
+                    "editada": m["curso"] in editadas, "editada_em": editadas.get(m["curso"]),
+                    "drift": EST.get_config(f"lp_drift_{m['curso']}") == "1"})
     return jsonify({"wp_configurado": bool(base), "lps": out})
 
 
@@ -710,9 +712,15 @@ def lp_salvar(curso):
     html = (request.get_json(silent=True) or {}).get("html") or ""
     if len(html.strip()) < 200:
         return jsonify({"erro": "HTML muito curto — provável engano"}), 400
-    if not _lp_gerado(curso) and not EST.get_lp_html(curso):
+    gerado = _lp_gerado(curso)
+    if not gerado and not EST.get_lp_html(curso):
         return jsonify({"erro": "curso sem LP (fora do cursos_metas)"}), 404
     EST.set_lp_html(curso, html, autor=session.get("usuario", "operador"))
+    # baseline de deriva: "o que a ontologia geraria agora" no INSTANTE da edição —
+    # o tick automático (lp_auto.rodar) compara contra isto, nunca contra si mesmo.
+    from atena.growth.lp_auto import _hash as _lp_hash
+    EST.set_config(f"lp_hash_{curso}", _lp_hash(gerado or ""))
+    EST.set_config(f"lp_drift_{curso}", "0")
     return jsonify({"ok": True, "curso": curso, "bytes": len(html)})
 
 
@@ -722,6 +730,7 @@ def lp_restaurar(curso):
     curso = curso.upper()
     if not EST.del_lp_html(curso):
         return jsonify({"erro": "esta LP não estava editada"}), 404
+    EST.set_config(f"lp_drift_{curso}", "0")
     EST.log_acao(session.get("usuario", "operador"), f"restaurou LP gerada {curso}")
     return jsonify({"ok": True, "curso": curso})
 
@@ -998,6 +1007,24 @@ def injetor_propor():
     return jsonify(ONTO.propor(b.get("texto", ""), autor=b.get("autor", "operador")))
 
 
+@app.route("/api/injetor/oferecimento", methods=["POST"])
+def injetor_propor_oferecimento():
+    """Declarar novo oferecimento: estruturado, não texto livre (5 campos atômicos +
+    URL exata cruzando catalogo.jsonld e cursos_metas — ver Ontologista.propor_oferecimento)."""
+    b = request.get_json(silent=True) or {}
+    curso = (b.get("curso") or "").strip().upper()
+    # o check de "está no cursos_metas" mora aqui, não dentro do Ontologista: a
+    # ontologia e o Growth são deliberadamente desacoplados (spec 13), e essa fronteira
+    # só existe na camada da app, que já enxerga os dois.
+    if not any(m["curso"] == curso for m in GRW.cursos()):
+        return jsonify({"erro": "curso fora do cursos_metas — sem turma/URL para gerenciar"}), 404
+    return jsonify(ONTO.propor_oferecimento(
+        curso=curso, turma=b.get("turma"), url_extecamp=b.get("url_extecamp"),
+        insc_inicio=b.get("insc_inicio"), insc_fim=b.get("insc_fim"),
+        of_inicio=b.get("of_inicio"), of_fim=b.get("of_fim"),
+        autor=session.get("usuario", "operador")))
+
+
 @app.route("/api/injetor/<pid>")
 def injetor_get(pid):
     p = EST.get_proposta(pid)
@@ -1006,8 +1033,25 @@ def injetor_get(pid):
 
 @app.route("/api/injetor/<pid>/aprovar", methods=["POST"])
 def injetor_aprovar(pid):
-    r = ONTO.aprovar(pid)
-    ORQ.ont = ING.ont = CUR.ont = ONTO.ont   # todos passam a usar o grafo recarregado
+    p = EST.get_proposta(pid)
+    oferecimento = bool(p) and p.get("tipo") == "novo_oferecimento"
+    # muda ontologia governada E publica página pública -> mesmo gate de lp_publicar
+    if oferecimento and session.get("papel") != "supervisor":
+        return jsonify({"erro": "aprovar novo oferecimento exige papel supervisor"}), 403
+    if oferecimento and p["status"] == "aprovada":
+        r = {"ok": True, "retomado": True}   # reclique após crash: ontologia já escrita
+    else:
+        r = ONTO.aprovar(pid)
+        ORQ.ont = ING.ont = CUR.ont = ONTO.ont   # todos passam a usar o grafo recarregado
+    if r.get("ok") and oferecimento:
+        extra = json.loads(p["texto"])
+        if not GRW.set_oferecimento(p["alvo"], extra["turma"], extra["url_extecamp"]):
+            r["aviso"] = "ontologia atualizada, mas curso não está em cursos_metas — LP não republicada"
+        else:
+            from atena.growth import lp_auto
+            r["lp"] = lp_auto.republicar_um(GRW, ONTO.ont, EST, p["alvo"])
+        EST.log_acao(session.get("usuario", "operador"),
+                    f"novo oferecimento {p['alvo']}: turma {extra['turma']}")
     return jsonify(r)
 
 
@@ -1365,6 +1409,19 @@ def _operacoes():
                         _cl.main(aplicar=True, est=EST, ont=ONTO.ont)
                 except Exception as e:
                     print(f"[operacoes] correcao de link falhou: {e}", flush=True)
+            # Auto-republicação de LP quando a ontologia deriva (preço/promoção expirando,
+            # curso mudando de status). Sem o gate de horário comercial: não é mensagem a
+            # lead, é publicação de página — pode rodar de madrugada sem problema.
+            if _t.time() - float(EST.get_config("op_lp_auto") or 0) > 3600:
+                EST.set_config("op_lp_auto", str(_t.time()))
+                try:
+                    from atena.growth import lp_auto
+                    rl = lp_auto.rodar(GRW, ONTO.ont, EST)
+                    if rl["publicados"] or rl["drift"]:
+                        print(f"[operacoes] lp_auto: {len(rl['publicados'])} republicada(s), "
+                              f"{len(rl['drift'])} editada(s) com deriva sinalizada", flush=True)
+                except Exception as e:
+                    print(f"[operacoes] lp_auto falhou: {e}", flush=True)
             # retentativa de entrega: recupera quem a Meta recusou (número na variante do
             # 9º dígito; pacing de marketing com espera + template complementar). A cada ~1h,
             # no horário comercial — o caminho manda template ao lead.

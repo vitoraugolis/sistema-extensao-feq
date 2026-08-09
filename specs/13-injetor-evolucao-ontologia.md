@@ -56,3 +56,36 @@ GET  /injetor/historico       # versões + proveniência (rollback)
 - AC3 O relatório de impacto lista leads e fases afetados antes da aprovação.
 - AC4 Curso que fecha → leads ativos não recebem mais cadência de captação (entram em revisão).
 - AC5 Texto livre ambíguo → o Ontologista pede esclarecimento, não adivinha.
+
+## Declarar novo oferecimento (✅ implementado)
+Um caso especial, ESTRUTURADO em vez de texto livre: `Ontologista.propor_oferecimento()`
+(`atena/agentes/ontologista.py`). Diferente de `interpretar()` (1 campo por regra, seguro
+adivinhar em prosa), aqui são 5 campos atômicos — `janelaInscricao.{inicio,fim}`,
+`janelaOferecimento.{inicio,fim}`, `urlExtecamp` (campo de nível raiz do curso, **não**
+aninhado em `planoPagamento`) — cruzando **dois armazenamentos hoje desconectados**:
+`catalogo.jsonld` (ontologia) e `cursos_metas` (`atena/growth/db.py`, turma/URL da LP).
+`turma`+`url_extecamp` viajam serializados no campo `texto` da proposta (não existem no
+vocabulário) até a aprovação. Reaproveita `_get`/`_set`/`_impacto`/validação SHACL de
+`propor()` sem alterar `aprovar()`.
+
+Rota `POST /api/injetor/oferecimento`; `injetor_aprovar` ganha um branch: proposta tipo
+`novo_oferecimento` exige `papel=="supervisor"` (mesmo gate de `lp_publicar`, porque muda
+ontologia governada E publica página pública), e após `ONTO.aprovar()` chama
+`Growth.set_oferecimento(curso, turma, url)` — **primeiro writer runtime** dessas colunas,
+que antes só existiam no seed hardcoded — e então `lp_auto.republicar_um(...)` (feedback
+imediato, não espera o tick da hora). Sequência validar→ontologia→cursos_metas→publicar é
+idempotente ponta a ponta (reclicar "Aprovar" após uma falha no meio completa o que faltou).
+
+**URL perene**: `wp_deploy_bridge._slug()` ganha `LEGADO_TURMA`, cópia estática das turmas
+já publicadas no dia desta feature (conferida ao vivo em produção). Turma igual à legada →
+slug numerado de sempre (campanhas pagas atuais não quebram). Qualquer turma diferente —
+todo oferecimento declarado por este fluxo — nasce no slug perene `inscricao-{curso}`, sem
+número de turma: a turma seguinte cai no MESMO slug (WP já resolve por GET-then-update).
+
+## Auto-republicação de LP por deriva (✅ implementado — spec 17)
+Ver `atena/growth/lp_auto.py`: tick horário (`op_lp_auto`) compara o hash do que
+`ponte.render()` produziria agora contra o hash do último tick; republica sozinho se
+mudou e a LP não está editada à mão. LP editada nunca é sobrescrita — ganha uma flag de
+"pode estar desatualizada" (`lp_drift_<curso>`, chip na UI de Gestão de LPs) comparando
+contra a baseline gravada no MOMENTO da edição, não a cada tick (senão o aviso se
+autoapagaria um tick depois da deriva real).

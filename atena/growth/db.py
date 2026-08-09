@@ -106,6 +106,18 @@ class Growth:
                               (prazo, _agora(), curso))
             self.conn.commit()
 
+    def set_oferecimento(self, curso, turma, url):
+        """Primeiro (e único) writer em tempo de execução de turma/url — até aqui, os
+        dois só existiam no seed hardcoded de METAS. Chamado pelo Injetor ao aprovar
+        um 'novo_oferecimento' (atena/agentes/ontologista.py). Normaliza espaço em
+        branco aqui, na única porta de escrita — é onde importa fazer isso uma vez."""
+        with self._lock:
+            n = self.conn.execute(
+                "UPDATE cursos_metas SET turma=?, url=?, atualizado=? WHERE curso=?",
+                ((turma or "").strip(), (url or "").strip(), _agora(), curso)).rowcount
+            self.conn.commit()
+        return n > 0
+
     def inscritos(self, curso):
         with self._lock:
             n = self.conn.execute(

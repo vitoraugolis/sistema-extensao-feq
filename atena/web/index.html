@@ -435,6 +435,24 @@ input:focus,select:focus,textarea:focus{outline:none;box-shadow:3px 3px 0 var(--
           </div>
           <div id="injout" style="margin-top:12px;"></div>
         </div>
+        <div class="g sec">
+          <h2><i class="ti ti-calendar-plus"></i> Declarar novo oferecimento</h2>
+          <p class="muted" style="margin:0 0 10px;">Nova turma de um curso já existente: turma, janela de inscrição, janela das aulas e o link da Extecamp. Estruturado (não texto livre) porque mexe em dois lugares ao mesmo tempo — a ontologia e o cadastro da turma — e a URL precisa ser exata.</p>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+            <select id="ofCurso"></select>
+            <input id="ofTurma" placeholder="Turma (ex.: 010)">
+            <label class="muted" style="grid-column:1/-1;font-size:11.5px;margin-bottom:-4px;">Inscrições</label>
+            <input id="ofInscIni" type="date" title="Início das inscrições">
+            <input id="ofInscFim" type="date" title="Fim das inscrições">
+            <label class="muted" style="grid-column:1/-1;font-size:11.5px;margin-bottom:-4px;">Aulas</label>
+            <input id="ofAulasIni" type="date" title="Início das aulas">
+            <input id="ofAulasFim" type="date" title="Fim das aulas">
+            <input id="ofUrl" style="grid-column:1/-1;" placeholder="https://ins.extecamp.unicamp.br/curso/inscricao/FEQ-XXXX/0YY">
+          </div>
+          <div style="display:flex;justify-content:flex-end;margin-top:10px;">
+            <button class="btn btn-v" onclick="proporOferecimento()">Analisar impacto</button>
+          </div>
+        </div>
       </section>
 
       <section id="revisor" class="hidden">
@@ -495,6 +513,7 @@ document.querySelectorAll('.navi').forEach(b=>b.onclick=()=>{
   if(b.dataset.sec==='templates') tplCarregar();
   if(b.dataset.sec==='lps') lpCarregar();
   if(b.dataset.sec==='medicao') mdCarregar();
+  if(b.dataset.sec==='injetor') ofCursosCarregar();
   setTimeout(ajustarAltura, 0);      // a seção acabou de ficar visível: agora dá p/ medir
 });
 
@@ -702,13 +721,17 @@ async function lpCarregar(){
     const edit = l.editada
       ? `<span class="chip t-acc" style="margin:0;" title="Editada em ${l.editada_em||''} — não recebe mais atualizações da ontologia"><i class="ti ti-pencil"></i> editada à mão</span>`
       : '<span class="chip" style="margin:0;background:var(--paper);">gerada</span>';
+    // só existe quando editada=true: LP gerada se auto-atualiza sozinha (lp_auto), não desatualiza
+    const drift = l.drift
+      ? '<span class="chip t-bad" style="margin:0;" title="A ontologia mudou desde esta edição — a página no ar pode estar desatualizada"><i class="ti ti-alert-triangle"></i> pode estar desatualizada</span>'
+      : '';
     return `<div class="lp-linha">
       <i class="ti ti-browser"></i>
       <div style="min-width:190px;">
         <strong>${l.curso}</strong> <span class="muted">turma ${l.turma}</span>
         <div class="muted" style="font-size:11.5px;">${escapeHtml(l.nome).slice(0,58)}</div>
       </div>
-      ${insc} ${edit}
+      ${insc} ${edit} ${drift}
       <a href="${l.previa}" target="_blank" title="Ver como está agora"><i class="ti ti-eye"></i> prévia</a>
       ${l.link?`<a href="${l.link}" target="_blank" title="Página publicada"><i class="ti ti-external-link"></i> no ar</a>`:''}
       <button class="btn btn-v" style="margin-left:auto;padding:5px 10px;" onclick="lpAbrir('${l.curso}')"><i class="ti ti-code"></i> Editar HTML</button>
@@ -876,8 +899,30 @@ function renderProposta(p){
 
 async function aprovarProposta(pid){
   const r = await api('/api/injetor/'+pid+'/aprovar',{method:'POST'});
-  if(r.ok){ $('#injout').innerHTML = `<div class="row t-ok" style="background:var(--mint);"><i class="ti ti-circle-check"></i><span>Aplicado e versionado (${r.versao.versao}). Ontologia recarregada.</span></div>`; carregar(); }
+  if(r.ok){
+    // oferecimento: sem 'versao' (é diff+cursos_metas+publicação, não só versionamento do jsonld)
+    const msg = r.versao ? `Aplicado e versionado (${r.versao.versao}). Ontologia recarregada.`
+      : `Ontologia atualizada${r.lp?' e LP republicada':''}.${r.aviso?' ⚠️ '+r.aviso:''}`;
+    $('#injout').innerHTML = `<div class="row t-ok" style="background:var(--mint);"><i class="ti ti-circle-check"></i><span>${msg}</span></div>`;
+    carregar();
+  }
   else { $('#injout').innerHTML = `<div class="row t-bad" style="background:var(--rosa);"><i class="ti ti-ban"></i><span>${r.erro}</span></div>`; }
+}
+
+async function ofCursosCarregar(){
+  // só cursos com turma/URL a gerenciar (cursos_metas) — os mesmos de "Gestão de LPs",
+  // não o portfólio inteiro, que inclui curso sem LP nenhuma.
+  const sel = $('#ofCurso'); if(!sel || sel.options.length) return;
+  const d = await api('/api/lps');
+  sel.innerHTML = (d.lps||[]).map(l=>`<option value="${l.curso}">${l.curso} — turma atual ${l.turma}</option>`).join('');
+}
+async function proporOferecimento(){
+  const b = {curso: $('#ofCurso').value, turma: $('#ofTurma').value.trim(),
+    url_extecamp: $('#ofUrl').value.trim(), insc_inicio: $('#ofInscIni').value,
+    insc_fim: $('#ofInscFim').value, of_inicio: $('#ofAulasIni').value, of_fim: $('#ofAulasFim').value};
+  $('#injout').innerHTML = `<div class="row t-acc"><i class="ti ti-loader"></i><span>Validando com SHACL…</span></div>`;
+  const p = await api('/api/injetor/oferecimento',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)});
+  renderProposta(p);
 }
 
 // -------------------------------------- Verificação: veredito automático

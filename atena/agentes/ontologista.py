@@ -192,3 +192,62 @@ class Ontologista:
     def rejeitar(self, pid):
         self.est.set_proposta_status(pid, "rejeitada")
         return {"ok": True}
+
+    # ------------------------------------------------------ novo oferecimento
+    def propor_oferecimento(self, curso, turma, url_extecamp, insc_inicio, insc_fim,
+                            of_inicio, of_fim, autor="operador"):
+        """Declarar uma nova turma: estruturado, não texto livre por regex.
+
+        `interpretar()` funciona para os casos de 1 campo (reabrir prazo, trocar carga)
+        porque adivinhar 1 número em prosa é seguro o bastante. Aqui são 5 campos
+        atômicos cruzando DOIS armazenamentos (catalogo.jsonld + cursos_metas, hoje
+        desconectados — ver Growth.set_oferecimento) e uma URL exata que vira link
+        público: regex adivinhando turma em frase seria frágil demais para isso.
+
+        `turma`/`url_extecamp` não têm caminho no vocabulário da ontologia — viajam
+        serializados em `texto` só até a aprovação (ver injetor_aprovar em app.py).
+        """
+        pid = f"prop-{int(time.time() * 1000)}"
+        code = (curso or "").strip().upper()
+        campos = {"turma": (turma or "").strip(), "url_extecamp": (url_extecamp or "").strip(),
+                 "insc_inicio": insc_inicio, "insc_fim": insc_fim,
+                 "of_inicio": of_inicio, "of_fim": of_fim}
+        if not code or any(not v for v in campos.values()):
+            self.est.add_proposta(pid, autor, json.dumps(campos), code or "?", "novo_oferecimento",
+                                  [], ["Preencha os 6 campos: turma, URL da Extecamp e as 4 datas."],
+                                  {"ok": False, "mensagem": "campos incompletos"}, status="esclarecer")
+            return self.est.get_proposta(pid)
+        # mesma normalização já aplicada a cursos_metas.url em Growth.__init__
+        url = campos["url_extecamp"].replace("/curso/dados/", "/curso/inscricao/")
+        if not re.search(rf"/{re.escape(code)}/{re.escape(campos['turma'])}$", url, re.I):
+            self.est.add_proposta(pid, autor, json.dumps(campos), code, "novo_oferecimento", [],
+                                  [f"A URL não termina em /{code}/{campos['turma']} — "
+                                   "confira se a turma bate com o link colado."],
+                                  {"ok": False, "mensagem": "URL não corresponde à turma"},
+                                  status="esclarecer")
+            return self.est.get_proposta(pid)
+        cat = self._carregar()
+        course = self._find(cat, code)
+        if not course:
+            self.est.add_proposta(pid, autor, json.dumps(campos), code, "novo_oferecimento", [],
+                                  [f"Curso {code} não está no catálogo."],
+                                  {"ok": False, "mensagem": "curso inexistente"}, status="invalida")
+            return self.est.get_proposta(pid)
+        raw = [("janelaInscricao.inicio", insc_inicio), ("janelaInscricao.fim", insc_fim),
+              ("janelaOferecimento.inicio", of_inicio), ("janelaOferecimento.fim", of_fim),
+              ("urlExtecamp", url)]
+        diff = []
+        cat2 = copy.deepcopy(cat)
+        course2 = self._find(cat2, code)
+        for path, para in raw:
+            diff.append({"campo": path, "de": _get(course, path), "para": para})
+            _set(course2, path, para)
+        data_graph = validacao.grafo_de_catalogo(cat2, self.vocab_path)
+        ok, txt = validacao.validar(data_graph, shapes_path=ONT_DIR / "shapes.ttl")
+        impacto = self._impacto(code, "novo_oferecimento", cat2)
+        impacto.append(f"Ao aprovar, a turma do cursos_metas passa a ser '{campos['turma']}' "
+                       "e a LP é republicada imediatamente (não espera o tick da hora).")
+        self.est.add_proposta(pid, autor, json.dumps(campos), code, "novo_oferecimento", diff, impacto,
+                              {"ok": bool(ok), "mensagem": "SHACL conforme" if ok else txt[:300]},
+                              status="proposta" if ok else "invalida")
+        return self.est.get_proposta(pid)

@@ -25,8 +25,28 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2]))
 from atena.growth import ponte
 
 
+# Congelado em 09/08/2026 (dia desta feature) — cópia ESTÁTICA de cursos_metas.turma
+# NAQUELE momento, conferida ao vivo no banco de produção. NÃO importar de METAS: essa
+# lista segue crescendo com cursos futuros, que devem nascer no slug perene desde a
+# primeira turma, não herdar tratamento "legado". As URLs abaixo já circulam em
+# campanha — não mudam nunca. Qualquer turma DIFERENTE da listada aqui (ou seja, todo
+# oferecimento novo declarado a partir de agora) usa o slug perene.
+# ponytail: comparação por valor de turma — assume que a Extecamp nunca reaproveita um
+# número dentro do mesmo curso. Se isso acontecer, trocar por uma coluna
+# cursos_metas.evergreen (setada por Growth.set_oferecimento, nunca desfeita).
+LEGADO_TURMA = {
+    "FEQ-0480": "009", "FEQ-0580": "001", "FEQ-0333": "001", "FEQ-1000": "018",
+    "FEQ-0360": "007", "FEQ-0331": "004", "FEQ-0299": "001", "FEQ-0670": "001",
+    "FEQ-0499": "001",
+}
+
+
 def _slug(curso, turma):
-    return f"inscricao-{curso.lower()}-{turma}"
+    turma = (turma or "").strip()
+    legado = LEGADO_TURMA.get(curso.upper())
+    if legado is not None and turma == legado.strip():
+        return f"inscricao-{curso.lower()}-{turma}"      # URL já publicada: nunca muda
+    return f"inscricao-{curso.lower()}"                   # oferecimento novo: URL perene
 
 
 def _webhook_url():
