@@ -44,8 +44,32 @@ cada ~2h **dentro do horário comercial**; a escolha do canal é pela **janela d
   (tier externa); templates são pré-aprovados e enviados diretos. Status de entrega da mensagem
   (✓/✓✓/lido/falhou) chega pelo webhook `statuses` e atualiza a bolha; falha vira alerta.
 
+## Negociação humana (`confia_valor_humano`, ✅ implementado)
+O Revisor é fail-closed para **conteúdo gerado pelo LLM** — mas até 10/08/2026 aplicava a
+mesma trava a texto **digitado por um operador**, que é quem de fato negocia preço com o
+lead ou com a coordenação. Um humano digitando "R$ 692,87" não é o mesmo risco que um LLM
+inventando: o LLM alucina, o operador está relatando uma negociação real.
+
+`revisar(..., confia_valor_humano=True)` afrouxa **só** os passos de valor monetário e
+parcela — a mensagem passa, e o trace de auditoria/corpus registra explicitamente
+`"valor R$X (negociado por humano, fora da base)"`, nunca fingindo que bateu com o
+catálogo. **Data, carga horária e link da Extecamp continuam bloqueados mesmo com um
+humano digitando**: não são termos de negociação, são fatos estruturais do curso — a
+correção correta para eles é editar a ontologia via Injetor (`specs/13`), não digitar por
+cima (foi exatamente um link de turma errada, digitado à mão, que já causou 6 leads do
+FEQ-0480 indo ao formulário errado).
+
+Usado nos três caminhos onde o operador digita texto que vai direto ao lead:
+`conversa_enviar` (mensagem livre), `_aprovar_e_enviar` quando o operador **edita** o
+rascunho do LLM antes de aprovar, e a legenda de `conversa_enviar_midia`. O rascunho do
+LLM em si — aprovado sem edição, ou qualquer mensagem que o cérebro gera sozinho
+(`propor_reativacao`, resposta inicial) — continua na checagem estrita, sem
+`confia_valor_humano`: preço inventado pelo modelo segue bloqueando exatamente como antes.
+
 ## Critérios de aceitação (todos cobertos por teste)
 - Inelegível nunca vira Prospect; curso encerrado não é engajado (escala).
-- Toda mensagem passou pelo Revisor; preço/data/carga/parcelas inventados bloqueiam.
+- Toda mensagem passou pelo Revisor; preço/data/carga/parcelas inventados pelo LLM bloqueiam.
+- Preço/parcela digitados por um HUMANO (negociação real) não bloqueiam; data/carga/link
+  continuam bloqueando mesmo digitados por humano.
 - Opt-out determinístico cessa e marca; gatilho sensível (desconto/reclamação) escala.
 - Conversa e decisões persistem em SQLite (`specs/12`).

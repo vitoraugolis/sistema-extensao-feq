@@ -54,7 +54,7 @@ def _ancoras_escopo(codigo, texto, ont):
     return ancs
 
 
-def revisar_estrutural(codigo, texto, ont, fonte_extra=None):
+def revisar_estrutural(codigo, texto, ont, fonte_extra=None, confia_valor_humano=False):
     """Passada determinística, sem rede. Retorna {aprovado, bloqueios, ancoras}.
     `fonte_extra`: texto autorizado por humano (ex.: resposta da coordenação) cujos
     fatos viram âncoras válidas para ESTA mensagem (proveniência humana).
@@ -63,7 +63,17 @@ def revisar_estrutural(codigo, texto, ont, fonte_extra=None):
     sem afirmação factual (preço/data/carga/parcela) — não há o que verificar,
     então não há o que alucinar. Qualquer afirmação desse tipo, porém, segue
     bloqueada: sem âncora pra checar, o valor cai fora dos conjuntos abaixo e os
-    passos 1-4 barram normalmente."""
+    passos 1-4 barram normalmente.
+
+    `confia_valor_humano`: mensagem digitada ou editada DIRETAMENTE por um operador
+    (não gerada pelo LLM) — preço e parcela negociados de verdade com o lead/
+    coordenação não têm por que existir na ontologia (spec 15: preço muda por
+    campanha; negociação pontual é ainda mais específica). Afrouxa SÓ os passos 1/2
+    (parcelas e valor monetário). Data, carga horária e link da Extecamp continuam
+    travados mesmo com um humano digitando: são fatos estruturais do curso, não
+    termos de negociação — datado errado ou link da turma errada já causaram
+    incidente real neste projeto (ver comentário de URL_EXTECAMP_RE) e a correção
+    correta pra eles é editar a ontologia (Injetor), não digitar por cima."""
     ancs = _ancoras_escopo(codigo, texto, ont)
     escopo = "/".join(a["codigo"] for a in ancs) or (
         f"curso '{codigo}' desconhecido" if codigo else "nenhum curso associado")
@@ -90,6 +100,10 @@ def revisar_estrutural(codigo, texto, ont, fonte_extra=None):
         n, vd = int(m.group(1)), re.sub(r"\D", "", m.group(2))
         if (n, vd) in planos:
             usadas.append(f"parcelamento {n}x")
+        elif confia_valor_humano:
+            # NÃO finge que bateu com a base — fica honesto no trace de auditoria/corpus
+            # (spec 18) que este valor veio de negociação humana, não da ontologia.
+            usadas.append(f"parcelamento {n}x (negociado por humano, fora da base)")
         else:
             bloq.append(f"Plano de parcelas incoerente: '{n}x de {m.group(2).strip()}' "
                         f"não corresponde a nenhum curso citado ({escopo}).")
@@ -101,6 +115,8 @@ def revisar_estrutural(codigo, texto, ont, fonte_extra=None):
         d = re.sub(r"\D", "", m.group(0))
         if d in money:
             usadas.append(f"valor {m.group(0).strip()}")
+        elif confia_valor_humano:
+            usadas.append(f"valor {m.group(0).strip()} (negociado por humano, fora da base)")
         else:
             bloq.append(f"Valor monetário fora da base ({escopo}): {m.group(0).strip()}.")
 
@@ -178,8 +194,9 @@ def revisar_semantico(codigo, texto, ont):
         return {"bloqueios": [], "nota": f"semântica falhou: {e}"}
 
 
-def revisar(codigo, texto, ont, usar_semantico=False, fonte_extra=None):
-    r1 = revisar_estrutural(codigo, texto, ont, fonte_extra=fonte_extra)
+def revisar(codigo, texto, ont, usar_semantico=False, fonte_extra=None, confia_valor_humano=False):
+    r1 = revisar_estrutural(codigo, texto, ont, fonte_extra=fonte_extra,
+                            confia_valor_humano=confia_valor_humano)
     bloq = list(r1["bloqueios"])
     nota = None
     if usar_semantico:

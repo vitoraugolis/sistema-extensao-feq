@@ -555,8 +555,12 @@ def _aprovar_e_enviar(card_id, texto=None, ator="humano"):
         return {"erro": "sem proposta pendente"}, 404
     lead = EST.get_lead(card_id)
     texto = (texto or "").strip() or prop["mensagem"]
-    if texto != prop["mensagem"]:  # edição humana também passa pelo Revisor (spec 14)
-        rev = revisar(lead["curso"], texto, ONTO.ont)
+    if texto != prop["mensagem"]:
+        # edição humana também passa pelo Revisor (spec 14), mas confiando no operador
+        # para preço/parcela (negociação real) — mesmo raciocínio de conversa_enviar.
+        # Se o texto NÃO foi editado (aprovou o rascunho do LLM tal como veio), esse
+        # ramo nem roda: o preço já foi checado ESTRITO quando a proposta nasceu.
+        rev = revisar(lead["curso"], texto, ONTO.ont, confia_valor_humano=True)
         if not rev["aprovado"]:
             return {"erro": "edição bloqueada pelo Revisor", "bloqueios": rev["bloqueios"]}, 422
     r = WA.enviar(lead["telefone"], texto, forcar=True)   # resposta humana: não trava por horário
@@ -612,16 +616,19 @@ def conversa_aprovar(card_id):
 @app.route("/api/conversas/<card_id>/enviar", methods=["POST"])
 def conversa_enviar(card_id):
     """Intervenção humana: operador escreve e envia agora, sem proposta prévia
-    do agente (estilo WhatsApp). Mesmo guardrail de sempre: passa pelo Revisor
-    antes de sair (spec 07/CLAUDE.md §7) — só bloqueia se o texto citar preço/
-    data/carga/parcela que não bate com o curso do card."""
+    do agente (estilo WhatsApp). Passa pelo Revisor (spec 07/CLAUDE.md §7), mas
+    com confia_valor_humano=True: preço/parcela que o operador digitou são
+    negociação de verdade com o lead, não alucinação de LLM — o Revisor deixa
+    passar (e registra como negociado, não como "bateu com a base"). Data, carga
+    horária e link da Extecamp continuam bloqueados mesmo digitados por humano:
+    são fatos estruturais do curso; a correção correta é editar a ontologia."""
     lead = EST.get_lead(card_id)
     if not lead:
         return jsonify({"erro": "lead inexistente"}), 404
     texto = (request.get_json(silent=True) or {}).get("texto", "").strip()
     if not texto:
         return jsonify({"erro": "texto vazio"}), 400
-    rev = revisar(lead["curso"], texto, ONTO.ont)
+    rev = revisar(lead["curso"], texto, ONTO.ont, confia_valor_humano=True)
     if not rev["aprovado"]:
         return jsonify({"erro": "mensagem bloqueada pelo Revisor", "bloqueios": rev["bloqueios"]}), 422
     r = WA.enviar(lead["telefone"], texto, forcar=True)   # envio humano: passa fora do horário
@@ -792,7 +799,9 @@ def conversa_enviar_guia(card_id):
 @app.route("/api/conversas/<card_id>/midia", methods=["POST"])
 def conversa_enviar_midia(card_id):
     """Operador envia arquivo/áudio/foto ao lead (multipart: arquivo + legenda opcional).
-    A legenda é texto ao lead -> passa pelo Revisor, como qualquer mensagem."""
+    A legenda é texto digitado pelo operador -> mesmo tratamento de conversa_enviar
+    (confia_valor_humano=True): passa pelo Revisor, mas preço/parcela negociado não
+    bloqueia; data/carga/link seguem travados."""
     lead = EST.get_lead(card_id)
     if not lead:
         return jsonify({"erro": "lead inexistente"}), 404
@@ -801,7 +810,7 @@ def conversa_enviar_midia(card_id):
         return jsonify({"erro": "nenhum arquivo enviado"}), 400
     legenda = (request.form.get("legenda") or "").strip()
     if legenda:
-        rev = revisar(lead["curso"], legenda, ONTO.ont)
+        rev = revisar(lead["curso"], legenda, ONTO.ont, confia_valor_humano=True)
         if not rev["aprovado"]:
             return jsonify({"erro": "legenda bloqueada pelo Revisor", "bloqueios": rev["bloqueios"]}), 422
     conteudo = arq.read()

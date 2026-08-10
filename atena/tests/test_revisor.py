@@ -151,6 +151,55 @@ def test_elegibilidade_ordinal():
     assert ONT.elegivel("Superior Completo", "FEQ-0480") is True
 
 
+# --------------------------- confia_valor_humano (negociação real, 10/08/2026) ---
+def test_humano_pode_negociar_valor_fora_da_base():
+    r = revisar_estrutural("FEQ-0480", "Consegui fechar com você por R$ 692,87.", ONT,
+                           confia_valor_humano=True)
+    assert r["aprovado"], r["bloqueios"]
+    assert any("negociado por humano" in a for a in r["ancoras"])
+
+
+def test_humano_pode_negociar_parcela_fora_da_base():
+    r = revisar_estrutural("FEQ-0480", "Fica em 12x de R$ 500,00 no seu caso.", ONT,
+                           confia_valor_humano=True)
+    assert r["aprovado"], r["bloqueios"]
+
+
+def test_sem_flag_continua_bloqueando_preco_mesmo_texto():
+    """Mesma mensagem, SEM confia_valor_humano: comportamento de antes, intocado —
+    é o que protege o caminho do LLM (que nunca passa a flag)."""
+    assert not revisar_estrutural("FEQ-0480", "Consegui fechar com você por R$ 692,87.",
+                                  ONT)["aprovado"]
+
+
+def test_confia_valor_humano_nao_libera_data_inventada():
+    """Negociação é sobre preço/parcela — data é fato estrutural do curso. Um humano
+    digitando uma data errada ainda é bloqueado (a correção é editar a ontologia)."""
+    assert not revisar_estrutural("FEQ-0480", "As inscrições vão até 30/12/2099.", ONT,
+                                  confia_valor_humano=True)["aprovado"]
+
+
+def test_confia_valor_humano_nao_libera_carga_inventada():
+    assert not revisar_estrutural("FEQ-0480", "São 999 horas de curso.", ONT,
+                                  confia_valor_humano=True)["aprovado"]
+
+
+def test_confia_valor_humano_nao_libera_link_errado():
+    """Mesmo bug que já aconteceu de verdade (6 leads do FEQ-0480 receberam a turma
+    errada) — link continua travado mesmo com um humano digitando por cima."""
+    url_errado = "https://ins.extecamp.unicamp.br/curso/inscricao/FEQ-0480/001"
+    assert not revisar_estrutural("FEQ-0480", f"Aqui está o link: {url_errado}", ONT,
+                                  confia_valor_humano=True)["aprovado"]
+
+
+def test_confia_valor_humano_nao_bloqueia_valor_real_da_base():
+    """Preço que JÁ bate com a base continua sendo registrado como tal (não como
+    'negociado'), mesmo com a flag ligada — a flag afrouxa, não confunde a origem."""
+    r = revisar_estrutural("FEQ-0480", "O à vista é R$ 16.455,75.", ONT, confia_valor_humano=True)
+    assert r["aprovado"]
+    assert any("negociado" not in a and "16.455,75" in a for a in r["ancoras"])
+
+
 # --------------------------------------------------------- runner sem pytest
 if __name__ == "__main__":
     casos = [v for k, v in sorted(globals().items()) if k.startswith("test_") and callable(v)]
