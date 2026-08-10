@@ -41,9 +41,11 @@ echo "==> configurando o VPS"
 set -e
 # pacotes (apt=Ubuntu/Debian · dnf=Amazon Linux)
 if command -v apt-get >/dev/null; then
-  # libpango/gdk-pixbuf/libffi: exigidas pelo WeasyPrint (guia do curso em PDF, spec 08)
+  # libpango/gdk-pixbuf/libffi: exigidas pelo WeasyPrint (guia do curso em PDF, spec 08).
+  # fonts-inter: o VPS só trazia DejaVu, e o guia é gerado AQUI — sem a fonte certa o
+  # PDF de produção sai com tipografia diferente da que foi aprovada visualmente.
   sudo apt-get update -qq && sudo apt-get install -y -qq python3-pip python3-venv sqlite3 curl \
-    libpango-1.0-0 libpangocairo-1.0-0 libgdk-pixbuf2.0-0 libffi-dev
+    libpango-1.0-0 libpangocairo-1.0-0 libgdk-pixbuf2.0-0 libffi-dev fonts-inter
 elif command -v dnf >/dev/null; then
   sudo dnf install -y -q python3-pip sqlite curl pango gdk-pixbuf2 libffi-devel
 fi

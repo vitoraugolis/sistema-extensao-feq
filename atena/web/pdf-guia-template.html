@@ -4,83 +4,196 @@
 <meta charset="utf-8">
 <title>Guia do Curso — {{NOME_CURSO}}</title>
 <style>
+  /* Inter: instalada no VPS pelo deploy_vps.sh (fonts-inter). O VPS só tinha DejaVu,
+     que renderiza MUITO diferente do Mac — e o PDF de produção é gerado lá, então
+     sem fixar a fonte a validação visual local seria enganosa. */
   @page { size: A4; margin: 0; }
-  /* Páginas de CONTEÚDO usam page:conteudo -> ganham margem; capas/divisores ficam
-     full-bleed (margin:0 do @page global) — CSS Paged Media nativo do WeasyPrint,
-     sem precisar simular margem com padding em cada bloco. */
-  @page conteudo { margin: 20mm 18mm 16mm; @bottom-center { content: counter(page); font-size: 9px; color: #94a3b8; } }
+  /* Páginas de CONTEÚDO usam page:conteudo -> ganham margem e cabeçalho/rodapé;
+     capas e divisores ficam full-bleed (margin:0 do @page global). */
+  @page conteudo {
+    margin: 24mm 18mm 18mm;
+    @top-right { content: "Guia do Curso · {{CODIGO_CURSO}}"; font-family: Inter, Arial, sans-serif;
+                 font-size: 7.5pt; color: #94a3b8; letter-spacing: .04em; }
+    @bottom-center { content: counter(page); font-family: Inter, Arial, sans-serif;
+                     font-size: 8pt; color: #94a3b8; }
+  }
   * { box-sizing: border-box; }
-  body { margin: 0; font-family: "Helvetica Neue", Arial, sans-serif; color: #0f172a; font-size: 11pt; line-height: 1.45; }
-  h1, h2, h3 { margin: 0 0 8px; font-weight: 700; }
+  body { margin: 0; font-family: Inter, "Helvetica Neue", Arial, sans-serif;
+         color: #0f172a; font-size: 10.5pt; line-height: 1.55; }
+  h1, h2, h3 { margin: 0 0 8px; font-weight: 700; letter-spacing: -0.015em; }
   p { margin: 0 0 8px; }
+
   .pagina { page: conteudo; page-break-before: always; }
   .pagina:first-of-type { page-break-before: avoid; }
-  .divisor {
+
+  /* ---------------------------------------------------------------- capa */
+  .capa { position: relative; height: 297mm; width: 210mm; overflow: hidden;
+    background: #020617; color: #fff; page-break-after: always; }
+  /* dois gradientes: um brilho radial que dá profundidade + a base navy */
+  .capa-fundo { position: absolute; top: 0; left: 0; width: 210mm; height: 297mm;
+    background-image: radial-gradient(circle at 78% 18%, #1e3a5f 0%, rgba(2,6,23,0) 58%),
+                      linear-gradient(165deg, #0b1220 0%, #020617 55%, #0b1628 100%); }
+  .capa-motivo { position: absolute; top: -34mm; right: -40mm; width: 165mm; height: 165mm; }
+  .capa-motivo img { width: 100%; height: 100%; }
+  /* faixa âmbar sangrando no rodapé: fecha a composição e ecoa o traço das seções */
+  .capa-faixa { position: absolute; bottom: 0; left: 0; width: 210mm; height: 6mm;
+    background: linear-gradient(90deg, #fbbf24 0%, #f59e0b 55%, #2dd4bf 100%); }
+  /* space-between em vez de `margin-top:auto` no bloco de baixo: o auto-margin de
+     flex item NÃO empurra no WeasyPrint (testado — tudo colava no topo).
+     align-items:flex-start porque o stretch padrão esticava o logo na largura toda. */
+  .capa-conteudo { position: absolute; top: 0; left: 0; width: 210mm; height: 297mm;
+    padding: 20mm 20mm 26mm; display: flex; flex-direction: column;
+    justify-content: space-between; align-items: flex-start; }
+  .capa-logo { height: 12mm; width: 51mm; }
+  .capa-regua { width: 22mm; height: 1.2mm; background: #fbbf24; margin-bottom: 6mm; }
+  .capa-eyebrow { color: #fbbf24; text-transform: uppercase; letter-spacing: .22em;
+    font-size: 8.5pt; font-weight: 700; margin-bottom: 5mm; }
+  .capa h1 { font-size: 27pt; line-height: 1.14; font-weight: 800; letter-spacing: -0.025em;
+    margin: 0 0 6mm; max-width: 150mm; }
+  .capa-sub { color: #cbd5e1; font-size: 11pt; margin-bottom: 9mm; }
+  .capa-chips { display: flex; flex-wrap: wrap; gap: 3mm; }
+  .capa-chip { border: 0.4mm solid rgba(148,163,184,.45); border-radius: 20mm;
+    padding: 2.4mm 5mm; font-size: 8.5pt; color: #e2e8f0; font-weight: 600; }
+  .capa-chip b { color: #fbbf24; font-weight: 700; }
+
+  /* ------------------------------------------------------------ divisores */
+  .divisor { position: relative; overflow: hidden;
     page-break-before: always; page-break-after: always;
-    height: 297mm; width: 210mm; background: linear-gradient(160deg, #020617, #0f172a);
-    color: #fff; display: flex; flex-direction: column; justify-content: center;
-    align-items: center; text-align: center; padding: 30mm;
-  }
-  .divisor .tag { color: #fbbf24; text-transform: uppercase; letter-spacing: .12em; font-size: 10pt; font-weight: 700; margin-bottom: 10mm; }
-  .divisor h1 { font-size: 26pt; line-height: 1.2; }
-  .divisor .sub { margin-top: 8mm; font-size: 12pt; color: #cbd5e1; max-width: 140mm; }
+    height: 297mm; width: 210mm; background: #0f172a; color: #fff; }
+  .divisor-fundo { position: absolute; top: 0; left: 0; width: 210mm; height: 297mm;
+    background-image: radial-gradient(circle at 20% 80%, #1e3a5f 0%, rgba(15,23,42,0) 60%),
+                      linear-gradient(160deg, #0f172a 0%, #020617 100%); }
+  .divisor-motivo { position: absolute; bottom: -45mm; left: -45mm; width: 150mm; height: 150mm; }
+  .divisor-motivo img { width: 100%; height: 100%; }
+  .divisor-conteudo { position: absolute; top: 0; left: 0; width: 210mm; height: 297mm;
+    padding: 30mm; display: flex; flex-direction: column; justify-content: center; }
+  .divisor .tag { color: #fbbf24; text-transform: uppercase; letter-spacing: .2em;
+    font-size: 9pt; font-weight: 700; margin-bottom: 6mm; }
+  .divisor h1 { font-size: 25pt; line-height: 1.18; font-weight: 800; max-width: 135mm; }
+  .divisor .sub { margin-top: 7mm; font-size: 11pt; color: #cbd5e1; max-width: 128mm; }
+  .divisor-regua { width: 20mm; height: 1.2mm; background: #fbbf24; margin-top: 9mm; }
 
-  /* Capa */
-  .capa { page-break-after: always; height: 297mm; width: 210mm;
-    background: linear-gradient(160deg, #020617, #0f172a); color: #fff;
-    display: flex; flex-direction: column; justify-content: flex-end; padding: 22mm; }
-  .capa img.logo { height: 14mm; margin-bottom: 14mm; filter: brightness(0) invert(1); }
-  .capa .tag { color: #fbbf24; text-transform: uppercase; letter-spacing: .1em; font-size: 10pt; font-weight: 700; margin-bottom: 4mm; }
-  .capa h1 { font-size: 24pt; line-height: 1.2; }
-
+  /* ------------------------------------------------------------- títulos */
   /* bookmark-level/-label = índice nativo do PDF (painel lateral do leitor) — dá
      navegação real sem precisar simular numeração de página no Sumário impresso. */
-  h2.titulo { font-size: 16pt; color: #0f172a; border-bottom: 3px solid #fbbf24;
-    padding-bottom: 4mm; margin-bottom: 8mm; bookmark-level: 1; bookmark-label: content(); }
+  h2.titulo { font-size: 15pt; color: #0f172a; margin-bottom: 7mm; padding-bottom: 3mm;
+    border-bottom: 0.8mm solid #fbbf24; font-weight: 800;
+    bookmark-level: 1; bookmark-label: content(); }
   .divisor h1, .capa h1 { bookmark-level: 1; bookmark-label: content(); }
+  .secao + .secao { margin-top: 13mm; }
 
-  .selo-grid { display: flex; flex-wrap: wrap; gap: 6mm; margin: 4mm 0 8mm; }
-  .selo { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 3mm; padding: 5mm; flex: 1 1 45mm; }
-  .selo b { display: block; color: #0f172a; margin-bottom: 1mm; }
-  .selo span { color: #64748b; font-size: 9.5pt; }
+  /* --------------------------------------------------------------- selos */
+  .selo-grid { display: flex; flex-wrap: wrap; gap: 4mm; margin: 4mm 0 0; }
+  .selo { background: #f8fafc; border: 0.3mm solid #e2e8f0; border-left: 1.1mm solid #fbbf24;
+    border-radius: 2mm; padding: 4.5mm 5mm; flex: 1 1 46%; }
+  .selo b { display: block; color: #0f172a; margin-bottom: 1.2mm; font-size: 10pt; }
+  .selo span { color: #64748b; font-size: 9pt; line-height: 1.45; }
 
-  .item-num { display: flex; gap: 5mm; margin-bottom: 6mm; align-items: flex-start; }
-  .item-num .bola { flex-shrink: 0; width: 8mm; height: 8mm; border-radius: 50%; background: #fbbf24;
-    color: #0f172a; font-weight: 700; display: flex; align-items: center; justify-content: center; font-size: 10pt; }
-  .item-num b { display: block; }
+  /* -------------------------------------------------------- ficha técnica */
+  .ficha { display: flex; flex-wrap: wrap; border: 0.3mm solid #e2e8f0; border-radius: 2.5mm;
+    overflow: hidden; margin-top: 2mm; }
+  .ficha-item { flex: 1 1 33%; padding: 5mm; border-right: 0.3mm solid #e2e8f0;
+    border-bottom: 0.3mm solid #e2e8f0; }
+  .ficha-rot { color: #94a3b8; font-size: 7.5pt; text-transform: uppercase;
+    letter-spacing: .12em; font-weight: 700; margin-bottom: 1.5mm; }
+  .ficha-val { color: #0f172a; font-size: 10.5pt; font-weight: 700; }
 
-  .empresa-chip { display: inline-block; background: #0f172a; color: #fff; padding: 3mm 6mm;
-    border-radius: 2mm; margin: 0 3mm 3mm 0; font-size: 10pt; font-weight: 600; }
+  /* ------------------------------------------------------- itens numerados */
+  .item-num { display: flex; gap: 5mm; margin-bottom: 6mm; align-items: flex-start;
+    page-break-inside: avoid; }
+  .item-num .bola { flex-shrink: 0; width: 8mm; height: 8mm; border-radius: 50%;
+    background: #fbbf24; color: #0f172a; font-weight: 800;
+    display: flex; align-items: center; justify-content: center; font-size: 10pt; }
+  .item-num b { display: block; margin-bottom: 0.8mm; }
+  .item-num span { color: #475569; }
 
-  .prof-card { display: flex; gap: 6mm; margin-bottom: 8mm; padding-bottom: 8mm; border-bottom: 1px solid #e2e8f0; }
-  .prof-foto { width: 24mm; height: 24mm; border-radius: 50%; object-fit: cover; flex-shrink: 0; border: 2px solid #fbbf24; }
-  .prof-avatar { width: 24mm; height: 24mm; border-radius: 50%; background: #0f172a; color: #fff;
-    display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14pt; flex-shrink: 0; }
-  .prof-nome { font-weight: 700; font-size: 12pt; }
-  .prof-cargo { color: #b45309; font-size: 9.5pt; font-weight: 600; margin-bottom: 2mm; }
-  .prof-bio { color: #334155; font-size: 10pt; }
-  .prof-link { color: #0369a1; font-size: 9pt; }
+  /* ------------------------------------------------------------- empresas */
+  .empresa-chip { display: inline-block; background: #0f172a; color: #fff;
+    padding: 2.6mm 5mm; border-radius: 1.5mm; margin: 0 2.5mm 2.5mm 0;
+    font-size: 9pt; font-weight: 600; }
 
-  .modulo { margin-bottom: 6mm; page-break-inside: avoid; }
-  .modulo-tit { display: flex; gap: 4mm; align-items: center; font-weight: 700; margin-bottom: 2mm; }
-  .modulo ul { margin: 0; padding-left: 12mm; color: #475569; font-size: 10pt; }
+  /* --------------------------------------------------------- habilidades */
+  .hab { display: flex; gap: 4mm; align-items: flex-start; margin-bottom: 4.5mm;
+    page-break-inside: avoid; }
+  .hab-marca { flex-shrink: 0; width: 3mm; height: 3mm; border-radius: 50%;
+    background: #fbbf24; margin-top: 2mm; }
+  .hab span { color: #1e293b; font-weight: 600; }
 
-  .contato-pagina { page-break-before: always; height: 297mm; width: 210mm;
-    background: #0f172a; color: #fff; display: flex; flex-direction: column;
-    justify-content: center; align-items: center; text-align: center; gap: 4mm; }
-  .contato-pagina h2 { color: #fbbf24; font-size: 16pt; margin-bottom: 4mm; }
-  .contato-pagina a { color: #fff; text-decoration: none; }
+  /* -------------------------------------------------------- depoimentos */
+  .depo { border-left: 1.1mm solid #fbbf24; background: #f8fafc; border-radius: 0 2mm 2mm 0;
+    padding: 5mm 6mm; margin-bottom: 5mm; page-break-inside: avoid; }
+  .depo-txt { color: #334155; font-style: italic; margin-bottom: 3mm; }
+  .depo-nome { font-weight: 700; font-size: 9.5pt; }
+  .depo-cargo { color: #64748b; font-size: 8.5pt; }
 
-  .sumario-item { display: flex; justify-content: space-between; padding: 3mm 0; border-bottom: 1px dotted #cbd5e1; }
+  /* -------------------------------------------------------- professores */
+  .prof-card { display: flex; gap: 6mm; margin-bottom: 7mm; padding-bottom: 7mm;
+    border-bottom: 0.3mm solid #e2e8f0; page-break-inside: avoid; }
+  .prof-card:last-child { border-bottom: none; }
+  /* O avatar de iniciais fica ATRÁS da foto: se o download da foto falhar na geração
+     (as fotos são URLs das páginas oficiais da FEQ), sobra a inicial em vez de um
+     buraco branco no meio do card. */
+  .prof-media { position: relative; flex-shrink: 0; width: 26mm; height: 26mm;
+    border-radius: 50%; background: #0f172a; color: #fff; overflow: hidden;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 800; font-size: 13pt; border: 0.7mm solid #fbbf24; }
+  .prof-media img { position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+    object-fit: cover; }
+  .prof-nome { font-weight: 800; font-size: 11.5pt; margin-bottom: 0.8mm; }
+  .prof-cargo { color: #b45309; font-size: 9pt; font-weight: 700; margin-bottom: 2mm;
+    text-transform: uppercase; letter-spacing: .05em; }
+  .prof-bio { color: #334155; font-size: 9.5pt; line-height: 1.5; }
+  .prof-link { color: #0369a1; font-size: 8.5pt; margin-top: 1.5mm; }
+
+  /* ------------------------------------------------------------- módulos */
+  .modulo { margin-bottom: 5mm; page-break-inside: avoid; }
+  .modulo-tit { display: flex; gap: 4mm; align-items: center; font-weight: 700;
+    margin-bottom: 1.5mm; font-size: 10.5pt; }
+  .modulo-n { flex-shrink: 0; width: 7mm; height: 7mm; border-radius: 1.5mm;
+    background: #0f172a; color: #fbbf24; font-size: 9pt; font-weight: 800;
+    display: flex; align-items: center; justify-content: center; }
+  .modulo ul { margin: 0; padding-left: 11mm; color: #475569; font-size: 9pt; line-height: 1.5; }
+
+  /* ------------------------------------------------------------- sumário */
+  .sumario-item { display: flex; align-items: center; gap: 4mm; padding: 2.8mm 0;
+    border-bottom: 0.25mm dotted #cbd5e1; }
+  .sumario-n { color: #fbbf24; font-weight: 800; font-size: 9pt; width: 6mm; }
+  .sumario-item span { color: #334155; font-weight: 600; }
+
+  /* ------------------------------------------------------------- contato */
+  .contato-pagina { position: relative; overflow: hidden; page-break-before: always;
+    height: 297mm; width: 210mm; background: #0f172a; color: #fff; }
+  .contato-fundo { position: absolute; top: 0; left: 0; width: 210mm; height: 297mm;
+    background-image: radial-gradient(circle at 50% 30%, #1e3a5f 0%, rgba(15,23,42,0) 60%),
+                      linear-gradient(160deg, #0f172a 0%, #020617 100%); }
+  .contato-conteudo { position: absolute; top: 0; left: 0; width: 210mm; height: 297mm;
+    padding: 32mm; display: flex; flex-direction: column;
+    justify-content: center; align-items: center; text-align: center; }
+  .contato-logo { height: 11mm; margin-bottom: 14mm; }
+  .contato-pagina h2 { color: #fbbf24; font-size: 14pt; margin-bottom: 8mm;
+    text-transform: uppercase; letter-spacing: .18em; }
+  .contato-linha { font-size: 11.5pt; margin-bottom: 4mm; color: #e2e8f0; }
+  .contato-pagina a { color: #e2e8f0; text-decoration: none; }
+  .contato-regua { width: 20mm; height: 1.2mm; background: #fbbf24; margin: 10mm 0; }
+  .contato-nota { color: #94a3b8; font-size: 9pt; max-width: 120mm; line-height: 1.55; }
 </style>
 </head>
 <body>
 
 <div class="capa">
-  <img class="logo" src="{{LOGO_URL}}" alt="FEQ Unicamp">
-  <p class="tag">Guia do Curso</p>
-  <h1>{{NOME_CURSO}}</h1>
-  <p style="margin-top:6mm;color:#cbd5e1;">{{TIPO_CURSO}} · {{MODALIDADE}}</p>
+  <div class="capa-fundo"></div>
+  <div class="capa-motivo"><img src="{{MOTIVO_CAPA}}" alt=""></div>
+  <div class="capa-conteudo">
+    <img class="capa-logo" src="{{LOGO_BRANCO}}" alt="FEQ Unicamp">
+    <div class="capa-baixo">
+      <div class="capa-regua"></div>
+      <p class="capa-eyebrow">Guia do Curso</p>
+      <h1>{{NOME_CURSO}}</h1>
+      <p class="capa-sub">{{TIPO_CURSO}} · {{MODALIDADE}}</p>
+      <div class="capa-chips">{{CAPA_CHIPS}}</div>
+    </div>
+  </div>
+  <div class="capa-faixa"></div>
 </div>
 
 <div class="pagina">
@@ -92,50 +205,66 @@
   <p>Este guia apresenta o curso <strong>{{NOME_CURSO}}</strong> ({{CODIGO_CURSO}}) em detalhe:
   objetivos, metodologia, corpo docente e conteúdo programático completo.</p>
 
-  <h2 class="titulo" style="margin-top:14mm;">Sumário</h2>
-  <div class="sumario-item"><span>Por que estudar na Extensão FEQ</span></div>
-  <div class="sumario-item"><span>Objetivos do curso</span></div>
-  <div class="sumario-item"><span>Metodologia</span></div>
-  <div class="sumario-item"><span>Diferenciais</span></div>
-  {{SUMARIO_EMPRESAS}}
-  <div class="sumario-item"><span>Público-alvo</span></div>
-  <div class="sumario-item"><span>Professores</span></div>
-  <div class="sumario-item"><span>Conteúdo programático</span></div>
-  <div class="sumario-item"><span>Contato</span></div>
+  <div class="secao">
+    <h2 class="titulo">Ficha técnica</h2>
+    {{FICHA_HTML}}
+  </div>
+
+  <div class="secao">
+    <h2 class="titulo">Sumário</h2>
+    {{SUMARIO_HTML}}
+  </div>
 </div>
 
 <div class="divisor">
-  <p class="tag">Por que estudar na</p>
-  <h1>Extensão FEQ Unicamp</h1>
+  <div class="divisor-fundo"></div>
+  <div class="divisor-motivo"><img src="{{MOTIVO_DIVISOR}}" alt=""></div>
+  <div class="divisor-conteudo">
+    <p class="tag">Por que estudar na</p>
+    <h1>Extensão FEQ Unicamp</h1>
+    <div class="divisor-regua"></div>
+  </div>
 </div>
 
 <div class="pagina">
   <h2 class="titulo">3 motivos essenciais</h2>
-  <div class="item-num"><div class="bola">1</div><div><b>Disponibilidade</b>Aulas 100% online, ao vivo e gravadas, para assistir de onde e quando quiser.</div></div>
-  <div class="item-num"><div class="bola">2</div><div><b>Networking</b>Corpo docente dividido entre pesquisadores da Unicamp e profissionais referência no mercado. Alunos de todo o Brasil.</div></div>
-  <div class="item-num"><div class="bola">3</div><div><b>Formação profissional</b>Sem exigência de monografia — todo o conhecimento é aplicado à sua carreira desde o primeiro dia.</div></div>
+  <div class="item-num"><div class="bola">1</div><div><b>Disponibilidade</b><span>Aulas 100% online, ao vivo e gravadas, para assistir de onde e quando quiser.</span></div></div>
+  <div class="item-num"><div class="bola">2</div><div><b>Networking</b><span>Corpo docente dividido entre pesquisadores da Unicamp e profissionais referência no mercado. Alunos de todo o Brasil.</span></div></div>
+  <div class="item-num"><div class="bola">3</div><div><b>Formação profissional</b><span>Sem exigência de monografia — todo o conhecimento é aplicado à sua carreira desde o primeiro dia.</span></div></div>
 </div>
 
 <div class="divisor">
-  <p class="tag">Conheça o curso</p>
-  <h1>{{NOME_CURSO}}</h1>
-  <p class="sub">{{OBJETIVO_RESUMO}}</p>
+  <div class="divisor-fundo"></div>
+  <div class="divisor-motivo"><img src="{{MOTIVO_DIVISOR}}" alt=""></div>
+  <div class="divisor-conteudo">
+    <p class="tag">Conheça o curso</p>
+    <h1>{{NOME_CURSO}}</h1>
+    <p class="sub">{{OBJETIVO_RESUMO}}</p>
+    <div class="divisor-regua"></div>
+  </div>
 </div>
 
 <div class="pagina">
   <h2 class="titulo">Objetivos</h2>
   {{OBJETIVOS_HTML}}
 
-  <h2 class="titulo" style="margin-top:14mm;">Metodologia</h2>
-  <div class="selo-grid">
-    {{SELOS_HTML}}
+  <div class="secao">
+    <h2 class="titulo">Metodologia</h2>
+    <div class="selo-grid">{{SELOS_HTML}}</div>
+    {{AVALIACAO_HTML}}
   </div>
-  {{AVALIACAO_HTML}}
 </div>
 
+{{PAGINA_HABILIDADES}}
+
 <div class="divisor">
-  <p class="tag">Os Diferenciais da</p>
-  <h1>Extensão FEQ Unicamp</h1>
+  <div class="divisor-fundo"></div>
+  <div class="divisor-motivo"><img src="{{MOTIVO_DIVISOR}}" alt=""></div>
+  <div class="divisor-conteudo">
+    <p class="tag">Os diferenciais da</p>
+    <h1>Extensão FEQ Unicamp</h1>
+    <div class="divisor-regua"></div>
+  </div>
 </div>
 
 <div class="pagina">
@@ -148,12 +277,22 @@
   </div>
   {{EMPRESAS_PAGINA}}
 
-  <h2 class="titulo" style="margin-top:14mm;">Público-alvo</h2>
-  {{PUBLICO_ALVO_HTML}}
+  <div class="secao">
+    <h2 class="titulo">Público-alvo</h2>
+    {{PUBLICO_ALVO_HTML}}
+  </div>
 </div>
 
+{{PAGINA_DEPOIMENTOS}}
+
 <div class="divisor">
-  <h1>Os Professores</h1>
+  <div class="divisor-fundo"></div>
+  <div class="divisor-motivo"><img src="{{MOTIVO_DIVISOR}}" alt=""></div>
+  <div class="divisor-conteudo">
+    <p class="tag">Quem ensina</p>
+    <h1>Os Professores</h1>
+    <div class="divisor-regua"></div>
+  </div>
 </div>
 
 <div class="pagina">
@@ -162,7 +301,13 @@
 </div>
 
 <div class="divisor">
-  <h1>Conteúdo Programático</h1>
+  <div class="divisor-fundo"></div>
+  <div class="divisor-motivo"><img src="{{MOTIVO_DIVISOR}}" alt=""></div>
+  <div class="divisor-conteudo">
+    <p class="tag">O que você vai estudar</p>
+    <h1>Conteúdo Programático</h1>
+    <div class="divisor-regua"></div>
+  </div>
 </div>
 
 <div class="pagina">
@@ -171,12 +316,20 @@
 </div>
 
 <div class="contato-pagina">
-  <h2>Nossos contatos</h2>
-  <p>{{CONTATO_TELEFONE}}</p>
-  <p>WhatsApp: {{CONTATO_WHATSAPP}}</p>
-  <p>Instagram: {{CONTATO_INSTAGRAM}}</p>
-  <p>{{CONTATO_EMAIL}}</p>
-  <p><a href="{{CONTATO_SITE}}">{{CONTATO_SITE}}</a></p>
+  <div class="contato-fundo"></div>
+  <div class="contato-conteudo">
+    <img class="contato-logo" src="{{LOGO_BRANCO}}" alt="FEQ Unicamp">
+    <h2>Nossos contatos</h2>
+    <p class="contato-linha">{{CONTATO_TELEFONE}}</p>
+    <p class="contato-linha">WhatsApp: {{CONTATO_WHATSAPP}}</p>
+    <p class="contato-linha">Instagram: {{CONTATO_INSTAGRAM}}</p>
+    <p class="contato-linha">{{CONTATO_EMAIL}}</p>
+    <p class="contato-linha"><a href="{{CONTATO_SITE}}">{{CONTATO_SITE}}</a></p>
+    <div class="contato-regua"></div>
+    <p class="contato-nota">Ficou com alguma dúvida sobre o {{CODIGO_CURSO}}? Fale com a
+    Extensão FEQ pelos canais acima — a equipe confirma prazos, valores e condições
+    de inscrição vigentes.</p>
+  </div>
 </div>
 
 </body>

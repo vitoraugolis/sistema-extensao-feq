@@ -61,7 +61,18 @@ check(c_esparso is not None, "FEQ-0655 existe no catálogo (pré-condição do t
 check(G._empresas_html(ONT.curso("FEQ-1000")) != "", "curso COM empresas mostra a seção")
 c_sem_empresas = dict(c0480, empresas=[])
 check(G._empresas_html(c_sem_empresas) == "", "curso sem empresas -> seção some (não título vazio)")
-check(G._sumario_empresas(c_sem_empresas) == "", "sumário também não referencia seção inexistente")
+
+# o sumário lista o que o documento REALMENTE tem — anunciar uma seção que foi
+# omitida por falta de dado seria o guia mentindo sobre si mesmo
+check("Empresas de alunos formados" not in G._sumario_html(c_sem_empresas),
+      "sumário não anuncia seção que não foi gerada")
+check("Empresas de alunos formados" in G._sumario_html(c0480),
+      "sumário anuncia a seção quando ela existe")
+check(G._pagina_habilidades(dict(c0480, habilidades=[])) == ""
+      and G._pagina_depoimentos(dict(c0480, depoimentos=[])) == "",
+      "páginas de habilidades/depoimentos somem inteiras sem dado")
+check("O que você vai dominar" not in G._sumario_html(dict(c0480, habilidades=[])),
+      "sumário acompanha a página condicional que sumiu")
 
 c_sem_modulos = dict(c0480, programa_detalhe=[])
 check("<div class=\"modulo\">" not in G._modulos_html(c_sem_modulos),
