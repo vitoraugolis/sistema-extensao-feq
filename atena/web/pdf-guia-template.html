@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Guia do Curso — {{NOME_CURSO}}</title>
+<style>
+  @page { size: A4; margin: 0; }
+  /* Páginas de CONTEÚDO usam page:conteudo -> ganham margem; capas/divisores ficam
+     full-bleed (margin:0 do @page global) — CSS Paged Media nativo do WeasyPrint,
+     sem precisar simular margem com padding em cada bloco. */
+  @page conteudo { margin: 20mm 18mm 16mm; @bottom-center { content: counter(page); font-size: 9px; color: #94a3b8; } }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: "Helvetica Neue", Arial, sans-serif; color: #0f172a; font-size: 11pt; line-height: 1.45; }
+  h1, h2, h3 { margin: 0 0 8px; font-weight: 700; }
+  p { margin: 0 0 8px; }
+  .pagina { page: conteudo; page-break-before: always; }
+  .pagina:first-of-type { page-break-before: avoid; }
+  .divisor {
+    page-break-before: always; page-break-after: always;
+    height: 297mm; width: 210mm; background: linear-gradient(160deg, #020617, #0f172a);
+    color: #fff; display: flex; flex-direction: column; justify-content: center;
+    align-items: center; text-align: center; padding: 30mm;
+  }
+  .divisor .tag { color: #fbbf24; text-transform: uppercase; letter-spacing: .12em; font-size: 10pt; font-weight: 700; margin-bottom: 10mm; }
+  .divisor h1 { font-size: 26pt; line-height: 1.2; }
+  .divisor .sub { margin-top: 8mm; font-size: 12pt; color: #cbd5e1; max-width: 140mm; }
+
+  /* Capa */
+  .capa { page-break-after: always; height: 297mm; width: 210mm;
+    background: linear-gradient(160deg, #020617, #0f172a); color: #fff;
+    display: flex; flex-direction: column; justify-content: flex-end; padding: 22mm; }
+  .capa img.logo { height: 14mm; margin-bottom: 14mm; filter: brightness(0) invert(1); }
+  .capa .tag { color: #fbbf24; text-transform: uppercase; letter-spacing: .1em; font-size: 10pt; font-weight: 700; margin-bottom: 4mm; }
+  .capa h1 { font-size: 24pt; line-height: 1.2; }
+
+  /* bookmark-level/-label = índice nativo do PDF (painel lateral do leitor) — dá
+     navegação real sem precisar simular numeração de página no Sumário impresso. */
+  h2.titulo { font-size: 16pt; color: #0f172a; border-bottom: 3px solid #fbbf24;
+    padding-bottom: 4mm; margin-bottom: 8mm; bookmark-level: 1; bookmark-label: content(); }
+  .divisor h1, .capa h1 { bookmark-level: 1; bookmark-label: content(); }
+
+  .selo-grid { display: flex; flex-wrap: wrap; gap: 6mm; margin: 4mm 0 8mm; }
+  .selo { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 3mm; padding: 5mm; flex: 1 1 45mm; }
+  .selo b { display: block; color: #0f172a; margin-bottom: 1mm; }
+  .selo span { color: #64748b; font-size: 9.5pt; }
+
+  .item-num { display: flex; gap: 5mm; margin-bottom: 6mm; align-items: flex-start; }
+  .item-num .bola { flex-shrink: 0; width: 8mm; height: 8mm; border-radius: 50%; background: #fbbf24;
+    color: #0f172a; font-weight: 700; display: flex; align-items: center; justify-content: center; font-size: 10pt; }
+  .item-num b { display: block; }
+
+  .empresa-chip { display: inline-block; background: #0f172a; color: #fff; padding: 3mm 6mm;
+    border-radius: 2mm; margin: 0 3mm 3mm 0; font-size: 10pt; font-weight: 600; }
+
+  .prof-card { display: flex; gap: 6mm; margin-bottom: 8mm; padding-bottom: 8mm; border-bottom: 1px solid #e2e8f0; }
+  .prof-foto { width: 24mm; height: 24mm; border-radius: 50%; object-fit: cover; flex-shrink: 0; border: 2px solid #fbbf24; }
+  .prof-avatar { width: 24mm; height: 24mm; border-radius: 50%; background: #0f172a; color: #fff;
+    display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14pt; flex-shrink: 0; }
+  .prof-nome { font-weight: 700; font-size: 12pt; }
+  .prof-cargo { color: #b45309; font-size: 9.5pt; font-weight: 600; margin-bottom: 2mm; }
+  .prof-bio { color: #334155; font-size: 10pt; }
+  .prof-link { color: #0369a1; font-size: 9pt; }
+
+  .modulo { margin-bottom: 6mm; page-break-inside: avoid; }
+  .modulo-tit { display: flex; gap: 4mm; align-items: center; font-weight: 700; margin-bottom: 2mm; }
+  .modulo ul { margin: 0; padding-left: 12mm; color: #475569; font-size: 10pt; }
+
+  .contato-pagina { page-break-before: always; height: 297mm; width: 210mm;
+    background: #0f172a; color: #fff; display: flex; flex-direction: column;
+    justify-content: center; align-items: center; text-align: center; gap: 4mm; }
+  .contato-pagina h2 { color: #fbbf24; font-size: 16pt; margin-bottom: 4mm; }
+  .contato-pagina a { color: #fff; text-decoration: none; }
+
+  .sumario-item { display: flex; justify-content: space-between; padding: 3mm 0; border-bottom: 1px dotted #cbd5e1; }
+</style>
+</head>
+<body>
+
+<div class="capa">
+  <img class="logo" src="{{LOGO_URL}}" alt="FEQ Unicamp">
+  <p class="tag">Guia do Curso</p>
+  <h1>{{NOME_CURSO}}</h1>
+  <p style="margin-top:6mm;color:#cbd5e1;">{{TIPO_CURSO}} · {{MODALIDADE}}</p>
+</div>
+
+<div class="pagina">
+  <h2 class="titulo">Bem-vindo(a) à Extensão FEQ Unicamp</h2>
+  <p>A Unicamp é uma das melhores universidades da América Latina e uma referência em inovação no
+  Brasil. Os cursos de extensão da FEQ combinam metodologia, qualidade de ensino e geração de
+  networking profissional — sem exigência de monografia para conclusão: todo o conhecimento é
+  voltado à aplicação prática desde o primeiro dia.</p>
+  <p>Este guia apresenta o curso <strong>{{NOME_CURSO}}</strong> ({{CODIGO_CURSO}}) em detalhe:
+  objetivos, metodologia, corpo docente e conteúdo programático completo.</p>
+
+  <h2 class="titulo" style="margin-top:14mm;">Sumário</h2>
+  <div class="sumario-item"><span>Por que estudar na Extensão FEQ</span></div>
+  <div class="sumario-item"><span>Objetivos do curso</span></div>
+  <div class="sumario-item"><span>Metodologia</span></div>
+  <div class="sumario-item"><span>Diferenciais</span></div>
+  {{SUMARIO_EMPRESAS}}
+  <div class="sumario-item"><span>Público-alvo</span></div>
+  <div class="sumario-item"><span>Professores</span></div>
+  <div class="sumario-item"><span>Conteúdo programático</span></div>
+  <div class="sumario-item"><span>Contato</span></div>
+</div>
+
+<div class="divisor">
+  <p class="tag">Por que estudar na</p>
+  <h1>Extensão FEQ Unicamp</h1>
+</div>
+
+<div class="pagina">
+  <h2 class="titulo">3 motivos essenciais</h2>
+  <div class="item-num"><div class="bola">1</div><div><b>Disponibilidade</b>Aulas 100% online, ao vivo e gravadas, para assistir de onde e quando quiser.</div></div>
+  <div class="item-num"><div class="bola">2</div><div><b>Networking</b>Corpo docente dividido entre pesquisadores da Unicamp e profissionais referência no mercado. Alunos de todo o Brasil.</div></div>
+  <div class="item-num"><div class="bola">3</div><div><b>Formação profissional</b>Sem exigência de monografia — todo o conhecimento é aplicado à sua carreira desde o primeiro dia.</div></div>
+</div>
+
+<div class="divisor">
+  <p class="tag">Conheça o curso</p>
+  <h1>{{NOME_CURSO}}</h1>
+  <p class="sub">{{OBJETIVO_RESUMO}}</p>
+</div>
+
+<div class="pagina">
+  <h2 class="titulo">Objetivos</h2>
+  {{OBJETIVOS_HTML}}
+
+  <h2 class="titulo" style="margin-top:14mm;">Metodologia</h2>
+  <div class="selo-grid">
+    {{SELOS_HTML}}
+  </div>
+  {{AVALIACAO_HTML}}
+</div>
+
+<div class="divisor">
+  <p class="tag">Os Diferenciais da</p>
+  <h1>Extensão FEQ Unicamp</h1>
+</div>
+
+<div class="pagina">
+  <h2 class="titulo">Diferenciais</h2>
+  <div class="selo-grid">
+    <div class="selo"><b>Certificado emitido pela Unicamp</b><span>Certificado de {{TIPO_CURSO}} emitido diretamente pela Unicamp.</span></div>
+    <div class="selo"><b>Turmas reduzidas</b><span>Atendimento individual e interação em tempo real entre aluno e professor.</span></div>
+    <div class="selo"><b>Conhecimento atualizado</b><span>Domine ferramentas e conhecimentos revolucionários antes deles chegarem ao seu dia a dia.</span></div>
+    {{GARANTIA_SELO}}
+  </div>
+  {{EMPRESAS_PAGINA}}
+
+  <h2 class="titulo" style="margin-top:14mm;">Público-alvo</h2>
+  {{PUBLICO_ALVO_HTML}}
+</div>
+
+<div class="divisor">
+  <h1>Os Professores</h1>
+</div>
+
+<div class="pagina">
+  <h2 class="titulo">Corpo docente</h2>
+  {{PROFESSORES_HTML}}
+</div>
+
+<div class="divisor">
+  <h1>Conteúdo Programático</h1>
+</div>
+
+<div class="pagina">
+  <h2 class="titulo">Módulos do curso</h2>
+  {{MODULOS_HTML}}
+</div>
+
+<div class="contato-pagina">
+  <h2>Nossos contatos</h2>
+  <p>{{CONTATO_TELEFONE}}</p>
+  <p>WhatsApp: {{CONTATO_WHATSAPP}}</p>
+  <p>Instagram: {{CONTATO_INSTAGRAM}}</p>
+  <p>{{CONTATO_EMAIL}}</p>
+  <p><a href="{{CONTATO_SITE}}">{{CONTATO_SITE}}</a></p>
+</div>
+
+</body>
+</html>

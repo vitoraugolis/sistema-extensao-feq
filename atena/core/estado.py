@@ -133,7 +133,11 @@ class Estado:
                     "ALTER TABLE cards_vistos ADD COLUMN ultimo_id INTEGER",
                     # Reação (emoji) sobre uma mensagem existente — não é linha nova na
                     # thread, é uma marca sobre uma já enviada/recebida (ver marcar_reacao).
-                    "ALTER TABLE conversas ADD COLUMN reacao TEXT"):
+                    "ALTER TABLE conversas ADD COLUMN reacao TEXT",
+                    # Anexo a mandar JUNTO com esta proposta, se aprovada (ex.: "guia_curso") —
+                    # o flag do cérebro (dados.anexo_guia) precisa sobreviver até a aprovação
+                    # humana, que pode vir bem depois da decisão.
+                    "ALTER TABLE decisoes ADD COLUMN anexo TEXT"):
             try:
                 self.conn.execute(mig)
             except sqlite3.OperationalError:
@@ -535,13 +539,13 @@ class Estado:
 
     # ------------------------------------------------------------- decisoes
     def add_decisao(self, card_id, agente, acao, mensagem=None, motivo="", ancoras=None,
-                    aprovado_revisor=1, bloqueios=None, status="acao"):
+                    aprovado_revisor=1, bloqueios=None, status="acao", anexo=None):
         with self._lock:
             self.conn.execute(
                 """INSERT INTO decisoes(card_id,agente,acao,mensagem,motivo,ancoras_json,
-                   aprovado_revisor,bloqueios_json,status,ts) VALUES(?,?,?,?,?,?,?,?,?,?)""",
+                   aprovado_revisor,bloqueios_json,status,ts,anexo) VALUES(?,?,?,?,?,?,?,?,?,?,?)""",
                 (card_id, agente, acao, mensagem, motivo, json.dumps(ancoras or []),
-                 int(aprovado_revisor), json.dumps(bloqueios or []), status, _agora()))
+                 int(aprovado_revisor), json.dumps(bloqueios or []), status, _agora(), anexo))
             self.conn.commit()
 
     def decisao_pendente(self, card_id):

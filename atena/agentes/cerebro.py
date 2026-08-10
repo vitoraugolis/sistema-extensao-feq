@@ -61,7 +61,9 @@ _FERRAMENTA = {
             "dados": {"type": "object", "properties": {
                 "escolaridade": {"type": ["string", "null"]},
                 "curso": {"type": ["string", "null"]},
-                "duvida": {"type": ["string", "null"]}}},
+                "duvida": {"type": ["string", "null"]},
+                "anexo_guia": {"type": ["boolean", "null"],
+                               "description": "true quando o lead pediu material/PDF/apresentação formal do curso."}}},
         },
         "required": ["mensagem_ao_lead", "proxima_acao", "motivo"],
     },
@@ -391,6 +393,10 @@ def _system_prompt(ctx, lead_nome=None, precedentes=""):
         "intenção de fechar/dúvida fora da base.\n"
         "TROCA DE INTERESSE: se o lead demonstrar que o curso que quer é OUTRO do portfólio, "
         'retorne o código dele em dados.curso (ex.: "FEQ-0580") e siga a conversa nesse curso.\n'
+        "MATERIAL EM PDF: se o lead pedir um material formal do curso (PDF, apresentação, "
+        "guia, algo para 'analisar' ou 'mostrar para alguém'), diga na mensagem que você vai "
+        "mandar o guia completo em seguida e marque dados.anexo_guia=true — o sistema anexa o "
+        "PDF automaticamente após esta mensagem; NUNCA invente um link de download.\n"
         "LINK DE INSCRIÇÃO: use o campo 'url_inscricao' dos dados COPIADO CARACTERE POR "
         "CARACTERE. Ele já vem pronto — não monte, não converta, não troque o número da turma "
         "e não use o 'url_extecamp' (esse é a página de detalhes). Link com a turma errada leva "
@@ -409,7 +415,7 @@ def _system_prompt(ctx, lead_nome=None, precedentes=""):
         '"proxima_acao": "continuar|qualificar|descartar|em_espera|escalar_humano|'
         'consultar_coordenacao|encerrar_optout", '
         '"motivo": "<justificativa em no MÁXIMO 15 palavras>", "escalonamento_motivo": null, '
-        '"dados": {"escolaridade": null, "curso": null, "duvida": null}}'
+        '"dados": {"escolaridade": null, "curso": null, "duvida": null, "anexo_guia": null}}'
     )
 
 

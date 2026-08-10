@@ -52,6 +52,7 @@ from atena.growth.db import Growth
 from atena.growth.meta_ads import MetaAds
 from atena.growth import ponte
 from atena.growth import funil as growth_funil
+from atena.growth import pdf_guia
 
 EST = Estado()
 if os.environ.get("ATENA_SEED_DEMO") == "1":   # produção fica só com leads reais do sistema
@@ -528,6 +529,25 @@ CFG = {"auto_aprovar": EST.get_config("auto_aprovar") == "1",   # persistido: de
        "verif_auto_horas": int(EST.get_config("verif_auto_horas") or 48)}
 
 
+def _enviar_guia(card_id, lead, ator="humano"):
+    """Anexa o guia em PDF do curso do lead à thread. Best-effort: usada tanto pelo
+    fluxo automático (após o texto do agente) quanto pelo botão manual do operador —
+    falha aqui nunca desfaz um texto já enviado, só fica registrada no retorno."""
+    try:
+        pdf = pdf_guia.obter(ONTO.ont, lead["curso"])
+    except Exception as e:   # WeasyPrint ausente/quebrado no host não pode derrubar a rota
+        return {"ok": False, "motivo": f"geração do guia falhou: {e}"}
+    if not pdf:
+        return {"ok": False, "motivo": f"sem guia disponível para {lead['curso']}"}
+    r = WA.enviar_midia(lead["telefone"], pdf, f"Guia-{lead['curso']}.pdf",
+                        "application/pdf", forcar=True)
+    if r.get("ok"):
+        EST.add_conversa(card_id, "agente", "", tipo=r.get("tipo"), media_id=r.get("media_id"),
+                         wamid=r.get("wamid"), status="enviado", autor=f"guia:{ator}")
+        EST.log_acao(ator, "enviar_guia_pdf", card_id)
+    return r
+
+
 def _aprovar_e_enviar(card_id, texto=None, ator="humano"):
     """Caminho único de aprovação: usado pelo endpoint e pelo modo automático."""
     prop = EST.decisao_pendente(card_id)
@@ -547,6 +567,8 @@ def _aprovar_e_enviar(card_id, texto=None, ator="humano"):
                          autor=autoria)
         EST.set_decisao_status(prop["id"], "enviada")
         EST.log_acao(ator, "aprovar_enviar", card_id)
+        if prop.get("anexo") == "guia_curso":
+            r["guia"] = _enviar_guia(card_id, lead, ator=ator)
     return {"envio": r}, 200
 
 
@@ -649,6 +671,17 @@ def conversa_enviar_contato(card_id):
                          status="enviado", autor=f"humano:{session.get('usuario','humano')}")
         EST.log_acao(session.get("usuario", "humano"), f"compartilhou contato {chave}", card_id)
     return jsonify(r)
+
+
+@app.route("/api/conversas/<card_id>/guia", methods=["POST"])
+def conversa_enviar_guia(card_id):
+    """Operador manda o guia em PDF do curso do lead — mesmo material que o agente
+    anexa automaticamente, disparado por ação humana explícita (sem passar pelo
+    cérebro/Revisor: é um documento fixo gerado da ontologia, não texto livre)."""
+    lead = EST.get_lead(card_id)
+    if not lead:
+        return jsonify({"erro": "lead inexistente"}), 404
+    return jsonify(_enviar_guia(card_id, lead, ator=f"humano:{session.get('usuario','humano')}"))
 
 
 @app.route("/api/conversas/<card_id>/midia", methods=["POST"])

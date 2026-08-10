@@ -303,11 +303,13 @@ class Orquestrador:
             status = "bloqueada"
         else:
             status = "acao"
+        # guia em PDF só faz sentido junto de uma proposta de fato aprovada pelo Revisor
+        anexo = "guia_curso" if (status == "proposta" and dec.dados.get("anexo_guia")) else None
         self.est.add_decisao(card_id, agente="orquestrador", acao=acao,
                              mensagem=dec.mensagem_ao_lead, motivo=dec.motivo,
                              ancoras=rev.get("ancoras", []),
                              aprovado_revisor=1 if rev["aprovado"] else 0,
-                             bloqueios=rev.get("bloqueios", []), status=status)
+                             bloqueios=rev.get("bloqueios", []), status=status, anexo=anexo)
 
     def responder_duvida(self, did, resposta):
         """Coordenação respondeu: o cérebro elabora a resposta ao lead, com a resposta

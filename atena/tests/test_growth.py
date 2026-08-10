@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Growth Engine (spec 15): pacing, CPL, realocação, CAPI, recuperação 24h, scoring, opt-in."""
+import os
 import re
 import sys
 import base64
@@ -8,6 +9,14 @@ import hashlib
 import datetime
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2]))
+
+# wp_deploy_bridge.publicar() lê WP_URL/WP_USER/WP_APP_PASSWORD direto do ambiente —
+# se alguém rodar os testes com essas chaves reais no shell (ex.: `source .env`), o
+# teste abaixo deixaria de ser dry-run e publicaria de verdade nas páginas em campanha.
+# O teste garante seu próprio pressuposto ("sem credenciais = dry-run"), independente
+# do ambiente de quem o invoca. (Incidente real: 09/08/2026, corrigido às pressas.)
+for _k in ("WP_URL", "WP_USER", "WP_APP_PASSWORD"):
+    os.environ.pop(_k, None)
 
 from atena.core.estado import Estado
 from atena.agentes.ingestao import Ingestao

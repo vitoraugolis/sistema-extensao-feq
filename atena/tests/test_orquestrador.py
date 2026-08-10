@@ -233,6 +233,41 @@ def test_optout_de_verdade_continua_valendo():
     assert est.get_lead("c1")["optout"] == 1
 
 
+def test_anexo_guia_marca_a_proposta_quando_o_cerebro_pede():
+    """dados.anexo_guia=True (spec 08) precisa sobreviver até a aprovação humana —
+    fica em decisoes.anexo, não em memória, porque a aprovação pode vir bem depois."""
+    est, orq = _novo()
+    orq.brain = lambda lead, msg, hist=None: C.DecisaoAgente(
+        C.QUALIFICAR, "pediu material",
+        mensagem_ao_lead="Claro, já te mando o guia completo do curso!",
+        dados={"anexo_guia": True})
+    orq.processar_mensagem("c1", "vocês têm um PDF do curso pra eu ver com calma?")
+    prop = est.decisao_pendente("c1")
+    assert prop is not None and prop["anexo"] == "guia_curso"
+
+
+def test_anexo_guia_nao_marca_quando_revisor_bloqueia():
+    """Revisor bloqueou (preço inventado) -> a mensagem nem virou proposta (o
+    orquestrador escala para humano, sem mensagem_ao_lead); anexar um PDF a uma
+    decisão que não vai para o lead não faz sentido."""
+    est, orq = _novo()
+    orq.brain = lambda lead, msg, hist=None: C.DecisaoAgente(
+        C.QUALIFICAR, "preço inventado",
+        mensagem_ao_lead="O curso custa R$ 999,00 e já te mando o PDF.",
+        dados={"anexo_guia": True})
+    orq.processar_mensagem("c1", "quanto custa?")
+    prop = est.decisao_pendente("c1")
+    assert prop is None   # não é 'proposta': foi escalada
+    ultima = est.listar_decisoes("c1")[0]
+    assert ultima["status"] != "proposta" and ultima["anexo"] is None
+
+
+def test_sem_pedido_de_guia_decisao_fica_sem_anexo():
+    est, orq = _novo()
+    orq.processar_mensagem("c1", "tenho superior em engenharia química, quero o curso")
+    assert est.decisao_pendente("c1")["anexo"] is None
+
+
 if __name__ == "__main__":
     casos = [v for k, v in sorted(globals().items()) if k.startswith("test_") and callable(v)]
     falhas = 0

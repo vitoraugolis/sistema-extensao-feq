@@ -1299,6 +1299,7 @@ function renderChrome(d){
            <button class="btn btn-g" id="convClipe" onclick="$('#convArquivo').click()" title="Enviar arquivo, áudio ou foto (o texto digitado vai como legenda)"><i class="ti ti-paperclip"></i></button>
            <button class="btn btn-g" onclick="toggleTpl('${d.id}')" title="Enviar template aprovado (reabre fora da janela de 24h)"><i class="ti ti-mail-fast"></i></button>
            <button class="btn btn-g" onclick="toggleContato('${d.id}')" title="Compartilhar contato oficial"><i class="ti ti-id-badge-2"></i></button>
+           <button class="btn btn-g" id="convGuia" onclick="enviarGuia('${d.id}')" title="Enviar guia do curso em PDF"><i class="ti ti-file-type-pdf"></i></button>
            <button class="btn btn-g" onclick="toggleEmoji()" title="Inserir emoji"><i class="ti ti-mood-smile"></i></button>
            <textarea id="convInput" rows="1" placeholder="Digite uma mensagem…" onkeydown="convKeydown(event)"></textarea>
            <button class="btn btn-p" onclick="convEnviar()" title="Enviar (Enter)"><i class="ti ti-send"></i></button>
@@ -1584,6 +1585,16 @@ async function enviarContato(id, chave){
     headers:{'Content-Type':'application/json'}, body:JSON.stringify({chave})});
   if(!r.ok){ marcarErro(id, {}, r.motivo || 'não enviado'); return; }
   const box = $('#convContato'); if(box){ box.classList.add('hidden'); box.innerHTML=''; }
+  await aposAcao();
+}
+
+async function enviarGuia(id){
+  const btn = $('#convGuia');   // gerar o PDF (1ª vez por curso) leva alguns segundos
+  if(btn){ btn.disabled = true; btn.innerHTML = '<i class="ti ti-loader"></i>'; }
+  const r = await api('/api/conversas/'+id+'/guia',{method:'POST'});
+  if(btn){ btn.disabled = false; btn.innerHTML = '<i class="ti ti-file-type-pdf"></i>'; }
+  if(r.erro){ marcarErro(id, r); return; }
+  if(!r.ok){ marcarErro(id, {}, r.motivo || 'guia não enviado'); return; }
   await aposAcao();
 }
 
