@@ -16,12 +16,14 @@ CONTATOS_OFICIAIS = {
         "telefone": "+551935214132",
         "telefone_exibicao": "(19) 3521-4132",
         "email": "sextfeq@unicamp.br",
+        "whatsapp": False,   # fixo institucional — não tem conta de WhatsApp
     },
     "whatsapp": {
         "rotulo": "WhatsApp da Extensão FEQ",
         "telefone": "+5519982620072",
         "telefone_exibicao": "(19) 98262-0072",
         "email": None,
+        "whatsapp": True,
     },
 }
 
@@ -35,10 +37,16 @@ def payload_contato(chave):
     c = CONTATOS_OFICIAIS.get(chave)
     if not c:
         return None
+    fone = {"phone": c["telefone_exibicao"], "type": "WORK"}
+    if c.get("whatsapp"):
+        # wa_id só entra quando o número TEM conta de WhatsApp de verdade — postar wa_id
+        # para um fixo institucional (ex.: a secretaria) faz o app do lead tentar resolver
+        # aquele ID e mostrar "este número não está no WhatsApp" (bug real, 10/08/2026).
+        fone["wa_id"] = c["telefone"].lstrip("+")
     contato = {
         "name": {"formatted_name": c["rotulo"], "first_name": c["rotulo"]},
         "org": {"company": "Extensão FEQ Unicamp"},
-        "phones": [{"phone": c["telefone_exibicao"], "wa_id": c["telefone"].lstrip("+"), "type": "WORK"}],
+        "phones": [fone],
         "urls": [{"url": SITE, "type": "WORK"}],
     }
     if c["email"]:
