@@ -597,8 +597,8 @@ input:focus,select:focus,textarea:focus{outline:none;box-shadow:3px 3px 0 var(--
           <label>Instituto<input id="pfInstituto" placeholder="FEQ, IQ, Poli-USP…"></label>
           <label>Último contato<input id="pfUltimo" type="date"></label>
           <label>Fase<select id="pfFase"></select></label>
-          <label class="pf-largo">Cursos <span class="muted" style="font-weight:400;">(segure Cmd/Ctrl para escolher mais de um)</span>
-            <select id="pfCursos" multiple size="4"></select></label>
+          <label class="pf-largo">Cursos <span class="muted" style="font-weight:400;">(texto livre — vários, separados por vírgula; podem ser de fora da FEQ)</span>
+            <input id="pfCursos" placeholder="Ex.: FEQ-0480, Termodinâmica Avançada (IQ-Unicamp), Data Science (USP)"></label>
           <label class="pf-largo">Serviços oferecidos<input id="pfServicos" placeholder="Aula ao vivo, videoaula gravada, mentoria…"></label>
           <label class="pf-largo">Proposta realizada<input id="pfProposta" placeholder="Valor//condições já apresentados"></label>
           <label class="pf-largo">Anotações<textarea id="pfAnotacoes" rows="4" placeholder="Histórico da conversa, quem indicou, restrições de agenda…"></textarea></label>
@@ -1431,8 +1431,7 @@ function pfAbrirForm(id){
   $('#pfTitulo').textContent = id ? 'Editar professor' : 'Novo professor';
   $('#pfExcluir').style.display = id ? '' : 'none';
   $('#pfFase').innerHTML = PF_DADOS.fases.map(f=>`<option${(p.fase||PF_DADOS.fases[0])===f?' selected':''}>${escapeHtml(f)}</option>`).join('');
-  const sel = (p.cursos||'').split(',').filter(Boolean);
-  $('#pfCursos').innerHTML = (PF_DADOS.cursos||[]).map(c=>`<option value="${escapeHtml(c)}"${sel.includes(c)?' selected':''}>${escapeHtml(c)}</option>`).join('');
+  $('#pfCursos').value = p.cursos||'';
   $('#pfNome').value = p.nome||''; $('#pfTelefone').value = p.telefone||'';
   $('#pfEmail').value = p.email||''; $('#pfInstituto').value = p.instituto||'';
   $('#pfUltimo').value = p.ultimo_contato||''; $('#pfServicos').value = p.servicos||'';
@@ -1446,10 +1445,13 @@ async function pfSalvar(){
   const corpo = {
     nome: $('#pfNome').value.trim(), telefone: $('#pfTelefone').value.trim(),
     email: $('#pfEmail').value.trim(), instituto: $('#pfInstituto').value.trim(),
-    cursos: Array.from($('#pfCursos').selectedOptions).map(o=>o.value).join(','),
+    cursos: $('#pfCursos').value.split(',').map(s=>s.trim()).filter(Boolean).join(','),
     anotacoes: $('#pfAnotacoes').value.trim(), ultimo_contato: $('#pfUltimo').value,
     proposta: $('#pfProposta').value.trim(), servicos: $('#pfServicos').value.trim(),
-    fase: $('#pfFase').value};
+    // fallback: se o cadastro abriu antes do 1º renderProfessores() popular PF_DADOS.fases
+    // (clique rápido logo ao trocar de aba), o <select> fica sem opções e o valor vem
+    // vazio — sem isto o professor era salvo com fase="" e sumia de toda coluna do quadro.
+    fase: $('#pfFase').value || PF_DADOS.fases[0] || 'Lead'};
   if(!corpo.nome){ alert('O nome é obrigatório.'); return; }
   const rota = PF_EDITANDO ? '/api/professores/'+PF_EDITANDO : '/api/professores';
   const r = await api(rota, {method:'POST', headers:{'Content-Type':'application/json'},

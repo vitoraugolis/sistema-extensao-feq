@@ -682,8 +682,9 @@ def professores_listar():
     profs = EST.listar_professores()
     colunas = [{"fase": f, "professores": [p for p in profs if (p["fase"] or "Lead") == f]}
                for f in FASES_PROFESSOR]
-    return jsonify({"colunas": colunas, "fases": FASES_PROFESSOR,
-                    "cursos": ONTO.ont.cursos(), "total": len(profs)})
+    # "cursos" NÃO vem da ontologia: são professores de fora da FEQ, prospectados para
+    # cursos que muitas vezes ainda nem existem no catálogo — o campo é texto livre.
+    return jsonify({"colunas": colunas, "fases": FASES_PROFESSOR, "total": len(profs)})
 
 
 @app.route("/api/professores", methods=["POST"])

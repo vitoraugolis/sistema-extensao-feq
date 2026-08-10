@@ -20,8 +20,12 @@ Fonte única: `estado.FASES_PROFESSOR`. A API devolve a lista e a Central desenh
 dela — a ordem não é duplicada no front.
 
 ## Campos (todos manuais)
-`nome` (obrigatório) · `telefone` · `email` · `instituto` · `cursos` (vários, CSV de códigos
-vindos da ontologia) · `anotacoes` · `ultimo_contato` · `proposta` · `servicos` · `fase`.
+`nome` (obrigatório) · `telefone` · `email` · `instituto` · `cursos` (texto livre, vários
+separados por vírgula) · `anotacoes` · `ultimo_contato` · `proposta` · `servicos` · `fase`.
+
+`cursos` é texto livre, **não** vinculado à ontologia: a prospecção inclui professores de
+fora da FEQ, para cursos que muitas vezes ainda nem existem no catálogo — amarrar ao
+`Ontologia.cursos()` impediria cadastrar exatamente o caso mais comum deste funil.
 
 `telefone` é normalizado para E.164 na gravação — é o que faz o link `wa.me` abrir.
 `set_professor`/`add_professor` filtram por lista branca de colunas: campo desconhecido
