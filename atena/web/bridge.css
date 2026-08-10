@@ -312,6 +312,10 @@ h1, h2, h3, p { margin: 0; }
 .disabled\:opacity-60:disabled { opacity: 0.6; }
 
 @media (min-width: 640px) {
+
+  .sm\:p-8 { padding: 2rem; }
+  .sm\:p-9 { padding: 2.25rem; }
+  .sm\:col-span-2 { grid-column: span 2 / span 2; }
   .sm\:text-3xl { font-size: 1.875rem; line-height: 2.25rem; }
   .sm\:text-5xl { font-size: 3rem; line-height: 1; }
   /* MESMA especificidade da regra base (.grid.sm\:grid-cols-N, 2 classes): com só
@@ -500,3 +504,57 @@ h1, h2, h3, p { margin: 0; }
 .invest-eco strong { color: #fbbf24; font-size: 1.25rem; }
 .invest-destaque-prazo { margin-top: 4px; font-size: .82rem; font-weight: 700; color: #fbbf24;
   text-transform: uppercase; letter-spacing: .05em; }
+
+/* ---- Etapa 2: ficha completa (spec 17 §7) ------------------------------------
+   Classes próprias em vez de utilitárias soltas: são ~30 campos, e repetir a mesma
+   cadeia de utilitárias em cada input engorda o HTML que vai para o post_content
+   do WordPress sem ganho nenhum. */
+.lbl { display: block; font-size: .8rem; color: #cbd5e1; margin-bottom: 4px; }
+.inp { width: 100%; border-radius: 10px; background: rgba(255,255,255,.08);
+  border: 1px solid rgba(255,255,255,.2); padding: 11px 14px; color: #f1f5f9;
+  font-size: .95rem; font-family: inherit; }
+.inp:focus { outline: none; border-color: #fbbf24; background: rgba(255,255,255,.12); }
+.inp option { background: #0f172a; color: #f1f5f9; }
+/* autofill do navegador: sem isto o texto sai branco sobre branco (mesmo bug já
+   corrigido no formulário da etapa 1) */
+.inp:-webkit-autofill, .inp:-webkit-autofill:focus {
+  -webkit-text-fill-color: #f1f5f9;
+  -webkit-box-shadow: 0 0 0 1000px #1e293b inset; }
+#etapa2 fieldset { border: 0; padding: 0; margin: 0; }
+#etapa2 legend { padding: 0; margin-bottom: 10px; }
+
+/* ---- Empresas e "Seu currículo no futuro" (jornada da página antiga) ---------- */
+.empresas-grid { display: flex; flex-wrap: wrap; justify-content: center; align-items: center;
+  gap: 26px 40px; margin-top: 28px; }
+/* logo em escala de cinza e claro: as marcas têm cores muito diferentes entre si e,
+   sobre o fundo escuro, viravam um mosaico berrante que competia com o CTA */
+.logo-empresa { height: 34px; width: auto; object-fit: contain; filter: grayscale(1) brightness(2.2);
+  opacity: .75; transition: opacity .2s, filter .2s; }
+.logo-empresa:hover { opacity: 1; filter: grayscale(0) brightness(1); }
+.logo-empresa-txt { font-weight: 700; color: #cbd5e1; letter-spacing: .02em; }
+.curriculo-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-top: 28px; }
+@media (max-width: 640px) { .curriculo-grid { grid-template-columns: 1fr; } }
+.curriculo-salario, .curriculo-habs, .curriculo-cert {
+  background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.1);
+  border-radius: 16px; padding: 22px 24px; }
+.curriculo-salario-num { font-size: 1.5rem; font-weight: 800; color: #fbbf24; margin-top: 6px;
+  line-height: 1.25; }
+.curriculo-habs ul { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
+.curriculo-habs li { position: relative; padding-left: 20px; font-size: .9rem; color: #cbd5e1; }
+.curriculo-habs li::before { content: "✓"; position: absolute; left: 0; color: #fbbf24; font-weight: 700; }
+.curriculo-cert { margin-top: 18px; text-align: center; }
+.curriculo-cert img { width: 100%; max-width: 34rem; border-radius: 10px; margin: 0 auto;
+  display: block; border: 1px solid rgba(255,255,255,.12); background: #fff; }
+
+/* ---- Utilitárias que a etapa 2 usa (a LP não carrega Tailwind: o CSS é estático,
+   e o teste de cobertura de classes cobra cada uma) ---------------------------- */
+.max-w-3xl { max-width: 48rem; }
+.mt-7 { margin-top: 1.75rem; }
+.pl-3 { padding-left: .75rem; }
+.border-l-2 { border-left-width: 2px; border-left-style: solid; }
+.border-amber-400\/60 { border-color: rgba(251,191,36,.6); }
+.text-amber-300\/90 { color: rgba(252,211,77,.9); }
+.bg-slate-950\/95 { background-color: rgba(2,6,23,.95); }
+.overflow-y-auto { overflow-y: auto; }
+.space-y-7 > * + * { margin-top: 1.75rem; }
+.sm\:col-span-2 { grid-column: span 1 / span 1; }

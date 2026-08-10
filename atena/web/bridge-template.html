@@ -87,8 +87,14 @@
   </div>
 </section>
 
-<!-- 2b. Objetivos do curso (texto oficial; some se o curso não tiver) -->
+<!-- 2b. Empresas onde os formados trabalham (prova social; some sem dado) -->
+{{SECAO_EMPRESAS}}
+
+<!-- 2c. Objetivos do curso (texto oficial; some se o curso não tiver) -->
 {{SECAO_OBJETIVOS}}
+
+<!-- 2d. Seu Currículo no Futuro: salário de referência + habilidades + certificado -->
+{{SECAO_CURRICULO}}
 
 <!-- 3. Cards de valor -->
 <section data-secao="valor" class="secao-divisor max-w-4xl mx-auto px-6 py-16 grid sm:grid-cols-3 gap-4">
@@ -247,11 +253,19 @@
     <button id="fechar" type="button" aria-label="Fechar"
             class="absolute top-3 right-4 text-slate-400 hover:text-white text-2xl leading-none">&times;</button>
     <h3 class="text-lg font-semibold">{{MODAL_TITULO}}</h3>
+    <p class="mt-1 text-xs text-slate-400">Etapa 1 de 2 — leva 30 segundos.</p>
     <form id="bridge-form" class="mt-5 space-y-4" novalidate>
       <div>
-        <label for="nome" class="block text-sm text-slate-300 mb-1">Nome</label>
+        <label for="nome" class="block text-sm text-slate-300 mb-1">Nome completo</label>
         <input id="nome" type="text" required autocomplete="name"
                class="w-full rounded-lg bg-white/10 border border-white/20 px-4 py-3 text-slate-100 focus:outline-none focus:border-amber-400">
+      </div>
+      <div>
+        <label for="email" class="block text-sm text-slate-300 mb-1">E-mail</label>
+        <input id="email" type="email" required autocomplete="email"
+               placeholder="seu@email.com"
+               class="w-full rounded-lg bg-white/10 border border-white/20 px-4 py-3 text-slate-100 focus:outline-none focus:border-amber-400">
+        <p id="erro-email" class="hidden mt-1 text-xs text-red-400">Informe um e-mail válido.</p>
       </div>
       <div>
         <label for="whatsapp" class="block text-sm text-slate-300 mb-1">WhatsApp (com DDD)</label>
@@ -270,6 +284,125 @@
               class="w-full bg-amber-400 hover:bg-amber-300 disabled:opacity-60 text-slate-900 font-bold py-4 rounded-xl">
         {{MODAL_BOTAO}}
       </button>
+    </form>
+  </div>
+</div>
+
+<!-- ETAPA 2 — ficha completa. Só aqui a conversão conta: o Pixel dispara no submit
+     deste formulário, não no da etapa 1 (spec 17 §7). Nome/e-mail/telefone não se
+     repetem: vieram da etapa 1 e já estão guardados. -->
+<div id="etapa2" class="fixed inset-0 z-50 hidden overflow-y-auto p-4 sm:p-8">
+  <div class="absolute inset-0 bg-slate-950/95"></div>
+  <div class="relative mx-auto w-full max-w-3xl bg-slate-900 border border-white/15 rounded-2xl p-6 sm:p-9 shadow-2xl">
+    <p class="text-xs uppercase tracking-widest text-amber-400 font-bold">Etapa 2 de 2</p>
+    <h3 class="mt-1 text-2xl font-bold">Complete sua inscrição</h3>
+    <p class="mt-2 text-sm text-slate-300">Olá, <span id="e2-nome" class="font-semibold text-white"></span>!
+      Estes são os dados que a Extecamp pede para efetivar a matrícula. Leva cerca de 3 minutos.</p>
+
+    <form id="etapa2-form" class="mt-7 space-y-7" novalidate>
+      <fieldset class="space-y-4">
+        <legend class="text-sm font-bold text-amber-400 uppercase tracking-wide">Dados pessoais</legend>
+        <div class="grid sm:grid-cols-2 gap-4">
+          <div><label class="lbl" for="cpf">CPF *</label>
+            <input id="cpf" name="cpf" required inputmode="numeric" placeholder="000.000.000-00" maxlength="14" class="inp"></div>
+          <div><label class="lbl" for="nascimento">Data de nascimento *</label>
+            <input id="nascimento" name="nascimento" type="date" required class="inp"></div>
+          <div><label class="lbl" for="doc_tipo">Tipo de documento</label>
+            <select id="doc_tipo" name="doc_tipo" class="inp"><option value="">Selecione…</option>
+              <option>RG</option><option>CNH</option><option>Passaporte</option><option>RNE</option></select></div>
+          <div><label class="lbl" for="doc_numero">Número do documento</label>
+            <input id="doc_numero" name="doc_numero" class="inp"></div>
+          <div><label class="lbl" for="doc_emissor">Estado emissor</label>
+            <input id="doc_emissor" name="doc_emissor" maxlength="2" placeholder="SP" class="inp"></div>
+          <div><label class="lbl" for="sexo">Sexo</label>
+            <select id="sexo" name="sexo" class="inp"><option value="">Selecione…</option>
+              <option>Feminino</option><option>Masculino</option><option>Prefiro não informar</option></select></div>
+          <div><label class="lbl" for="estado_civil">Estado civil</label>
+            <select id="estado_civil" name="estado_civil" class="inp"><option value="">Selecione…</option>
+              <option>Solteiro(a)</option><option>Casado(a)</option><option>Divorciado(a)</option>
+              <option>Viúvo(a)</option><option>União estável</option></select></div>
+          <div><label class="lbl" for="cidade_nascimento">Cidade onde nasceu</label>
+            <input id="cidade_nascimento" name="cidade_nascimento" class="inp"></div>
+        </div>
+      </fieldset>
+
+      <fieldset class="space-y-4">
+        <legend class="text-sm font-bold text-amber-400 uppercase tracking-wide">Endereço</legend>
+        <div class="grid sm:grid-cols-2 gap-4">
+          <div><label class="lbl" for="cep">CEP</label>
+            <input id="cep" name="cep" inputmode="numeric" placeholder="00000-000" maxlength="9" class="inp"></div>
+          <div><label class="lbl" for="rua">Rua</label><input id="rua" name="rua" class="inp"></div>
+          <div><label class="lbl" for="numero">Número</label><input id="numero" name="numero" class="inp"></div>
+          <div><label class="lbl" for="complemento">Complemento</label><input id="complemento" name="complemento" class="inp"></div>
+          <div><label class="lbl" for="bairro">Bairro</label><input id="bairro" name="bairro" class="inp"></div>
+          <div><label class="lbl" for="cidade">Cidade</label><input id="cidade" name="cidade" class="inp"></div>
+          <div><label class="lbl" for="estado">Estado</label>
+            <input id="estado" name="estado" maxlength="2" placeholder="SP" class="inp"></div>
+        </div>
+      </fieldset>
+
+      <fieldset class="space-y-4">
+        <legend class="text-sm font-bold text-amber-400 uppercase tracking-wide">Formação e atuação</legend>
+        <div class="grid sm:grid-cols-2 gap-4">
+          <div class="sm:col-span-2"><label class="lbl" for="escolaridade">Escolaridade *</label>
+            <select id="escolaridade" name="escolaridade" required class="inp"><option value="">Selecione…</option>
+              <option>Ensino Médio Completo</option><option>Superior Incompleto</option>
+              <option>Superior Completo</option><option>Pós-graduação</option>
+              <option>Mestrado</option><option>Doutorado</option></select>
+            <p class="mt-1 text-xs text-slate-400">{{REQUISITO_AVISO}}</p></div>
+          <div><label class="lbl" for="instituicao">Instituição de ensino</label>
+            <input id="instituicao" name="instituicao" class="inp"></div>
+          <div><label class="lbl" for="curso_concluido">Curso concluído</label>
+            <input id="curso_concluido" name="curso_concluido" class="inp"></div>
+          <div><label class="lbl" for="ano_conclusao">Ano de conclusão</label>
+            <input id="ano_conclusao" name="ano_conclusao" inputmode="numeric" maxlength="4" placeholder="2020" class="inp"></div>
+          <div><label class="lbl" for="situacao">Atualmente você está</label>
+            <select id="situacao" name="situacao" class="inp"><option value="">Selecione…</option>
+              <option>Empregado(a)</option><option>Autônomo(a)</option><option>Empresário(a)</option>
+              <option>Servidor(a) público(a)</option><option>Estudante</option><option>Desempregado(a)</option></select></div>
+          <div><label class="lbl" for="empresa">Empresa</label><input id="empresa" name="empresa" class="inp"></div>
+          <div><label class="lbl" for="cargo">Cargo</label><input id="cargo" name="cargo" class="inp"></div>
+          <div><label class="lbl" for="experiencia_anos">Tempo de experiência (anos)</label>
+            <input id="experiencia_anos" name="experiencia_anos" inputmode="numeric" maxlength="2" class="inp"></div>
+        </div>
+      </fieldset>
+
+      <fieldset class="space-y-4">
+        <legend class="text-sm font-bold text-amber-400 uppercase tracking-wide">Pagamento</legend>
+        <div><label class="lbl" for="forma_pagamento">Forma de pagamento *</label>
+          <select id="forma_pagamento" name="forma_pagamento" required class="inp">
+            <option value="">Selecione…</option>
+            {{OPCOES_PAGAMENTO}}
+          </select></div>
+        {{PROMO_AVISO}}
+        <div><label class="lbl" for="comprovante_em">Comprovante de pagamento em nome de</label>
+          <select id="comprovante_em" name="comprovante_em" class="inp">
+            <option>Aluno</option><option>Empresa</option></select></div>
+      </fieldset>
+
+      <fieldset class="space-y-4">
+        <legend class="text-sm font-bold text-amber-400 uppercase tracking-wide">Para finalizar</legend>
+        <div><label class="lbl" for="como_soube">Como ficou sabendo do curso?</label>
+          <select id="como_soube" name="como_soube" class="inp"><option value="">Selecione…</option>
+            <option>Instagram</option><option>Facebook</option><option>Google</option>
+            <option>Site da Extecamp</option><option>Indicação de amigo/colega</option>
+            <option>Já fiz outro curso da FEQ</option><option>Outros</option></select></div>
+        <div><label class="lbl" for="contato_pref">Como prefere que entremos em contato?</label>
+          <select id="contato_pref" name="contato_pref" class="inp"><option value="">Selecione…</option>
+            <option>WhatsApp</option><option>E-mail</option><option>Telefone</option></select></div>
+      </fieldset>
+
+      <p class="text-xs text-slate-400 border-l-2 border-amber-400/60 pl-3">
+        Estes dados são usados exclusivamente para efetivar sua inscrição junto à Escola de
+        Extensão da Unicamp (Extecamp) e para o contato sobre este curso. Você pode pedir a
+        correção ou a exclusão a qualquer momento pelos nossos canais oficiais.
+      </p>
+      <p id="erro-e2" class="hidden text-sm text-red-400"></p>
+      <button id="e2-enviar" type="submit"
+              class="w-full bg-amber-400 hover:bg-amber-300 disabled:opacity-60 text-slate-900 font-bold py-4 rounded-xl text-lg">
+        Concluir inscrição
+      </button>
+      <p class="text-center text-xs text-slate-500">* campos obrigatórios</p>
     </form>
   </div>
 </div>

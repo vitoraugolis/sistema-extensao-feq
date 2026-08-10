@@ -179,13 +179,16 @@ dados = {"nome": "Gil", "telefone": "(19) 98888-0010", "curso": "feq-0480",
          "event_id": "11111111-2222-3333-4444-555555555555", "fbp": "fb.1.y",
          "ip": "10.0.0.1", "ua": "UA", "url": "https://feq/ponte?curso=FEQ-0480"}
 r = ponte.processar(dados, est4, g4, ads, ing4)
-check(r["ok"] and r["redirect"].endswith("/FEQ-0480/009"), "ponte devolve o redirect da turma")
+# A etapa 1 não manda mais o lead à Extecamp: ela abre a ETAPA 2 na própria LP.
+# `aberto` diz à página se há inscrição a completar ou se é lista de espera.
+check(r["ok"] and r["aberto"] is True and "redirect" not in r,
+      "etapa 1 devolve 'aberto' e NÃO manda o lead embora (a etapa 2 vem na mesma página)")
 ev = g4.eventos(card_id=r["card_id"])[0]
-check(ev["tipo"] == "inicio_inscricao" and ev["capi"] == dados["event_id"],
-      "evento gravado com o MESMO event_id do Pixel")
+check(ev["tipo"] == "etapa1" and ev["capi"] is None,
+      "etapa 1 grava 'etapa1' SEM CAPI — quem só deixou o contato ainda não é conversão")
 check(est4.get_lead(r["card_id"])["optin_fonte"] == "ponte", "opt-in LGPD com fonte=ponte")
-check(funil.status_funil(g4, est4, r["card_id"]) == "initiated_checkout",
-      "status derivado: initiated_checkout")
+check(funil.status_funil(g4, est4, r["card_id"]) == "lead",
+      "status derivado: ainda 'lead' (só vira initiated_checkout na etapa 2)")
 check(not ponte.processar({"telefone": "123", "curso": "FEQ-0480"}, est4, g4, ads, ing4)["ok"],
       "telefone inválido é recusado")
 check(not ponte.processar({"telefone": "19988880011", "curso": "FEQ-9999"},
@@ -292,7 +295,7 @@ check(ponte.render(g5, FakeOnt(), "FEQ-9999") is None, "curso fora do cursos_met
 r = ponte.processar({"nome": "Alias", "whatsapp": "19966660001", "curso_id": "feq-0580",
                      "event_id": "e2e2e2e2-aaaa-bbbb-cccc-dddddddddddd"},
                     est5, g5, ads, Ingestao(est5, FakeOnt()))
-check(r["ok"] and r["redirect"].endswith("FEQ-0580/001"),
+check(r["ok"] and r["card_id"],
       "payload {whatsapp, curso_id} do bridge-logic é aceito")
 
 # --- deploy WP: renderiza todas e, sem credenciais, não publica ------------------
@@ -307,9 +310,11 @@ check(all(x["status"] == "dry_run" for x in wpd.publicar(pgs)),
 # confirmou) — o gatilho exige o path COMEÇANDO com /thank-you-page, não só contendo
 # a substring em qualquer posição. Sufixo preserva esse prefixo sem colidir com a
 # página Elementor pré-existente no slug exato "thank-you-page" (id 18818, outra campanha).
-check("window.location.href = \"/" + wpd.OBRIGADO_SLUG + "/?to=\" + encodeURIComponent(CFG.destino)"
-      in (pathlib.Path(__file__).resolve().parents[1] / "web" / "bridge-logic.js").read_text(),
-      "após o modal, o fluxo passa por /thank-you-page-lp/ antes do destino real")
+_logica = (pathlib.Path(__file__).resolve().parents[1] / "web" / "bridge-logic.js").read_text()
+# casa o destino, não a formatação: o redirect é montado em mais de uma linha, e o que
+# precisa ser verdade é o PATH pelo qual o fluxo passa
+check(f'"/{wpd.OBRIGADO_SLUG}/?to="' in _logica and "encodeURIComponent(CFG.destino" in _logica,
+      "ao concluir, o fluxo passa por /thank-you-page-lp/ antes do destino real")
 check(wpd.OBRIGADO_SLUG.startswith("thank-you-page"),
       "slug COMEÇA com thank-you-page (não só contém) — gatilho do GTM exige prefixo de path")
 obrigado = ponte.pagina_obrigado_html()

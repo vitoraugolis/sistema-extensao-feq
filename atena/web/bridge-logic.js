@@ -179,7 +179,15 @@
   }
   tel.addEventListener("input", function () { tel.value = mascarar(tel.value); });
 
-  // ---- Submit: valida -> Pixel -> POST (timeout 1,5s) -> Extecamp SEMPRE ---
+  // Guardado entre as duas etapas: a etapa 2 reencontra o lead pelo TELEFONE, e o
+  // event_id é criado aqui para ser o MESMO no Pixel e na CAPI quando a etapa 2 for
+  // concluída (a dedup exige o par idêntico).
+  var LEAD = { nome: "", email: "", telefone: "", event_id: "" };
+  var INSTAGRAM_URL = "https://www.instagram.com/extensaofequnicamp/";
+
+  // ---- ETAPA 1: valida -> POST -> abre a etapa 2. SEM Pixel. -------------------
+  // O lead que só deixou o contato ainda não é conversão: a etapa 1 alimenta a régua
+  // de recuperação de 2h no backend, mas nada é reportado ao Meta aqui (spec 17 §7).
   form.addEventListener("submit", function (ev) {
     ev.preventDefault();
     var digitos = tel.value.replace(/\D/g, "");
@@ -189,6 +197,13 @@
       return;
     }
     erroTel.classList.add("hidden");
+    var email = (document.getElementById("email") || {}).value || "";
+    var erroEmail = document.getElementById("erro-email");
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email.trim())) {
+      if (erroEmail) erroEmail.classList.remove("hidden");
+      return;
+    }
+    if (erroEmail) erroEmail.classList.add("hidden");
     if (!document.getElementById("optin").checked) {   // LGPD: opt-in explícito, com feedback
       erroOptin.classList.remove("hidden");
       return;
@@ -197,24 +212,19 @@
     document.getElementById("continuar").disabled = true;
     tele.modal_enviado = 1;
 
-    var eid = uuid();   // regra de ouro: MESMO id no Pixel e na CAPI (dedup)
-    if (CFG.pixel) {
-      fbq("track", "InitiateCheckout",
-          { content_ids: [CFG.curso], content_name: CFG.curso }, { eventID: eid });
-    }
-    var redirecionou = false;
-    function irParaExtecamp() {
-      if (redirecionou) return;
-      redirecionou = true;
+    LEAD.nome = document.getElementById("nome").value.trim();
+    LEAD.email = email.trim();
+    LEAD.telefone = digitos;
+    LEAD.event_id = uuid();
+
+    var seguiu = false;
+    function seguir() {
+      if (seguiu) return;
+      seguiu = true;
       enviarTele();
-      // Curso SEM turma aberta (lista de espera): não há inscrição pra onde mandar.
-      // Confirma na própria página — o lead já foi gravado pelo POST acima.
-      if (!CFG.aberto || !CFG.destino) { confirmarEspera(); return; }
-      // Passa por /thank-you-page-lp/ (interstício com o noscript do GTM) antes do
-      // destino real: é a URL que a conversão de Lead do Google Ads/GTM observa
-      // (o gatilho exige o path começando com /thank-you-page — um prefixo como
-      // "lp-thank-you-page" não disparou o Lead, confirmado pelo usuário).
-      window.location.href = "/thank-you-page-lp/?to=" + encodeURIComponent(CFG.destino);
+      // Curso SEM turma aberta: para aqui — não há inscrição a completar.
+      if (!CFG.aberto) { confirmarEspera(); return; }
+      abrirEtapa2();
     }
     function confirmarEspera() {
       var caixa = document.querySelector("#modal .modal-caixa") || form.parentNode;
@@ -222,24 +232,84 @@
         '<div class="espera-ok">' +
         '<p class="espera-check">✓</p>' +
         '<p class="espera-tit">Pronto, você está na lista!</p>' +
-        '<p class="espera-sub">Assim que a próxima turma deste curso for confirmada, ' +
-        'a gente te avisa no WhatsApp. Se quiser falar com a equipe agora, é só usar ' +
-        'o botão do WhatsApp aqui na página.</p></div>';
+        '<p class="espera-sub">Este curso está entre turmas. Assim que a próxima for ' +
+        'confirmada, a gente te avisa no WhatsApp. Enquanto isso, acompanhe as novidades ' +
+        'no nosso Instagram <a href="' + INSTAGRAM_URL + '" target="_blank" rel="noopener">' +
+        '@extensaofequnicamp</a>.</p></div>';
     }
-    // keepalive: o POST sobrevive à navegação se o redirect vier antes da resposta
     fetch(CFG.webhook, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       keepalive: true,
       body: JSON.stringify({
-        nome: document.getElementById("nome").value.trim(),
+        nome: LEAD.nome, email: LEAD.email,
         whatsapp: digitos, curso_id: CFG.curso,
-        event_id: eid, sessao_id: tele.sessao_id,
+        event_id: LEAD.event_id, sessao_id: tele.sessao_id,
         fbp: cookie("_fbp"), fbc: cookie("_fbc"),
         url: window.location.href,
         utm: utmSalvos()          // origem da campanha, capturada em silêncio
       })
-    }).then(irParaExtecamp, irParaExtecamp);
-    setTimeout(irParaExtecamp, TIMEOUT_MS);   // backend lento/fora: a venda não espera
+    }).then(seguir, seguir);
+    setTimeout(seguir, TIMEOUT_MS);   // backend lento/fora: o lead não fica preso
+  });
+
+  function abrirEtapa2() {
+    var m = document.getElementById("modal");
+    var e2 = document.getElementById("etapa2");
+    if (!e2) return;
+    if (m) { m.classList.add("hidden"); m.classList.remove("flex"); }
+    var alvo = document.getElementById("e2-nome");
+    if (alvo) alvo.textContent = (LEAD.nome.split(" ")[0] || "");
+    e2.classList.remove("hidden");
+    document.body.style.overflow = "hidden";
+    window.scrollTo(0, 0);
+  }
+
+  // ---- ETAPA 2: valida -> Pixel (AQUI) -> POST -> obrigado --------------------
+  var formE2 = document.getElementById("etapa2-form");
+  if (formE2) formE2.addEventListener("submit", function (ev) {
+    ev.preventDefault();
+    var erro = document.getElementById("erro-e2");
+    var faltando = [];
+    ["cpf", "nascimento", "escolaridade", "forma_pagamento"].forEach(function (id) {
+      var el = document.getElementById(id);
+      if (el && !String(el.value).trim()) faltando.push(id);
+    });
+    if (faltando.length) {
+      erro.textContent = "Preencha os campos obrigatórios antes de concluir.";
+      erro.classList.remove("hidden");
+      var p = document.getElementById(faltando[0]); if (p) p.focus();
+      return;
+    }
+    erro.classList.add("hidden");
+    document.getElementById("e2-enviar").disabled = true;
+
+    // É AQUI que a conversão conta. Mesmo event_id da etapa 1 -> a CAPI (que recebe
+    // este mesmo id no POST abaixo) desduplica contra este disparo do Pixel.
+    if (CFG.pixel) {
+      fbq("track", "InitiateCheckout",
+          { content_ids: [CFG.curso], content_name: CFG.curso }, { eventID: LEAD.event_id });
+    }
+    var corpo = { whatsapp: LEAD.telefone, nome: LEAD.nome, email: LEAD.email,
+                  curso_id: CFG.curso, event_id: LEAD.event_id,
+                  fbp: cookie("_fbp"), fbc: cookie("_fbc"), url: window.location.href };
+    new FormData(formE2).forEach(function (v, k) { if (v) corpo[k] = v; });
+
+    var foi = false;
+    function concluir() {
+      if (foi) return;
+      foi = true;
+      // Mesmo interstício de sempre: é o path que a conversão de Lead do Google
+      // Ads/GTM observa (o gatilho exige começar com /thank-you-page).
+      window.location.href = "/thank-you-page-lp/?to=" +
+        encodeURIComponent(CFG.destino || window.location.pathname);
+    }
+    fetch(CFG.webhook_inscricao, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      keepalive: true,
+      body: JSON.stringify(corpo)
+    }).then(concluir, concluir);
+    setTimeout(concluir, 4000);   // ficha é maior que o modal: dá mais folga ao POST
   });
 })();

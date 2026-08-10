@@ -458,6 +458,18 @@ class Estado:
                         " notas='' WHERE card_id=?",   # utm fica: é dado de campanha, não pessoal
                         (l["card_id"],))
                     self.conn.execute("DELETE FROM conversas WHERE card_id=?", (l["card_id"],))
+                    # A ficha da etapa 2 (growth/db.py::inscricoes) tem CPF, documento e
+                    # endereço — é o dado MAIS sensível que guardamos. Some junto, aqui,
+                    # e não numa varredura paralela do Growth: `inscricoes` vive no mesmo
+                    # arquivo SQLite, e uma segunda rotina que alguém precise lembrar de
+                    # chamar é exatamente como PII vira retenção silenciosa.
+                    # A tabela é criada pelo Growth: num processo que só abriu o Estado
+                    # (testes, script avulso) ela não existe — e a varredura LGPD não pode
+                    # abortar por causa disso, ou o resto do PII deixaria de ser apagado.
+                    try:
+                        self.conn.execute("DELETE FROM inscricoes WHERE card_id=?", (l["card_id"],))
+                    except sqlite3.OperationalError:
+                        pass
                     self.conn.commit()
                 n += 1
         if n:

@@ -41,6 +41,16 @@ CREATE TABLE IF NOT EXISTS lp_sessoes(
   max_scroll INTEGER, ultima_secao TEXT, secoes_json TEXT,
   cta_cliques INTEGER DEFAULT 0, modal_aberto INTEGER DEFAULT 0,
   modal_enviado INTEGER DEFAULT 0, card_id TEXT);
+-- Etapa 2 do formulário da LP: a ficha completa que o lead preencheu (spec 17).
+-- `dados_json` e não ~40 colunas de propósito: o único consumidor é um humano
+-- relendo para redigitar na Extecamp, e o formulário da Extecamp muda — 40 colunas
+-- virariam migração a cada mudança de lá.
+-- ATENÇÃO LGPD: este blob tem CPF e endereço. Ele é varrido por
+-- Estado.anonimizar_antigos() junto com o resto do PII (ver core/estado.py) —
+-- guardar aqui sem entrar naquela varredura seria retenção silenciosa.
+CREATE TABLE IF NOT EXISTS inscricoes(
+  id INTEGER PRIMARY KEY AUTOINCREMENT, card_id TEXT, curso TEXT, turma TEXT,
+  dados_json TEXT, status TEXT DEFAULT 'recebida', criado TEXT, atualizado TEXT);
 """
 
 # ordem canônica das seções da LP (bridge-template data-secao) p/ o funil de leitura.
@@ -175,36 +185,81 @@ class Growth:
         return [dict(r) for r in rows]
 
     def checkouts_pendentes(self):
-        """Leads com inicio_inscricao/boleto_gerado e SEM inscricao_confirmada.
+        """Leads em algum estágio de inscrição e SEM conversão confirmada — a base da
+        régua de recuperação. Inclui quem parou na ETAPA 1 do formulário da LP
+        ('etapa1'): ele é justamente quem a régua de 2h precisa alcançar (spec 17).
+
+        Os três lugares abaixo têm de listar os MESMOS tipos. Se 'etapa1' entrar só no
+        WHERE externo e ficar fora dos subselects, `curso` volta NULL para esse lead e
+        `funil._toque` desiste em silêncio (ont.captavel(None) não tem 'captavel'):
+        nenhum envio, nenhum log, ninguém descobre.
+
         Retorna [{card_id, curso, ultimo_checkout, tipo_checkout, toques, ultimo_toque}]."""
         with self._lock:
             rows = self.conn.execute("""
                 SELECT card_id, MAX(ts) ultimo_checkout,
+                  -- ts tem precisão de SEGUNDOS: etapa 1 e etapa 2 gravadas no mesmo
+                  -- segundo empatam. Sem o desempate por id, um lead que CONCLUIU a
+                  -- etapa 2 podia ser lido como 'etapa1' e sumir da fila de transcrição.
                   (SELECT curso FROM eventos_funil t WHERE t.card_id=e.card_id
-                     AND t.tipo IN ('inicio_inscricao','boleto_gerado')
-                     ORDER BY t.ts DESC LIMIT 1) curso,
+                     AND t.tipo IN ('etapa1','inicio_inscricao','boleto_gerado')
+                     ORDER BY t.ts DESC, t.id DESC LIMIT 1) curso,
                   (SELECT tipo FROM eventos_funil t WHERE t.card_id=e.card_id
-                     AND t.tipo IN ('inicio_inscricao','boleto_gerado')
-                     ORDER BY t.ts DESC LIMIT 1) tipo_checkout,
+                     AND t.tipo IN ('etapa1','inicio_inscricao','boleto_gerado')
+                     ORDER BY t.ts DESC, t.id DESC LIMIT 1) tipo_checkout,
                   (SELECT COUNT(*) FROM eventos_funil r WHERE r.card_id=e.card_id
                      AND r.tipo='recuperacao_enviada') toques,
                   (SELECT MAX(ts) FROM eventos_funil r WHERE r.card_id=e.card_id
                      AND r.tipo='recuperacao_enviada') ultimo_toque
                 FROM eventos_funil e
-                WHERE tipo IN ('inicio_inscricao','boleto_gerado')
+                WHERE tipo IN ('etapa1','inicio_inscricao','boleto_gerado')
                   AND card_id NOT IN (SELECT card_id FROM eventos_funil
                                       WHERE tipo IN ('inscricao_confirmada','matricula_confirmada'))
                 GROUP BY card_id""").fetchall()
         return [dict(r) for r in rows]
 
     def verificacoes_pendentes(self):
-        """Fila da aba Verificação (spec 17 §8b): checkouts sem conversão E sem
-        veredito humano. 'Não inscreveu' grava verificacao_negativa e sai daqui
-        (mas segue na régua); 'Inscreveu' grava inscricao_confirmada e sai das duas."""
+        """Fila da aba Verificação: quem CONCLUIU a etapa 2 (ou gerou boleto) e ainda
+        não teve desfecho — é a fila de transcrição para a Extecamp (spec 17 §8b).
+
+        Quem parou na etapa 1 fica de fora: não há o que transcrever nem o que conferir
+        (ele nunca chegou à Extecamp). Esse lead continua na régua de recuperação, que
+        roda por `checkouts_pendentes`. 'Não inscreveu' grava verificacao_negativa e sai
+        daqui (mas segue na régua); 'Inscreveu' grava inscricao_confirmada e sai das duas."""
         with self._lock:
             negs = {r[0] for r in self.conn.execute(
                 "SELECT DISTINCT card_id FROM eventos_funil WHERE tipo='verificacao_negativa'")}
-        return [p for p in self.checkouts_pendentes() if p["card_id"] not in negs]
+            # pertinência de conjunto, não leitura de tipo_checkout: imune ao empate de ts
+            concluiu = {r[0] for r in self.conn.execute(
+                "SELECT DISTINCT card_id FROM eventos_funil"
+                " WHERE tipo IN ('inicio_inscricao','boleto_gerado')")}
+        return [p for p in self.checkouts_pendentes()
+                if p["card_id"] not in negs and p["card_id"] in concluiu]
+
+    # ------------------------------------------------- etapa 2 (ficha completa)
+    def add_inscricao(self, card_id, curso, turma, dados_json):
+        with self._lock:
+            cur = self.conn.execute(
+                "INSERT INTO inscricoes(card_id,curso,turma,dados_json,criado,atualizado)"
+                " VALUES(?,?,?,?,?,?)",
+                (card_id, curso, turma, dados_json, _agora(), _agora()))
+            self.conn.commit()
+        return cur.lastrowid
+
+    def get_inscricao(self, card_id):
+        """A ficha mais recente do lead (ele pode ter refeito o formulário)."""
+        with self._lock:
+            r = self.conn.execute(
+                "SELECT * FROM inscricoes WHERE card_id=? ORDER BY id DESC LIMIT 1",
+                (card_id,)).fetchone()
+        return dict(r) if r else None
+
+    def set_inscricao_status(self, insc_id, status):
+        with self._lock:
+            n = self.conn.execute("UPDATE inscricoes SET status=?, atualizado=? WHERE id=?",
+                                  (status, _agora(), insc_id)).rowcount
+            self.conn.commit()
+        return n > 0
 
     # --------------------------------------------------- telemetria da LP
     def upsert_lp_sessao(self, d):

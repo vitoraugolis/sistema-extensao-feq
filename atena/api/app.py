@@ -324,11 +324,19 @@ def verificacao_lista():
 
 
 def _verif_elegiveis(horas=None, agora=None):
-    """Pendências antigas o bastante para o veredito automático de 'não inscreveu'."""
+    """Pendências antigas o bastante para o veredito automático de 'não inscreveu'.
+
+    Quem entregou a ficha da etapa 2 e ainda não foi transcrito NÃO entra: a bola está
+    com a gente, não com o lead. Declarar 'não inscreveu' e disparar 'teve dificuldade?'
+    para alguém que acabou de nos mandar CPF e endereço seria constrangedor — e
+    envenenaria o rótulo verificacao_negativa, que é o que mede o funil (spec 18)."""
     horas = horas if horas is not None else CFG["verif_auto_horas"]
     agora = agora or datetime.datetime.now()
     fora = []
     for p in GRW.verificacoes_pendentes():
+        insc = GRW.get_inscricao(p["card_id"])
+        if insc and insc["status"] == "recebida":
+            continue
         try:
             idade = (agora - datetime.datetime.fromisoformat(p["ultimo_checkout"])).total_seconds() / 3600
         except (TypeError, ValueError):
@@ -1282,20 +1290,26 @@ def webhook_ponte():
     dados = {**(request.get_json(silent=True) or {}),
              "ip": request.remote_addr, "ua": request.headers.get("User-Agent", "")}
     r = ponte.processar(dados, EST, GRW, ADS, ING, ont=_ont())
-    # Modo IMEDIATO (limiar 0): decide "não inscreveu" assim que o lead chega, sem
-    # esperar o tick de 15 min. Em thread para não segurar a resposta — o navegador
-    # do lead está aguardando este retorno para seguir à Extecamp.
-    if r.get("ok") and CFG["verif_auto"] and CFG["verif_auto_horas"] == 0:
-        threading.Thread(target=_verificacao_auto_imediata, args=(r["card_id"],),
-                         daemon=True).start()
+    # O "modo imediato" da verificação automática vivia aqui: com a régua de 2h nunca
+    # tendo rodado, ele era o que fazia o 1º toque sair. Agora a régua roda de verdade
+    # (op_recuperar no _operacoes), e quem parou na etapa 1 nem está na fila de
+    # Verificação — o gancho aqui seria no-op e, pior, declararia "não inscreveu"
+    # para alguém que acabou de chegar.
     return jsonify(r), (200 if r.get("ok") else 400), _CORS_LP
 
 
-def _verificacao_auto_imediata(card_id):
-    try:
-        _verificacao_auto(apenas=card_id)
-    except Exception as e:
-        print(f"[verificacao-auto] imediata falhou para {card_id}: {e}", flush=True)
+@app.route("/webhook/inscricao", methods=["POST", "OPTIONS"])
+def webhook_inscricao():
+    """Etapa 2 da LP: ficha completa. É o ponto em que a conversão conta — o Pixel
+    dispara no navegador com o MESMO event_id que vai daqui à CAPI."""
+    if request.method == "OPTIONS":
+        return "", 204, _CORS_LP
+    if not _rate_ok(request.remote_addr):
+        return jsonify({"ok": False, "motivo": "rate limit"}), 429, _CORS_LP
+    dados = {**(request.get_json(silent=True) or {}),
+             "ip": request.remote_addr, "ua": request.headers.get("User-Agent", "")}
+    r = ponte.processar_etapa2(dados, EST, GRW, ADS, ING, ont=_ont())
+    return jsonify(r), (200 if r.get("ok") else 400), _CORS_LP
 
 
 @app.route("/webhook/lp", methods=["POST", "OPTIONS"])
@@ -1621,6 +1635,15 @@ def _operacoes():
                 if CFG["auto_aprovar"]:              # nudges free-text respeitam o toggle (tier externa)
                     for cid in res["nudges"]:
                         _aprovar_e_enviar(cid, ator="reativacao")
+            # Régua de recuperação de inscrição (spec 17 §7): quem parou na etapa 1 da LP
+            # leva o 1º toque 2h depois. Estava escrita mas NUNCA rodava — só existia no
+            # CLI (growth/motor.py) e o VPS não tem cron nem timer, então o "2h" da spec
+            # nunca aconteceu. A cada ~15 min, no horário comercial (manda template).
+            if G.dentro_janela() and _t.time() - float(EST.get_config("op_recuperar") or 0) > 900:
+                EST.set_config("op_recuperar", str(_t.time()))
+                rc = growth_funil.recuperar(GRW, EST, ONTO.ont, WA)
+                if rc["enviados"]:
+                    print(f"[operacoes] recuperacao: {len(rc['enviados'])} toque(s)", flush=True)
         except Exception as e:
             print(f"[operacoes] tick falhou: {e}", flush=True)
 

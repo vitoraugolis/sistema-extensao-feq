@@ -50,6 +50,37 @@ LOGO_URL_DEFAULT = ("https://cursos-extensao.feq.unicamp.br/wp-content/uploads/"
                     "2021/04/logo-redmencionado-300x70.png")
 HERO_BG_URL_DEFAULT = "https://www.feq.unicamp.br/wp-content/uploads/2024/10/Group-103.png"
 GTM_ID_DEFAULT = "GTM-WPXLCWJ"   # já instalado no <head> do site (head code do usuário)
+_UPLOADS = "https://cursos-extensao.feq.unicamp.br/wp-content/uploads"
+
+# Logos das empresas onde os alunos formados trabalham — arquivos que a própria FEQ
+# já publicava nas páginas antigas dos cursos (mesma regra das fotos de professor:
+# só material oficial já publicado, nada fabricado).
+EMPRESA_LOGO = {
+    "3M": f"{_UPLOADS}/2024/02/3m.png",
+    "Boehringer": f"{_UPLOADS}/2024/02/boehringer.png",
+    "Braskem": f"{_UPLOADS}/2024/02/braskem-1.png",
+    "Buckman": f"{_UPLOADS}/2024/02/buckman.png",
+    "EMS": f"{_UPLOADS}/2024/02/ems.png",
+    "Eaton": f"{_UPLOADS}/2024/02/eaton.png",
+    "Petrobras": f"{_UPLOADS}/2024/02/petrobras.png",
+    "Solvay": f"{_UPLOADS}/2024/02/solvay.png",
+}
+
+# Modelo do certificado, POR CURSO: o nome e o tipo do curso estão impressos dentro
+# da imagem, então não existe arquivo genérico. Os nomes de arquivo NÃO identificam o
+# curso (são todos "Modelo-Declaracao-Curso-de-Difusao..."), inclusive nos cursos de
+# Formação de Especialistas — o mapa abaixo foi conferido lendo o texto de cada imagem.
+# FEQ-0331, FEQ-0499 e FEQ-0580 ainda não têm modelo publicado: a seção sai sem a
+# imagem neles (some, não inventa — mesma regra do resto do sistema).
+CERTIFICADO_MODELO = {
+    "FEQ-0480": f"{_UPLOADS}/2025/06/Modelo-Declaracao-Curso-de-Difusao-a-Distancia-1.pdf-2.png",
+    "FEQ-0360": f"{_UPLOADS}/2025/06/Modelo-Declaracao-Curso-de-Difusao-a-Distancia-1.pdf-1-1.png",
+    "FEQ-1000": f"{_UPLOADS}/2025/06/Modelo-Declaracao-Curso-de-Difusao-a-Distancia-1.pdf-2-1.png",
+    "FEQ-0299": f"{_UPLOADS}/2026/07/Modelo-Declaracao-Curso-de-Difusao-a-Distancia-1.pdf.png",
+    "FEQ-0333": f"{_UPLOADS}/2026/02/Modelo-Declaracao-Curso-de-Difusao-a-Distancia-1.pdf-2.png",
+    "FEQ-0670": f"{_UPLOADS}/2026/07/Modelo-Declaracao-Curso-de-Difusao-a-Distancia-1.pdf-1.png",
+}
+
 PROFESSOR_FOTOS = {
     "Flavio Vasconcelos da Silva":
         "https://www.feq.unicamp.br/wp-content/uploads/2025/09/D-Flavio-Vasconcelos-da-Silva-1.jpg",
@@ -250,6 +281,100 @@ def _moeda(v):
 
 def _esc(v):
     return html.escape(str(v), quote=False)
+
+
+def _secao_empresas(c):
+    """Logos das empresas onde trabalham os alunos formados. Some sem `empresasJson`.
+    Empresa sem logo cadastrado vira chip de texto — o nome é fato da ontologia, o
+    logo é só o enfeite; não deixar o dado de fora por falta de imagem."""
+    emp = (c or {}).get("empresas") or []
+    if not emp:
+        return ""
+    itens = []
+    for e in emp:
+        # "Boehringer Ingelheim" e "Boehringer" são a mesma empresa no catálogo
+        url = EMPRESA_LOGO.get(e) or next(
+            (u for k, u in EMPRESA_LOGO.items() if e.lower().startswith(k.lower())), None)
+        itens.append(f'<img src="{url}" alt="{_esc(e)}" loading="lazy" class="logo-empresa">'
+                     if url else f'<span class="logo-empresa-txt">{_esc(e)}</span>')
+    return (
+        '<section data-secao="empresas" class="secao-divisor max-w-4xl mx-auto px-6 py-16 text-center">'
+        '<p class="text-xs uppercase tracking-widest text-slate-400 font-bold">Onde nossos alunos atuam</p>'
+        '<h2 class="mt-2 text-2xl font-bold">Profissionais de empresas que você conhece</h2>'
+        f'<div class="empresas-grid">{"".join(itens)}</div>'
+        '</section>')
+
+
+def _secao_curriculo(c):
+    """"Seu Currículo no Futuro": o que o lead leva daqui — remuneração de referência,
+    competências e o modelo do certificado. Cada bloco some sozinho sem o dado
+    correspondente; se nenhum existir, a seção inteira some."""
+    cod = (c or {}).get("codigo", "")
+    salario = (c or {}).get("salario_ref")
+    habs = (c or {}).get("habilidades") or []
+    cert = CERTIFICADO_MODELO.get(cod)
+    if not (salario or habs or cert):
+        return ""
+    blocos = []
+    if salario:
+        blocos.append(
+            '<div class="curriculo-salario">'
+            '<p class="text-xs uppercase tracking-widest text-amber-400 font-bold">Referência de mercado</p>'
+            f'<p class="curriculo-salario-num">{_esc(salario)}</p></div>')
+    if habs:
+        blocos.append(
+            '<div class="curriculo-habs"><p class="font-semibold mb-3">O que você passa a dominar</p><ul>'
+            + "".join(f'<li>{_esc(h)}</li>' for h in habs) + '</ul></div>')
+    cert_html = (
+        '<div class="curriculo-cert">'
+        '<p class="font-semibold mb-3">O certificado que você recebe</p>'
+        f'<img src="{cert}" alt="Modelo do certificado de {_esc(cod)}" loading="lazy">'
+        '<p class="mt-2 text-xs text-slate-400">Modelo ilustrativo emitido pela Escola de '
+        'Extensão da Unicamp ao concluir o curso.</p></div>') if cert else ""
+    return (
+        '<section data-secao="curriculo" class="secao-divisor max-w-4xl mx-auto px-6 py-16">'
+        '<h2 class="text-2xl font-bold text-center">Seu currículo no futuro</h2>'
+        '<p class="mt-2 text-center text-slate-300 text-sm">O que muda no seu perfil profissional '
+        'depois deste curso.</p>'
+        f'<div class="curriculo-grid">{"".join(blocos)}</div>{cert_html}'
+        '</section>')
+
+
+def _opcoes_pagamento(c):
+    """<option> da etapa 2, no formato que a Extecamp usa no próprio formulário:
+    sempre o parcelamento MÁXIMO e a opção à vista, ambos boleto. Vem do plano da
+    ontologia — a mesma fonte que o Revisor usa para validar preço, então o que o
+    lead escolhe aqui não pode divergir do que o agente pode afirmar."""
+    p = (c or {}).get("plano") or {}
+    ops = []
+    if p.get("n") and p.get("valor_parcela"):
+        ops.append(f"{int(p['n']):02d} PARCELA(S) DE {_moeda(p['valor_parcela'])} "
+                   f"ATRAVÉS DE BOLETO BANCÁRIO")
+    if p.get("a_vista"):
+        ops.append(f"01 PARCELA(S) DE {_moeda(p['a_vista'])} À VISTA, "
+                   f"ATRAVÉS DE BOLETO BANCÁRIO")
+    # Campanha vigente: as ofertas promocionais entram ALÉM das de tabela — o lead
+    # escolhe, e o operador confirma na transcrição (o desconto é aplicado depois,
+    # nos boletos; o formulário da Extecamp mostra o valor cheio — ver promocao.como_aplicar).
+    for o in ((c or {}).get("promocao") or {}).get("ofertas", []):
+        if o.get("n") and o.get("valor_parcela"):
+            ops.append(f"{int(o['n']):02d} PARCELA(S) DE {_moeda(o['valor_parcela'])} "
+                       f"— {o.get('rotulo') or 'promoção'}")
+        if o.get("a_vista"):
+            ops.append(f"01 PARCELA(S) DE {_moeda(o['a_vista'])} À VISTA "
+                       f"— {o.get('rotulo') or 'promoção'}")
+    return "\n".join(f'<option>{_esc(o)}</option>' for o in ops)
+
+
+def _promo_aviso(c):
+    """Aviso da campanha dentro do formulário: sem ele o lead vê no boleto um valor
+    diferente do que a LP prometeu e acha que foi enganado."""
+    pr = (c or {}).get("promocao")
+    if not pr or not pr.get("como_aplicar"):
+        return ""
+    return ('<p class="text-xs text-amber-300/90 border-l-2 border-amber-400 pl-3">'
+            f'<strong>{_esc(pr.get("rotulo") or "Campanha vigente")}:</strong> '
+            f'{_esc(pr["como_aplicar"])}</p>')
 
 
 def _conteudo_html(texto):
@@ -949,7 +1074,11 @@ def _bridge_bootstrap(tokens, webhook_url, pixel_id, aberto=True):
         "curso": tokens["CURSO"],
         "destino": tokens["URL_CURSO"] if aberto else "",
         "aberto": bool(aberto),
-        "webhook": webhook_url, "pixel": pixel_id}) + ";"
+        "webhook": webhook_url,
+        # etapa 2 mora ao lado da etapa 1 no mesmo host (o webhook_url já traz o
+        # host público do hub — derivar daqui evita uma segunda variável de ambiente)
+        "webhook_inscricao": webhook_url.replace("/webhook/ponte", "/webhook/inscricao"),
+        "pixel": pixel_id}) + ";"
     completo = config_js + (_WEB / "bridge-logic.js").read_text()
     return base64.b64encode(completo.encode()).decode()
 
@@ -983,6 +1112,12 @@ def render(g, ont, curso, webhook_url="/webhook/ponte", hoje=None):
     return (pagina
             .replace("{{CURSOS_RELACIONADOS_HTML}}", _cursos_relacionados_html(g, ont, curso))
             .replace("{{WEBHOOK_URL}}", webhook_url)
+            .replace("{{SECAO_EMPRESAS}}", _secao_empresas(c))
+            .replace("{{SECAO_CURRICULO}}", _secao_curriculo(c))
+            .replace("{{OPCOES_PAGAMENTO}}", _opcoes_pagamento(c))
+            .replace("{{PROMO_AVISO}}", _promo_aviso(c))
+            .replace("{{REQUISITO_AVISO}}",
+                     _esc(_REQUISITO_TEXTO.get((c or {}).get("requisito"), "")))
             .replace("{{LOGO_URL}}", logo)
             .replace("{{BRIDGE_CSS}}", css)
             .replace("{{BRIDGE_B64}}", _bridge_bootstrap(tokens, webhook_url, pixel_id, aberto)))
@@ -1078,21 +1213,100 @@ def processar(dados, est, g, ads, ing, ont=None):
         return {"ok": False, "motivo": r.get("motivo", "ingestão falhou")}
     contexto = {k: dados.get(k) for k in ("fbp", "fbc", "ip", "ua", "url") if dados.get(k)}
     # Curso SEM turma aberta: o lead entrou na LISTA DE ESPERA, não num checkout.
-    # Registrar 'inicio_inscricao' aqui seria errado em cadeia — jogaria o lead na
-    # aba Verificação pedindo pro operador conferir na Extecamp uma inscrição que
-    # não existe, e o poria na régua de recuperação de checkout abandonado.
+    # Registrar checkout aqui seria errado em cadeia — jogaria o lead na aba
+    # Verificação pedindo pro operador conferir na Extecamp uma inscrição que não
+    # existe, e o poria na régua de recuperação de inscrição abandonada.
     try:
         aberto = bool(ont.captavel(curso).get("captavel")) if ont else True
     except Exception:
         aberto = True
-    funil.registrar(g, ads, est, r["card_id"],
-                    "inicio_inscricao" if aberto else "lista_espera",
-                    curso=curso, event_id=eid, contexto=contexto)
+    if aberto:
+        # ETAPA 1 concluída. Evento SEM CAPI e sem Pixel: quem só deixou o telefone
+        # ainda não é conversão (spec 17 §7) — o InitiateCheckout sai na etapa 2.
+        # Gravado direto com add_evento, fora de EVENTO_CAPI, do mesmo jeito que
+        # verificacao_negativa e recuperacao_enviada: mantém intocado o caminho de
+        # atribuição, que é onde errar custa dinheiro.
+        g.add_evento(r["card_id"], curso, "etapa1")
+        if est:
+            est.log_acao("ponte", f"etapa 1 concluída ({curso}) — aguardando ficha completa",
+                         r["card_id"])
+    else:
+        funil.registrar(g, ads, est, r["card_id"], "lista_espera",
+                        curso=curso, event_id=eid, contexto=contexto)
     if dados.get("sessao_id"):           # liga a telemetria da sessão ao lead (spec 17 §5)
         g.vincular_sessao(str(dados["sessao_id"])[:64], r["card_id"])
-    try:
-        c = ont.curso(curso) if ont else None
-    except Exception:
-        c = None
-    return {"ok": True, "card_id": r["card_id"], "event_id": eid,
-            "redirect": url_inscricao(alvo, c)}
+    # `aberto` diz à LP o que fazer: abrir a etapa 2 ou levar ao "voltamos em breve".
+    # Sem `redirect`: o lead não vai mais à Extecamp por aqui — quem transcreve lá é o
+    # agente comercial, com a ficha que a etapa 2 coletar.
+    return {"ok": True, "card_id": r["card_id"], "event_id": eid, "aberto": aberto}
+
+
+# Campos da ETAPA 2 — espelham o formulário oficial da Extecamp (PDFs de inscrição),
+# menos nome/e-mail/telefone, que já vieram na etapa 1 e não se repetem.
+# Lista branca: o que não está aqui é descartado, para o formulário público não virar
+# porta de gravação de campo arbitrário no banco.
+CAMPOS_ETAPA2 = (
+    # dados pessoais
+    "email_alt", "ddd_residencial", "telefone_residencial", "sexo", "genero",
+    "doc_tipo", "doc_numero", "doc_emissor", "cpf", "nascimento", "estado_civil",
+    "pais_nascimento", "estado_nascimento", "cidade_nascimento",
+    "necessidades", "deficiencia", "ajuda",
+    # endereço
+    "cep", "rua", "numero", "complemento", "bairro", "estado", "cidade", "pais",
+    # acadêmico
+    "escolaridade", "instituicao", "instituicao_cidade", "curso_concluido", "ano_conclusao",
+    # profissional
+    "situacao", "empresa", "empresa_estado", "cargo", "departamento",
+    "experiencia_anos", "superior",
+    # financeiro
+    "forma_pagamento", "comprovante_em",
+    # extras
+    "interesses", "como_soube", "como_soube_outro", "contato_pref",
+)
+OBRIGATORIOS_ETAPA2 = ("cpf", "nascimento", "escolaridade", "forma_pagamento")
+
+
+def processar_etapa2(dados, est, g, ads, ing, ont=None):
+    """Etapa 2 da LP: a ficha completa. É AQUI que a conversão conta (spec 17 §7).
+
+    Só neste ponto sai `inicio_inscricao` -> CAPI InitiateCheckout, com o event_id do
+    NAVEGADOR, para desduplicar contra o Pixel que dispara no mesmo submit.
+
+    O lead é reencontrado pelo TELEFONE (a mesma chave que a etapa 1 usou): nada de
+    card_id trafegando pelo navegador, que seria um id de registro nosso exposto num
+    formulário público e adulterável."""
+    tel = re.sub(r"\D", "", dados.get("telefone") or dados.get("whatsapp") or "")
+    curso = (dados.get("curso") or dados.get("curso_id") or "").strip().upper()
+    alvo = next((m for m in g.cursos() if m["curso"] == curso), None)
+    if not 10 <= len(tel) <= 13:
+        return {"ok": False, "motivo": "telefone inválido"}
+    if not alvo:
+        return {"ok": False, "motivo": f"curso desconhecido: {curso or '?'}"}
+    faltando = [c for c in OBRIGATORIOS_ETAPA2 if not (dados.get(c) or "").strip()]
+    if faltando:
+        return {"ok": False, "motivo": f"campos obrigatórios: {', '.join(faltando)}"}
+    eid = dados.get("event_id") or ""
+    if not _EVENT_ID_RE.match(eid):
+        eid = str(uuid.uuid4())
+    card_id = est.lead_por_telefone(tel) if est else None
+    if not card_id:
+        # Chegou na etapa 2 sem passar pela 1 (link direto, sessão perdida): cria o
+        # lead em vez de recusar — perder uma ficha completa por isso seria absurdo.
+        r = ing.ingest({"nome": (dados.get("nome") or "").strip()[:120], "telefone": tel,
+                        "curso": curso, "email": (dados.get("email") or "").strip(),
+                        "consentimento": "true", "fonte": "ponte-etapa2"})
+        if not r.get("ok"):
+            return {"ok": False, "motivo": r.get("motivo", "ingestão falhou")}
+        card_id = r["card_id"]
+    ficha = {c: (dados.get(c) or "").strip()[:500] for c in CAMPOS_ETAPA2 if dados.get(c)}
+    g.add_inscricao(card_id, curso, alvo.get("turma") or "",
+                    json.dumps(ficha, ensure_ascii=False))
+    contexto = {k: dados.get(k) for k in ("fbp", "fbc", "ip", "ua", "url") if dados.get(k)}
+    funil.registrar(g, ads, est, card_id, "inicio_inscricao",
+                    curso=curso, event_id=eid, contexto=contexto)
+    if est:
+        est.log_acao("ponte", f"ficha completa recebida ({curso}) — aguardando transcrição "
+                              f"na Extecamp", card_id)
+        est.add_alerta("inscricao", f"Ficha completa de {curso} pronta para transcrever na "
+                                    f"Extecamp (lead {card_id})")
+    return {"ok": True, "card_id": card_id, "event_id": eid}

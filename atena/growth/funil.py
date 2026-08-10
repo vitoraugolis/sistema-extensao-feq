@@ -21,9 +21,16 @@ EVENTO_CAPI = {"inicio_inscricao": "InitiateCheckout",
                "lista_espera": "Lead",
                "inscricao_confirmada": "CompleteRegistration",
                "matricula_confirmada": "Purchase"}   # offline, com valor real (spec 16)
-RECUPERAR_APOS_H = {"inicio_inscricao": 2,   # ponte: 2h sem converter -> "posso ajudar?" (spec 17 §7)
+RECUPERAR_APOS_H = {"etapa1": 2,             # parou na etapa 1 da LP: 2h -> "posso ajudar?" (spec 17 §7)
+                    "inicio_inscricao": 2,   # concluiu a etapa 2 e não converteu
                     "boleto_gerado": 24}     # boleto: prazo de compensação é maior
 MAX_POR_PASSADA = 25      # mesmo teto anti-blast da nutrição
+# Piso de idade: pendente mais velho que isto não recebe toque. MAX_POR_PASSADA limita
+# por PASSADA, não no total — sem este teto, ligar a régua no agendador faria os
+# pendentes acumulados (140 em produção, alguns de meses atrás) virarem uma rajada de
+# centenas de templates. "Você abandonou a inscrição" três semanas depois é ruído.
+# ponytail: teto fixo de 7 dias; se um dia precisar variar por curso, vira config.
+IDADE_MAX_H = 24 * 7
 # Cadência de 5 toques (spec 17 §7): ajuda -> lembrete -> valor -> urgência -> última
 # chamada. (template aprovado, horas de espera desde o toque anterior). Texto livre
 # exigiria template novo aprovado na Meta (business-initiated fora da janela de 24h).
@@ -176,9 +183,10 @@ def _toque(g, est, ont, wa, p, agora):
 
 
 def recuperar(g, est, ont, wa, agora=None):
-    """Uma passada da régua de recuperação: checkout sem conversão -> template
-    aprovado (espera por tipo: ponte 2h, boleto 24h). Lead que RESPONDEU depois
-    do checkout sai da régua (a conversa é do cérebro). Máx. 5 toques."""
+    """Uma passada da régua de recuperação: inscrição iniciada e não concluída ->
+    template aprovado. Espera por tipo (etapa1 2h, inicio_inscricao 2h, boleto 24h) e
+    piso de idade (IDADE_MAX_H). Lead que RESPONDEU depois do checkout sai da régua
+    (a conversa é do cérebro). Máx. 5 toques."""
     agora = agora or datetime.datetime.now()
     enviados = []
     for p in g.checkouts_pendentes():
@@ -188,6 +196,12 @@ def recuperar(g, est, ont, wa, agora=None):
         h = _horas(p["ultimo_checkout"], agora)
         espera = RECUPERAR_APOS_H.get(p.get("tipo_checkout"), 24)
         if h is None or h < espera or p["toques"] >= MAX_TOQUES:
+            continue
+        # Piso de idade só vale para quem NUNCA foi tocado: é o backlog frio que não
+        # pode ser acordado de uma vez. Quem já está na cadência segue até o fim — os
+        # 5 toques levam ~10 dias, então aplicar o piso a eles cortaria o último toque
+        # de um lead que está progredindo normalmente (pego pelo teste da cadência).
+        if p["toques"] == 0 and h > IDADE_MAX_H:
             continue
         espera_toque = CADENCIA[p["toques"]][1]
         ht = _horas(p["ultimo_toque"], agora)

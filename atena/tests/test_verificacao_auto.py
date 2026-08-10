@@ -122,38 +122,42 @@ def test_payload_da_aba_traz_o_estado_da_chave():
     assert isinstance(v["elegiveis"], int)
 
 
-def test_modo_imediato_decide_no_webhook_da_lp():
-    """'Assim que o lead chega' de verdade: o gancho está no webhook da LP, não no
-    tick de 15 min. E a resposta ao navegador não pode esperar o envio — por isso a
-    decisão roda em thread (aqui só validamos o efeito)."""
-    import time
+def test_etapa1_nao_entra_na_fila_de_transcricao():
+    """A etapa 1 (só contato) NÃO é um checkout: o lead não chegou à Extecamp e não
+    há ficha para transcrever. Ele fica na régua de recuperação (2h) e fora da fila
+    de Verificação. Antes o webhook da LP decidia 'não inscreveu' na hora — isso saiu
+    quando a régua de 2h passou a rodar de verdade no agendador."""
     c = _cliente()
     c.post("/api/config", json={"verif_auto": True, "verif_auto_horas": 0})
-    r = c.post("/webhook/ponte", json={"nome": "Imediato Um", "whatsapp": "19997770001",
-                                       "curso": "FEQ-0480", "event_id": "ev-imediato-1"})
+    r = c.post("/webhook/ponte", json={"nome": "Etapa Um", "whatsapp": "19997770001",
+                                       "curso": "FEQ-0480", "event_id": "ev-etapa1-1"})
     assert r.status_code == 200
     cid = r.get_json()["card_id"]
-    for _ in range(20):                      # espera a thread concluir
-        if cid not in {p["card_id"] for p in A.GRW.verificacoes_pendentes()}:
-            break
-        time.sleep(0.1)
     tipos = [x[0] for x in A.GRW.conn.execute(
         "SELECT tipo FROM eventos_funil WHERE card_id=?", (cid,))]
-    assert "inicio_inscricao" in tipos and "verificacao_negativa" in tipos
-    assert "recuperacao_enviada" in tipos                    # recebeu o toque
-    # o toque é a ABERTURA com link, não uma cobrança de "você não terminou"
-    msgs = [h["texto"] for h in A.EST.historico(cid) if h["papel"] == "agente"]
-    assert any("feq_lead" in m for m in msgs), msgs
+    assert tipos == ["etapa1"], tipos                       # sem checkout, sem CAPI
+    assert cid not in {p["card_id"] for p in A.GRW.verificacoes_pendentes()}
+    assert cid in {p["card_id"] for p in A.GRW.checkouts_pendentes()}   # está na régua
 
 
-def test_imediato_desligado_nao_mexe_no_webhook():
-    """Com a chave desligada o webhook da LP não pode decidir nada sozinho."""
+def test_etapa2_coloca_na_fila_de_transcricao():
+    """Concluída a etapa 2, a ficha existe e o agente precisa transcrevê-la na
+    Extecamp — é aí que o lead aparece na Verificação."""
     c = _cliente()
-    c.post("/api/config", json={"verif_auto": False})
-    r = c.post("/webhook/ponte", json={"nome": "Sem Auto", "whatsapp": "19997770002",
-                                       "curso": "FEQ-0480", "event_id": "ev-sem-auto"})
+    r = c.post("/webhook/ponte", json={"nome": "Etapa Dois", "whatsapp": "19997770002",
+                                       "curso": "FEQ-0480", "event_id": "ev-etapa2-1"})
     cid = r.get_json()["card_id"]
-    assert cid in {p["card_id"] for p in A.GRW.verificacoes_pendentes()}   # continua na fila
+    assert cid not in {p["card_id"] for p in A.GRW.verificacoes_pendentes()}
+    r2 = c.post("/webhook/inscricao", json={
+        "whatsapp": "19997770002", "curso_id": "FEQ-0480", "event_id": "ev-etapa2-1",
+        "cpf": "123.456.789-00", "nascimento": "1990-01-01",
+        "escolaridade": "Superior Completo", "forma_pagamento": "19 PARCELA(S)"})
+    assert r2.status_code == 200, r2.get_json()
+    tipos = [x[0] for x in A.GRW.conn.execute(
+        "SELECT tipo FROM eventos_funil WHERE card_id=?", (cid,))]
+    assert "inicio_inscricao" in tipos
+    assert cid in {p["card_id"] for p in A.GRW.verificacoes_pendentes()}
+    assert A.GRW.get_inscricao(cid)["status"] == "recebida"
 
 
 def test_decisao_automatica_fica_auditada():
