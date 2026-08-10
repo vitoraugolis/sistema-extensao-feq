@@ -50,7 +50,26 @@ CREATE TABLE IF NOT EXISTS midias(media_id TEXT PRIMARY KEY, mime TEXT, criado T
 -- que o operador restaure. Ver Gestão de LPs.
 CREATE TABLE IF NOT EXISTS lp_html(
   curso TEXT PRIMARY KEY, html TEXT, atualizado TEXT, autor TEXT);
+-- Funil COMERCIAL DE PROFESSORES (prospecção de docentes para novos cursos).
+-- Nada a ver com `leads`: aqui não há ingestão automática, webhook, Revisor nem
+-- agente — é cadastro manual do próprio operador. Tabela separada de propósito;
+-- misturar com leads faria toda regra de captação/LGPD/nutrição valer para
+-- professores, que não são leads de curso.
+CREATE TABLE IF NOT EXISTS professores(
+  id INTEGER PRIMARY KEY AUTOINCREMENT, nome TEXT, telefone TEXT, email TEXT,
+  instituto TEXT, cursos TEXT, anotacoes TEXT, ultimo_contato TEXT,
+  proposta TEXT, servicos TEXT, fase TEXT DEFAULT 'Lead',
+  criado TEXT, atualizado TEXT);
+-- Acesso a módulo restrito, concedido nominalmente pelo usuário master.
+-- NÃO é papel: ser supervisor não dá acesso — só a concessão explícita dá.
+CREATE TABLE IF NOT EXISTS modulo_acesso(
+  usuario TEXT, modulo TEXT, concedido_por TEXT, criado TEXT,
+  PRIMARY KEY(usuario, modulo));
 """
+
+# Fases do funil comercial de professores (ordem = ordem das colunas no quadro).
+FASES_PROFESSOR = ["Lead", "Aquecimento", "Proposta enviada", "Em negociação",
+                   "Aceito", "Recusado", "Revisitar", "Inviável"]
 
 FASES = ["Lead", "Prospect", "Inscrito", "Matriculado", "Em espera", "Perdido"]
 
@@ -267,6 +286,82 @@ class Estado:
         with self._lock:
             self.conn.execute("UPDATE usuarios SET ativo=? WHERE usuario=?", (int(ativo), usuario))
             self.conn.commit()
+
+    # ------------------------------------------------- acesso a módulo restrito
+    def tem_acesso_modulo(self, usuario, modulo):
+        with self._lock:
+            r = self.conn.execute("SELECT 1 FROM modulo_acesso WHERE usuario=? AND modulo=?",
+                                  (usuario, modulo)).fetchone()
+        return r is not None
+
+    def conceder_modulo(self, usuario, modulo, por):
+        with self._lock:
+            self.conn.execute(
+                "INSERT OR REPLACE INTO modulo_acesso(usuario,modulo,concedido_por,criado)"
+                " VALUES(?,?,?,?)", (usuario, modulo, por, _agora()))
+            self.conn.commit()
+
+    def revogar_modulo(self, usuario, modulo):
+        with self._lock:
+            n = self.conn.execute("DELETE FROM modulo_acesso WHERE usuario=? AND modulo=?",
+                                  (usuario, modulo)).rowcount
+            self.conn.commit()
+        return n > 0
+
+    def listar_acesso_modulo(self, modulo):
+        with self._lock:
+            rows = self.conn.execute(
+                "SELECT usuario, concedido_por, criado FROM modulo_acesso WHERE modulo=?"
+                " ORDER BY criado", (modulo,)).fetchall()
+        return [dict(r) for r in rows]
+
+    # ------------------------------------- funil comercial de professores (CRUD)
+    _CAMPOS_PROF = ("nome", "telefone", "email", "instituto", "cursos", "anotacoes",
+                    "ultimo_contato", "proposta", "servicos", "fase")
+
+    def listar_professores(self):
+        with self._lock:
+            rows = self.conn.execute(
+                "SELECT * FROM professores ORDER BY atualizado DESC").fetchall()
+        return [dict(r) for r in rows]
+
+    def get_professor(self, pid):
+        with self._lock:
+            r = self.conn.execute("SELECT * FROM professores WHERE id=?", (pid,)).fetchone()
+        return dict(r) if r else None
+
+    def add_professor(self, **campos):
+        campos = {k: v for k, v in campos.items() if k in self._CAMPOS_PROF}
+        if campos.get("telefone"):
+            campos["telefone"] = normalizar_e164(campos["telefone"])
+        campos.setdefault("fase", FASES_PROFESSOR[0])
+        campos["criado"] = campos["atualizado"] = _agora()
+        with self._lock:
+            cur = self.conn.execute(
+                f"INSERT INTO professores({','.join(campos)}) "
+                f"VALUES({','.join('?' * len(campos))})", list(campos.values()))
+            self.conn.commit()
+        return cur.lastrowid
+
+    def set_professor(self, pid, **campos):
+        campos = {k: v for k, v in campos.items() if k in self._CAMPOS_PROF}
+        if not campos:
+            return False
+        if campos.get("telefone"):
+            campos["telefone"] = normalizar_e164(campos["telefone"])
+        campos["atualizado"] = _agora()
+        with self._lock:
+            n = self.conn.execute(
+                f"UPDATE professores SET {','.join(k + '=?' for k in campos)} WHERE id=?",
+                list(campos.values()) + [pid]).rowcount
+            self.conn.commit()
+        return n > 0
+
+    def del_professor(self, pid):
+        with self._lock:
+            n = self.conn.execute("DELETE FROM professores WHERE id=?", (pid,)).rowcount
+            self.conn.commit()
+        return n > 0
 
     # ---------------------------------------------------------------- config
     def get_config(self, chave, default=None):

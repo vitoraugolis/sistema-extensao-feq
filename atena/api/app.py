@@ -35,7 +35,7 @@ _load_env()  # antes dos imports que leem env no import (auth lê ATENA_USERS)
 from flask import Flask, jsonify, request, send_from_directory, session
 
 from atena.revisor.ontologico import revisar
-from atena.core.estado import Estado
+from atena.core.estado import Estado, FASES_PROFESSOR
 from atena.core.orquestrador import Orquestrador
 from atena.core import guardrails as G
 from atena.core import auth
@@ -671,6 +671,85 @@ def conversa_enviar_contato(card_id):
                          status="enviado", autor=f"humano:{session.get('usuario','humano')}")
         EST.log_acao(session.get("usuario", "humano"), f"compartilhou contato {chave}", card_id)
     return jsonify(r)
+
+
+# ============================ Funil comercial de professores (módulo restrito) ===
+# O acesso é barrado no guard de auth.py (MODULOS_RESTRITOS), não aqui — rota nova
+# sob /api/professores já nasce protegida.
+
+@app.route("/api/professores")
+def professores_listar():
+    profs = EST.listar_professores()
+    colunas = [{"fase": f, "professores": [p for p in profs if (p["fase"] or "Lead") == f]}
+               for f in FASES_PROFESSOR]
+    return jsonify({"colunas": colunas, "fases": FASES_PROFESSOR,
+                    "cursos": ONTO.ont.cursos(), "total": len(profs)})
+
+
+@app.route("/api/professores", methods=["POST"])
+def professores_criar():
+    b = request.get_json(silent=True) or {}
+    if not (b.get("nome") or "").strip():
+        return jsonify({"erro": "nome é obrigatório"}), 400
+    if b.get("fase") and b["fase"] not in FASES_PROFESSOR:
+        return jsonify({"erro": "fase inválida"}), 400
+    pid = EST.add_professor(**b)
+    EST.log_acao(session.get("usuario", "?"), f"professor criado: {b['nome']}")
+    return jsonify({"ok": True, "id": pid})
+
+
+@app.route("/api/professores/<int:pid>", methods=["POST"])
+def professores_editar(pid):
+    if not EST.get_professor(pid):
+        return jsonify({"erro": "professor inexistente"}), 404
+    b = request.get_json(silent=True) or {}
+    if b.get("fase") and b["fase"] not in FASES_PROFESSOR:
+        return jsonify({"erro": "fase inválida"}), 400
+    EST.set_professor(pid, **b)
+    return jsonify({"ok": True, "professor": EST.get_professor(pid)})
+
+
+@app.route("/api/professores/<int:pid>/excluir", methods=["POST"])
+def professores_excluir(pid):
+    p = EST.get_professor(pid)
+    if not p:
+        return jsonify({"erro": "professor inexistente"}), 404
+    EST.del_professor(pid)
+    EST.log_acao(session.get("usuario", "?"), f"professor excluído: {p['nome']}")
+    return jsonify({"ok": True})
+
+
+@app.route("/api/modulo-acesso")
+def modulo_acesso_listar():
+    """Quem tem acesso ao módulo. Só o master gerencia — os demais nem veem a tela."""
+    if not auth.eh_master(session.get("usuario")):
+        return jsonify({"erro": "só o usuário master gerencia acessos"}), 403
+    concedidos = EST.listar_acesso_modulo("professores")
+    com_acesso = {c["usuario"] for c in concedidos}
+    disponiveis = [u["usuario"] for u in EST.listar_usuarios()
+                   if u["ativo"] and u["usuario"] not in com_acesso
+                   and not auth.eh_master(u["usuario"])]
+    return jsonify({"master": auth.master(), "concedidos": concedidos,
+                    "disponiveis": disponiveis})
+
+
+@app.route("/api/modulo-acesso", methods=["POST"])
+def modulo_acesso_conceder():
+    if not auth.eh_master(session.get("usuario")):
+        return jsonify({"erro": "só o usuário master gerencia acessos"}), 403
+    b = request.get_json(silent=True) or {}
+    usuario, revogar = (b.get("usuario") or "").strip(), bool(b.get("revogar"))
+    if not usuario:
+        return jsonify({"erro": "usuário obrigatório"}), 400
+    if revogar:
+        EST.revogar_modulo(usuario, "professores")
+    else:
+        if not EST.get_usuario(usuario):
+            return jsonify({"erro": "usuário não existe"}), 404
+        EST.conceder_modulo(usuario, "professores", session["usuario"])
+    EST.log_acao(session["usuario"],
+                 f"{'revogou' if revogar else 'concedeu'} acesso ao funil de professores: {usuario}")
+    return jsonify({"ok": True})
 
 
 @app.route("/api/conversas/transcrever/<int:conversa_id>", methods=["POST"])

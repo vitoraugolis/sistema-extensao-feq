@@ -90,6 +90,28 @@ body{margin:0;min-height:100vh;color:var(--ink);
  padding:4px 9px;font:inherit;font-size:12px;cursor:pointer;display:inline-flex;
  align-items:center;gap:5px;color:inherit;opacity:.75;}
 .leitura-auto-acao button:hover{opacity:1;background:rgba(0,0,0,.04);}
+/* ---- Funil de professores: ficha em modal + cards do quadro ---- */
+.pf-modal{position:fixed;inset:0;z-index:70;background:rgba(0,0,0,.45);
+ display:flex;align-items:flex-start;justify-content:center;padding:26px 16px;overflow-y:auto;}
+/* .hidden é declarada lá em cima (linha ~53) e tem a MESMA especificidade que
+   .pf-modal — a regra posterior venceria e o modal nasceria aberto. Reafirmar
+   aqui resolve sem recorrer a !important. */
+.pf-modal.hidden{display:none;}
+.pf-card-modal{background:var(--paper);width:min(720px,100%);padding:20px 22px;}
+.pf-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:14px;}
+.pf-grid label{display:flex;flex-direction:column;gap:4px;font-size:12.5px;font-weight:700;}
+.pf-grid .pf-largo{grid-column:1/-1;}
+.pf-grid input,.pf-grid select,.pf-grid textarea{font:inherit;font-size:13.5px;font-weight:400;}
+.pf-grid textarea{resize:vertical;}
+@media(max-width:620px){.pf-grid{grid-template-columns:1fr;}}
+.pf-wa{display:inline-flex;align-items:center;gap:4px;font-size:10.5px;font-weight:700;
+ color:#0b7a3b;text-decoration:none;margin-top:6px;border:1.5px solid var(--b);
+ border-radius:6px;padding:2px 7px;background:#eafaf0;}
+.pf-wa:hover{background:#d6f5e2;}
+.pf-linha{font-size:10.5px;color:#5b5b5b;margin-top:3px;display:flex;align-items:center;gap:4px;}
+.pf-linha i{font-size:12px;flex-shrink:0;}
+.pf-acesso-item{display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1.5px solid var(--b);}
+.pf-acesso-item:last-child{border-bottom:none;}
 .emoji-grid{display:grid;grid-template-columns:repeat(9,1fr);gap:2px;max-width:280px;}
 .emoji-grid button{border:0;background:none;font-size:19px;cursor:pointer;padding:5px;border-radius:6px;}
 .emoji-grid button:hover{background:var(--paper);}
@@ -288,6 +310,10 @@ input:focus,select:focus,textarea:focus{outline:none;box-shadow:3px 3px 0 var(--
       <button class="navi" data-sec="lps"><i class="ti ti-browser"></i> LPs</button>
       <button class="navi" data-sec="templates"><i class="ti ti-mail-cog"></i> Templates</button>
       <button class="navi" data-sec="revisor"><i class="ti ti-eye-search"></i> Revisor ao vivo</button>
+      <!-- Módulo restrito: nasce OCULTO e só aparece se /api/me disser que este
+           usuário tem acesso. Esconder é conveniência — quem barra é o guard do
+           servidor, então forjar o menu não abre a porta. -->
+      <button class="navi hidden" id="naviProfessores" data-sec="professores"><i class="ti ti-user-search"></i> Professores</button>
       <button class="navi" data-sec="config"><i class="ti ti-settings"></i> Configurações</button>
     </nav>
 
@@ -527,7 +553,65 @@ input:focus,select:focus,textarea:focus{outline:none;box-shadow:3px 3px 0 var(--
           <div id="usrOut" style="margin-top:10px;"></div>
         </div>
       </section>
+
+      <!-- ====================== Funil comercial de professores (restrito) ====== -->
+      <section id="professores" class="hidden">
+        <div class="g sec">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
+            <div>
+              <h2 style="margin:0;"><i class="ti ti-user-search"></i> Funil de professores</h2>
+              <p class="muted" style="margin:4px 0 0;">Prospecção de docentes para novos cursos. Cadastro manual — arraste o card para mudar de fase.</p>
+            </div>
+            <div style="display:flex;gap:8px;align-items:center;">
+              <input id="pfBusca" placeholder="Buscar nome, instituto ou curso…" oninput="renderProfessores()" style="min-width:210px;">
+              <button class="btn btn-p" onclick="pfAbrirForm()"><i class="ti ti-plus"></i> Novo professor</button>
+            </div>
+          </div>
+          <div class="kb-board" id="pfBoard" data-board="professores" style="margin-top:14px;"></div>
+        </div>
+
+        <!-- Gestão de acesso: só o master enxerga este bloco -->
+        <div class="g sec hidden" id="pfAcesso" style="margin-top:14px;">
+          <h2 style="margin:0 0 4px;"><i class="ti ti-lock-access"></i> Quem pode ver este módulo</h2>
+          <p class="muted" style="margin:0 0 12px;">Acesso não vem do papel: mesmo um supervisor só entra se você liberar aqui.</p>
+          <div id="pfAcessoLista"></div>
+          <div style="display:flex;gap:8px;margin-top:12px;align-items:center;flex-wrap:wrap;">
+            <select id="pfAcessoUsuario"></select>
+            <button class="btn btn-g" onclick="pfConceder()"><i class="ti ti-user-plus"></i> Liberar acesso</button>
+          </div>
+        </div>
+      </section>
     </main>
+
+    <!-- Ficha do professor (criar/editar) -->
+    <div id="pfModal" class="pf-modal hidden">
+      <div class="pf-card-modal g">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <h2 style="margin:0;" id="pfTitulo">Novo professor</h2>
+          <button class="conv-tpl-x" onclick="pfFechar()" title="Fechar">✕</button>
+        </div>
+        <div class="pf-grid">
+          <label>Nome<input id="pfNome" placeholder="Nome completo"></label>
+          <label>Telefone<input id="pfTelefone" placeholder="(19) 99999-0000"></label>
+          <label>E-mail<input id="pfEmail" placeholder="nome@instituicao.br"></label>
+          <label>Instituto<input id="pfInstituto" placeholder="FEQ, IQ, Poli-USP…"></label>
+          <label>Último contato<input id="pfUltimo" type="date"></label>
+          <label>Fase<select id="pfFase"></select></label>
+          <label class="pf-largo">Cursos <span class="muted" style="font-weight:400;">(segure Cmd/Ctrl para escolher mais de um)</span>
+            <select id="pfCursos" multiple size="4"></select></label>
+          <label class="pf-largo">Serviços oferecidos<input id="pfServicos" placeholder="Aula ao vivo, videoaula gravada, mentoria…"></label>
+          <label class="pf-largo">Proposta realizada<input id="pfProposta" placeholder="Valor//condições já apresentados"></label>
+          <label class="pf-largo">Anotações<textarea id="pfAnotacoes" rows="4" placeholder="Histórico da conversa, quem indicou, restrições de agenda…"></textarea></label>
+        </div>
+        <div style="display:flex;justify-content:space-between;gap:10px;margin-top:14px;flex-wrap:wrap;">
+          <button class="btn btn-g" id="pfExcluir" onclick="pfExcluir()"><i class="ti ti-trash"></i> Excluir</button>
+          <div style="display:flex;gap:8px;margin-left:auto;">
+            <button class="btn btn-g" onclick="pfFechar()">Cancelar</button>
+            <button class="btn btn-p" onclick="pfSalvar()"><i class="ti ti-check"></i> Salvar</button>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -543,6 +627,7 @@ document.querySelectorAll('.navi').forEach(b=>b.onclick=()=>{
   document.querySelectorAll('main section').forEach(s=>s.classList.add('hidden'));
   $('#'+b.dataset.sec).classList.remove('hidden');
   if(b.dataset.sec==='kanban') renderKanban();
+  if(b.dataset.sec==='professores') renderProfessores();
   if(b.dataset.sec==='templates') tplCarregar();
   if(b.dataset.sec==='lps') lpCarregar();
   if(b.dataset.sec==='medicao') mdCarregar();
@@ -1049,6 +1134,7 @@ async function renderKanban(){
     || (qNum && _digitos(c.telefone).includes(qNum));
   const passa = c => (!filtro || (c.cursos||[c.curso]).includes(filtro)) && casa(c);
   const board = $('#kbBoard');
+  board.dataset.board = 'leads';
   board.innerHTML = d.colunas.map(col=>{
     const leads = col.leads.filter(passa);
     return `<div class="kb-col" data-fase="${escapeHtml(col.fase)}">
@@ -1112,24 +1198,49 @@ function kbRealce(col){
   document.querySelectorAll('.kb-col.alvo').forEach(c=>{ if(c!==col) c.classList.remove('alvo'); });
   if(col) col.classList.add('alvo');
 }
+// O arraste atende DOIS quadros (leads e professores). Os listeners são globais e
+// pegam qualquer .kb-card do documento, então quem manda é o data-board do quadro:
+// sem isso o kanban de leads sequestraria os cards de professor e chamaria a API
+// errada. Generalizar aqui é melhor que duplicar o arraste inteiro.
+let KB_PEND = null;             // pointerdown registrado — ainda não se sabe se é clique
+let KB_CLIQUE_MORTO = false;    // houve arraste: o clique seguinte não deve abrir nada
+const KB_LIMIAR = 5;            // px até considerar que virou arraste
+
+function kbQuadroDe(card){
+  const b = card.closest('.kb-board');
+  return (b && b.dataset.board) || 'leads';
+}
 function kbInicio(ev){
-  if(!KB_MOVER || KB_ARRASTE) return;
+  if(KB_ARRASTE || KB_PEND) return;
   if(ev.pointerType === 'mouse' && ev.button !== 0) return;
   const card = ev.target.closest && ev.target.closest('.kb-card');
   if(!card || !card.dataset.id) return;
+  if(ev.target.closest('a, button')) return;   // link de WhatsApp/ações não arrastam
+  const quadro = kbQuadroDe(card);
+  // leads: exige a chave "modo mover" (clicar abre a conversa).
+  // professores: arrasta direto — o clique só vale se o ponteiro não andou além do
+  // limiar, então abrir o cadastro e mover o card convivem sem precisar de chave.
+  if(quadro === 'leads' && !KB_MOVER) return;
+  KB_PEND = {card, quadro, x0: ev.clientX, y0: ev.clientY, pointerId: ev.pointerId};
+}
+function kbMaterializar(ev){
+  const {card, quadro, pointerId} = KB_PEND;
   const r = card.getBoundingClientRect();
   const fantasma = card.cloneNode(true);
   fantasma.className = 'kb-card kb-fantasma';
   fantasma.style.left = r.left + 'px'; fantasma.style.top = r.top + 'px';
   document.body.appendChild(fantasma);
   card.classList.add('arrastando');
-  KB_ARRASTE = {id: card.dataset.id, card, fantasma,
+  KB_ARRASTE = {id: card.dataset.id, quadro, card, fantasma,
                 origem: card.closest('.kb-col'),
-                dx: ev.clientX - r.left, dy: ev.clientY - r.top};
-  card.setPointerCapture(ev.pointerId);
-  ev.preventDefault();
+                dx: KB_PEND.x0 - r.left, dy: KB_PEND.y0 - r.top};
+  try{ card.setPointerCapture(pointerId); }catch(e){}
 }
 function kbMove(ev){
+  if(KB_PEND && !KB_ARRASTE){
+    if(Math.abs(ev.clientX - KB_PEND.x0) + Math.abs(ev.clientY - KB_PEND.y0) < KB_LIMIAR) return;
+    kbMaterializar(ev);
+  }
   if(!KB_ARRASTE) return;
   KB_ARRASTE.fantasma.style.left = (ev.clientX - KB_ARRASTE.dx) + 'px';
   KB_ARRASTE.fantasma.style.top  = (ev.clientY - KB_ARRASTE.dy) + 'px';
@@ -1140,15 +1251,26 @@ function kbMove(ev){
   ev.preventDefault();
 }
 async function kbFim(ev){
+  KB_PEND = null;
   if(!KB_ARRASTE) return;
-  const {card, fantasma, origem, id} = KB_ARRASTE;
+  const {card, fantasma, origem, id, quadro} = KB_ARRASTE;
   fantasma.style.display = 'none';
   const col = kbColunaEm(ev.clientX, ev.clientY);
   fantasma.remove(); card.classList.remove('arrastando');
   kbRealce(null);
   KB_ARRASTE = null;                                  // libera o polling
+  // houve arraste de verdade: mata o clique que o navegador dispara em seguida,
+  // senão soltar o card abriria o cadastro do professor por cima do quadro
+  KB_CLIQUE_MORTO = true;
+  setTimeout(()=>{ KB_CLIQUE_MORTO = false; }, 0);
   const fase = col && col.dataset ? col.dataset.fase : null;
   if(!fase || col === origem) return;                 // soltou fora ou na mesma coluna
+  if(quadro === 'professores'){
+    await api('/api/professores/'+id, {method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({fase})});
+    renderProfessores();
+    return;
+  }
   await moverFase(id, fase);
   renderKanban();
 }
@@ -1264,6 +1386,115 @@ function bolhaConteudo(t){
   }
   return t.texto ? escapeHtml(t.texto) : '<i class="muted">(sem conteúdo)</i>';
 }
+// ==================== Funil comercial de professores (módulo restrito) ==========
+// Cadastro 100% manual: não há ingestão, webhook, Revisor nem agente aqui. O contato
+// sai pelo WhatsApp PESSOAL do operador (link wa.me), não pela API do WABA — por isso
+// nada nesta tela passa pelos guardrails de envio automático.
+let PF_DADOS = {colunas: [], fases: [], cursos: []};
+let PF_EDITANDO = null;
+
+async function renderProfessores(){
+  if(KB_ARRASTE) return;                     // não recria o quadro no meio de um arraste
+  const d = await api('/api/professores');
+  if(d.erro){ return; }
+  PF_DADOS = d;
+  const q = _busca(($('#pfBusca')||{}).value);
+  const casa = p => !q || _busca(p.nome).includes(q) || _busca(p.instituto||'').includes(q)
+                 || _busca(p.cursos||'').includes(q);
+  $('#pfBoard').innerHTML = d.colunas.map(col=>{
+    const lista = col.professores.filter(casa);
+    return `<div class="kb-col" data-fase="${escapeHtml(col.fase)}">
+      <div class="kb-col-h"><span>${escapeHtml(col.fase)}</span><span class="kb-count">${lista.length}</span></div>
+      ${lista.map(pfCard).join('') || '<div class="kb-empty">—</div>'}
+    </div>`;}).join('');
+}
+
+function pfCard(p){
+  const cursos = (p.cursos||'').split(',').filter(Boolean);
+  const wa = p.telefone
+    ? `<a class="pf-wa" href="https://wa.me/${encodeURIComponent(p.telefone)}" target="_blank" rel="noopener" onclick="event.stopPropagation();"><i class="ti ti-brand-whatsapp"></i> Conversar</a>`
+    : '';
+  return `<div class="kb-card" data-id="${p.id}" onclick="pfAbrirForm(${p.id})">
+    <div class="kb-nome">${escapeHtml(p.nome||'(sem nome)')}</div>
+    ${p.instituto?`<div class="pf-linha"><i class="ti ti-building-bank"></i>${escapeHtml(p.instituto)}</div>`:''}
+    ${cursos.length?`<div class="kb-badges">${cursos.map(c=>`<span class="chip t-acc" style="margin:0;padding:1px 6px;">${escapeHtml(c)}</span>`).join('')}</div>`:''}
+    ${p.ultimo_contato?`<div class="pf-linha"><i class="ti ti-calendar-event"></i>último contato ${escapeHtml(dataBr(p.ultimo_contato))}</div>`:''}
+    ${wa}
+  </div>`;
+}
+function dataBr(iso){ const p=(iso||'').split('-'); return p.length===3?`${p[2]}/${p[1]}/${p[0]}`:(iso||''); }
+
+function pfAbrirForm(id){
+  if(KB_CLIQUE_MORTO) return;                // veio de um arraste, não de um clique
+  const p = id ? (PF_DADOS.colunas.flatMap(c=>c.professores).find(x=>x.id===id) || {}) : {};
+  PF_EDITANDO = id || null;
+  $('#pfTitulo').textContent = id ? 'Editar professor' : 'Novo professor';
+  $('#pfExcluir').style.display = id ? '' : 'none';
+  $('#pfFase').innerHTML = PF_DADOS.fases.map(f=>`<option${(p.fase||PF_DADOS.fases[0])===f?' selected':''}>${escapeHtml(f)}</option>`).join('');
+  const sel = (p.cursos||'').split(',').filter(Boolean);
+  $('#pfCursos').innerHTML = (PF_DADOS.cursos||[]).map(c=>`<option value="${escapeHtml(c)}"${sel.includes(c)?' selected':''}>${escapeHtml(c)}</option>`).join('');
+  $('#pfNome').value = p.nome||''; $('#pfTelefone').value = p.telefone||'';
+  $('#pfEmail').value = p.email||''; $('#pfInstituto').value = p.instituto||'';
+  $('#pfUltimo').value = p.ultimo_contato||''; $('#pfServicos').value = p.servicos||'';
+  $('#pfProposta').value = p.proposta||''; $('#pfAnotacoes').value = p.anotacoes||'';
+  $('#pfModal').classList.remove('hidden');
+  $('#pfNome').focus();
+}
+function pfFechar(){ $('#pfModal').classList.add('hidden'); PF_EDITANDO = null; }
+
+async function pfSalvar(){
+  const corpo = {
+    nome: $('#pfNome').value.trim(), telefone: $('#pfTelefone').value.trim(),
+    email: $('#pfEmail').value.trim(), instituto: $('#pfInstituto').value.trim(),
+    cursos: Array.from($('#pfCursos').selectedOptions).map(o=>o.value).join(','),
+    anotacoes: $('#pfAnotacoes').value.trim(), ultimo_contato: $('#pfUltimo').value,
+    proposta: $('#pfProposta').value.trim(), servicos: $('#pfServicos').value.trim(),
+    fase: $('#pfFase').value};
+  if(!corpo.nome){ alert('O nome é obrigatório.'); return; }
+  const rota = PF_EDITANDO ? '/api/professores/'+PF_EDITANDO : '/api/professores';
+  const r = await api(rota, {method:'POST', headers:{'Content-Type':'application/json'},
+                             body: JSON.stringify(corpo)});
+  if(r.erro){ alert(r.erro); return; }
+  pfFechar(); renderProfessores();
+}
+async function pfExcluir(){
+  if(!PF_EDITANDO || !confirm('Excluir este professor do funil?')) return;
+  await api('/api/professores/'+PF_EDITANDO+'/excluir', {method:'POST'});
+  pfFechar(); renderProfessores();
+}
+
+// ---- gestão de acesso (só o master) ----
+async function pfAcessoCarregar(){
+  const d = await api('/api/modulo-acesso');
+  if(d.erro) return;                          // não é master: o bloco fica oculto
+  $('#pfAcesso').classList.remove('hidden');
+  $('#pfAcessoLista').innerHTML =
+    `<div class="pf-acesso-item"><strong>${escapeHtml(d.master)}</strong>
+       <span class="chip t-ok" style="margin:0;">você · master</span></div>`
+    + (d.concedidos.map(c=>`<div class="pf-acesso-item">
+        <strong>${escapeHtml(c.usuario)}</strong>
+        <span class="muted" style="font-size:11.5px;">liberado por ${escapeHtml(c.concedido_por)}</span>
+        <button class="btn btn-g" style="margin-left:auto;padding:3px 9px;font-size:12px;"
+          onclick="pfRevogar('${escapeHtml(c.usuario)}')">Revogar</button></div>`).join('')
+       || '<p class="muted" style="margin:6px 0 0;">Ninguém além de você tem acesso.</p>');
+  $('#pfAcessoUsuario').innerHTML = d.disponiveis.length
+    ? d.disponiveis.map(u=>`<option>${escapeHtml(u)}</option>`).join('')
+    : '<option value="">— todos os usuários ativos já têm acesso —</option>';
+}
+async function pfConceder(){
+  const u = $('#pfAcessoUsuario').value;
+  if(!u) return;
+  await api('/api/modulo-acesso', {method:'POST', headers:{'Content-Type':'application/json'},
+                                   body: JSON.stringify({usuario: u})});
+  pfAcessoCarregar();
+}
+async function pfRevogar(u){
+  if(!confirm('Revogar o acesso de '+u+' ao funil de professores?')) return;
+  await api('/api/modulo-acesso', {method:'POST', headers:{'Content-Type':'application/json'},
+                                   body: JSON.stringify({usuario: u, revogar: true})});
+  pfAcessoCarregar();
+}
+
 const REACOES_RAPIDAS = ['👍','❤️','😂','😮','😢','🙏'];   // mesmo conjunto fixo do WhatsApp/Slack
 
 function toggleReacaoPicker(btn, cardId, wamid){
@@ -1744,6 +1975,13 @@ async function boot(){
   if(!me.usuario){ document.getElementById('login').style.display='flex'; return; }
   document.getElementById('login').style.display='none';
   PAPEL = me.papel||'';
+  // Módulos restritos: o menu só aparece para quem o servidor reconhece. Se um
+  // acesso for revogado, o item some no próximo login/refresh — e a rota já estava
+  // fechada de qualquer forma.
+  if((me.modulos||[]).includes('professores')){
+    $('#naviProfessores').classList.remove('hidden');
+    if(me.master) pfAcessoCarregar();
+  }
   const cfg=await api('/api/config'); AUTO=!!cfg.auto_aprovar; pintaAuto();
   CFGSRV = cfg; cfgRender(); usrListar();
   try{                                    // a chave do funil sobrevive ao recarregar

@@ -65,6 +65,7 @@ specs/                          # ESPECIFICAÇÕES (fonte da verdade)
   10-testes-criterios-aceitacao.md
   11-ontologia-anchoring.md · 12-orquestracao-estado.md · 13-injetor-evolucao-ontologia.md · 14-central-operacao-frontend.md
   15-growth-engine.md           # RevOps: pacing, Meta Ads/CAPI, recuperação de checkout
+  19-funil-professores.md       # módulo RESTRITO (master concede acesso): prospecção de docentes
   16-funil-conversoes-hub.md    # bridge page (dedup Pixel×CAPI), matrículas offline, ferramentas p/ agentes
   17-fluxo-consolidado-lp.md    # FLUXO DEFINITIVO: LP órfã no WP FEQ, telemetria de sessão, 5 toques, conversão offline via Central
 atena/                          # SISTEMA v2 (monólito modular) — ver atena/README.md
@@ -92,6 +93,8 @@ META_VERIFY_TOKEN=...           # handshake do webhook Meta
 META_APP_SECRET=...             # verifica X-Hub-Signature-256 dos webhooks (v2)
 ATENA_USERS=nome:senha:supervisor,...   # Central v2 (sem isto: operador/operador DEV)
 ATENA_SECRET=...                # chave de sessão da Central v2
+ATENA_MASTER=vitor              # dono dos módulos restritos (spec 19) — só ele concede acesso
+OPENAI_API_KEY=sk-...           # Whisper: transcrição dos áudios do lead (spec 09)
 PORT=8080                       # 8090 cérebro v1 · 8095 Central v2
 # Growth Engine (spec 15) — sem estes tokens, tudo roda em dry-run:
 META_ADS_TOKEN=... META_AD_ACCOUNT_ID=act_... META_PIXEL_ID=... META_CAPI_TOKEN=...

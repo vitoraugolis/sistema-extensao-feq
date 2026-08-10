@@ -22,6 +22,24 @@ LIVRE = {"/api/login", "/health"}
 SUPERVISOR_APROVA = ("/api/injetor",)   # POST .../aprovar exige supervisor
 _FALHAS = {}                            # ip -> [timestamps]  (rate limit de login)
 
+# Módulos restritos: prefixo de rota -> nome do módulo. Acesso NÃO vem de papel —
+# um supervisor sem concessão não entra (em produção há outros supervisores, e o
+# funil de professores é do master). Só o master concede e revoga, nominalmente.
+MODULOS_RESTRITOS = {"/api/professores": "professores", "/api/modulo-acesso": "professores"}
+
+
+def master():
+    """Usuário dono dos módulos restritos. Em env para não ficar cravado no código."""
+    return os.environ.get("ATENA_MASTER", "vitor")
+
+
+def eh_master(usuario):
+    return bool(usuario) and usuario == master()
+
+
+def pode_modulo(estado, usuario, modulo):
+    return eh_master(usuario) or estado.tem_acesso_modulo(usuario, modulo)
+
 
 # ------------------------------------------------------------------ senhas
 def hash_senha(senha, salt=None):
@@ -101,7 +119,13 @@ def init_app(app, estado):
 
     @app.get("/api/me")
     def me():
-        return jsonify({"usuario": session.get("usuario"), "papel": session.get("papel")})
+        u = session.get("usuario")
+        # `modulos` diz à Central quais itens de menu desenhar. É conveniência de UI:
+        # quem manda é o guard abaixo, que bloqueia a rota mesmo se alguém forjar o menu.
+        return jsonify({"usuario": u, "papel": session.get("papel"),
+                        "master": eh_master(u),
+                        "modulos": sorted({m for m in MODULOS_RESTRITOS.values()
+                                           if pode_modulo(estado, u, m)})})
 
     # -------------------------------------------------- gestão de usuários
     @app.get("/api/usuarios")
@@ -145,6 +169,11 @@ def init_app(app, estado):
             return None
         if not session.get("usuario"):
             return jsonify({"erro": "não autenticado"}), 401
+        # Módulo restrito: barra AQUI, não em cada rota. Uma rota nova sob o prefixo
+        # nasce protegida por padrão — esquecer o decorador não vira vazamento.
+        for prefixo, modulo in MODULOS_RESTRITOS.items():
+            if path.startswith(prefixo) and not pode_modulo(estado, session["usuario"], modulo):
+                return jsonify({"erro": "sem acesso a este módulo"}), 403
         if request.method == "POST" and any(path.startswith(p) and path.endswith("/aprovar") for p in SUPERVISOR_APROVA):
             if session.get("papel") != "supervisor":
                 return jsonify({"erro": "requer papel supervisor"}), 403
