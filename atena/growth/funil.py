@@ -25,10 +25,10 @@ RECUPERAR_APOS_H = {"etapa1": 2,             # parou na etapa 1 da LP: 2h -> "po
                     "inicio_inscricao": 2,   # concluiu a etapa 2 e não converteu
                     "boleto_gerado": 24}     # boleto: prazo de compensação é maior
 MAX_POR_PASSADA = 25      # mesmo teto anti-blast da nutrição
-# Piso de idade: pendente mais velho que isto não recebe toque. MAX_POR_PASSADA limita
-# por PASSADA, não no total — sem este teto, ligar a régua no agendador faria os
-# pendentes acumulados (140 em produção, alguns de meses atrás) virarem uma rajada de
-# centenas de templates. "Você abandonou a inscrição" três semanas depois é ruído.
+# Ociosidade máxima: cadência parada há mais que isto não é retomada. MAX_POR_PASSADA
+# limita por PASSADA, não no total — sem este corte, ligar a régua no agendador faria
+# os pendentes acumulados (140 em produção, muitos de semanas atrás) virarem uma
+# rajada de templates. "Você abandonou a inscrição" três semanas depois é ruído.
 # ponytail: teto fixo de 7 dias; se um dia precisar variar por curso, vira config.
 IDADE_MAX_H = 24 * 7
 # Cadência de 5 toques (spec 17 §7): ajuda -> lembrete -> valor -> urgência -> última
@@ -197,11 +197,17 @@ def recuperar(g, est, ont, wa, agora=None):
         espera = RECUPERAR_APOS_H.get(p.get("tipo_checkout"), 24)
         if h is None or h < espera or p["toques"] >= MAX_TOQUES:
             continue
-        # Piso de idade só vale para quem NUNCA foi tocado: é o backlog frio que não
-        # pode ser acordado de uma vez. Quem já está na cadência segue até o fim — os
-        # 5 toques levam ~10 dias, então aplicar o piso a eles cortaria o último toque
-        # de um lead que está progredindo normalmente (pego pelo teste da cadência).
-        if p["toques"] == 0 and h > IDADE_MAX_H:
+        # Cadência DORMENTE não é retomada. O corte é sobre a última atividade (último
+        # toque, ou o checkout se nunca houve toque), não sobre a idade do checkout:
+        #   • nunca tocado e checkout velho  -> backlog frio, não acordar
+        #   • tocado, mas parado há >7 dias  -> retomar agora é um toque do nada
+        #   • cadência ativa (intervalos de 1h a 96h) -> segue até o 5º toque
+        # Medir só a idade do checkout errava dos dois lados: truncava a cadência ativa
+        # (que leva ~10 dias) e deixava passar backlog que já tinha 1 toque antigo — o
+        # ensaio contra a base real mostrou 50 desses prestes a receber um "toque 2"
+        # 12 a 15 dias depois do primeiro.
+        ocioso = _horas(p["ultimo_toque"], agora) if p["ultimo_toque"] else h
+        if ocioso is not None and ocioso > IDADE_MAX_H:
             continue
         espera_toque = CADENCIA[p["toques"]][1]
         ht = _horas(p["ultimo_toque"], agora)
