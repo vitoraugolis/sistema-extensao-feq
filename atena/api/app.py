@@ -673,6 +673,31 @@ def conversa_enviar_contato(card_id):
     return jsonify(r)
 
 
+@app.route("/api/conversas/transcrever/<int:conversa_id>", methods=["POST"])
+def conversa_transcrever(conversa_id):
+    """Lê uma mídia sob demanda: áudio -> transcrição, imagem -> descrição.
+
+    A percepção já roda sozinha quando a mídia chega (whatsapp._perceber), mas isto
+    cobre os dois casos em que ela não existe: o áudio que chegou ANTES desta função
+    existir, e o que falhou na hora (API fora do ar, timeout). Só relê o que ainda não
+    foi lido — não gasta chamada de API à toa."""
+    conv = EST.get_conversa(conversa_id)
+    if not conv or not conv.get("media_id"):
+        return jsonify({"ok": False, "motivo": "mensagem sem mídia"}), 404
+    if conv.get("transcricao"):
+        return jsonify({"ok": True, "transcricao": conv["transcricao"], "cache": True})
+    mime = EST.midia_mime(conv["media_id"])
+    texto = WA._perceber(conv["tipo"], conv["media_id"], mime)
+    if not texto:
+        return jsonify({"ok": False,
+                        "motivo": "não foi possível ler esta mídia (formato não suportado, "
+                                  "arquivo indisponível ou chave de API ausente)"}), 422
+    EST.set_transcricao(conversa_id, texto)
+    EST.log_acao(session.get("usuario", "humano"), f"leitura automática de mídia ({conv['tipo']})",
+                 conv["card_id"])
+    return jsonify({"ok": True, "transcricao": texto})
+
+
 @app.route("/api/conversas/<card_id>/guia", methods=["POST"])
 def conversa_enviar_guia(card_id):
     """Operador manda o guia em PDF do curso do lead — mesmo material que o agente

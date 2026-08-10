@@ -78,6 +78,18 @@ body{margin:0;min-height:100vh;color:var(--ink);
  border:1.5px solid var(--b);border-radius:9px;padding:7px 10px;}
 .contato-card:not(:last-child){margin-bottom:6px;}
 .contato-card i{font-size:20px;}
+/* Leitura automática de mídia: fica DENTRO da bolha mas visualmente separada do que o
+   lead escreveu — quem lê precisa distinguir "o lead disse" de "a máquina entendeu". */
+.leitura-auto{margin-top:7px;padding:7px 9px;border-radius:8px;background:rgba(0,0,0,.05);
+ border-left:3px solid var(--acc);font-size:13px;line-height:1.45;font-style:italic;}
+.leitura-auto-rot{display:block;font-style:normal;font-weight:700;font-size:10px;
+ text-transform:uppercase;letter-spacing:.06em;opacity:.65;margin-bottom:3px;}
+.leitura-auto-rot i{font-size:12px;}
+.leitura-auto-acao{margin-top:6px;}
+.leitura-auto-acao button{border:1.5px solid var(--b);background:none;border-radius:7px;
+ padding:4px 9px;font:inherit;font-size:12px;cursor:pointer;display:inline-flex;
+ align-items:center;gap:5px;color:inherit;opacity:.75;}
+.leitura-auto-acao button:hover{opacity:1;background:rgba(0,0,0,.04);}
 .emoji-grid{display:grid;grid-template-columns:repeat(9,1fr);gap:2px;max-width:280px;}
 .emoji-grid button{border:0;background:none;font-size:19px;cursor:pointer;padding:5px;border-radius:6px;}
 .emoji-grid button:hover{background:var(--paper);}
@@ -1216,6 +1228,24 @@ async function refrescarAberta(){
 }
 
 function escapeHtml(s){ return (s||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+// Leitura automática da mídia (transcrição de áudio / descrição de imagem). SEMPRE
+// rotulada e visualmente destacada do texto do lead: é palpite de máquina, e o operador
+// precisa saber disso antes de agir em cima. Sem transcrição, oferece o botão — os
+// áudios que chegaram antes desta função existir continuam recuperáveis.
+function leituraAuto(t){
+  if(t.transcricao){
+    const rotulo = t.tipo === 'audio' ? 'transcrição automática' : 'descrição automática';
+    return `<div class="leitura-auto"><span class="leitura-auto-rot"><i class="ti ti-sparkles"></i> ${rotulo}</span>${escapeHtml(t.transcricao)}</div>`;
+  }
+  if(t.papel !== 'lead') return '';
+  return `<div class="leitura-auto-acao"><button onclick="transcrever(${t.id})"><i class="ti ti-sparkles"></i> ${t.tipo==='audio'?'Transcrever áudio':'Descrever imagem'}</button></div>`;
+}
+async function transcrever(conversaId){
+  const r = await api('/api/conversas/transcrever/'+conversaId, {method:'POST'});
+  if(!r.ok){ alert(r.motivo || 'não foi possível ler esta mídia'); return; }
+  await refrescarAberta();
+}
 function bolhaConteudo(t){
   if(t.tipo === 'contatos'){
     // texto é JSON estruturado (ver extrair_mensagem em whatsapp.py), não fala do lead
@@ -1227,8 +1257,8 @@ function bolhaConteudo(t){
   const cap = t.texto ? `<div style="margin-top:${t.media_id?'5px':'0'};">${escapeHtml(t.texto)}</div>` : '';
   if(t.media_id){
     const src='/api/media/'+encodeURIComponent(t.media_id);
-    if(t.tipo==='image'||t.tipo==='sticker') return `<img src="${src}" style="max-width:230px;max-height:280px;border-radius:9px;display:block;cursor:pointer;" onclick="window.open('${src}')">${cap}`;
-    if(t.tipo==='audio') return `<audio controls preload="none" src="${src}" style="height:40px;max-width:232px;"></audio>${cap}`;
+    if(t.tipo==='image'||t.tipo==='sticker') return `<img src="${src}" style="max-width:230px;max-height:280px;border-radius:9px;display:block;cursor:pointer;" onclick="window.open('${src}')">${cap}${leituraAuto(t)}`;
+    if(t.tipo==='audio') return `<audio controls preload="none" src="${src}" style="height:40px;max-width:232px;"></audio>${cap}${leituraAuto(t)}`;
     if(t.tipo==='video') return `<video controls preload="none" src="${src}" style="max-width:240px;border-radius:9px;display:block;"></video>${cap}`;
     return `<a href="${src}" target="_blank"><i class="ti ti-paperclip"></i> ${t.tipo==='document'?'documento':'anexo'}</a>${cap}`;
   }
@@ -1413,9 +1443,10 @@ function renderMensagens(d){
   const fs = $('#convFaseSel'); if(fs && document.activeElement!==fs) fs.value = d.fase; // sem interromper o dropdown
   const cs = $('#convCursos'); const csig = d.curso + '|' + (d.cursos||[]).join(',');    // ativo + conjunto
   if(cs && cs.dataset.sig !== csig){ cs.innerHTML = barraCursosHTML(d); cs.dataset.sig = csig; }
-  // reação entra no sig: ela muda uma mensagem JÁ existente (sem linha nova, sem status
-  // novo) — sem isto, uma reação chegando pelo webhook não disparava re-render nenhum.
-  const sig = (d.thread||[]).map(t=>(t.status||'')+(t.reacao||'')).join('') + '|' + (d.thread||[]).length
+  // reação e transcrição entram no sig: as duas mudam uma mensagem JÁ existente (sem
+  // linha nova, sem status novo) — sem isto, nem a reação vinda do webhook nem a
+  // transcrição recém-gerada disparavam re-render nenhum.
+  const sig = (d.thread||[]).map(t=>(t.status||'')+(t.reacao||'')+(t.transcricao?'1':'')).join('') + '|' + (d.thread||[]).length
             + '|' + (d.proposta||'') + '|' + CONV_LIDO_ATE;
   if(th.dataset.sig === sig) return;   // muda com nova msg OU novo status -> re-render; senão nada
   // O CONTADOR conta só mensagens do lead (o que exige sua atenção), mas a LINHA marca

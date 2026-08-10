@@ -137,7 +137,13 @@ class Estado:
                     # Anexo a mandar JUNTO com esta proposta, se aprovada (ex.: "guia_curso") —
                     # o flag do cérebro (dados.anexo_guia) precisa sobreviver até a aprovação
                     # humana, que pode vir bem depois da decisão.
-                    "ALTER TABLE decisoes ADD COLUMN anexo TEXT"):
+                    "ALTER TABLE decisoes ADD COLUMN anexo TEXT",
+                    # Transcrição de áudio / descrição de imagem (agentes/percepcao.py).
+                    # Coluna SEPARADA de `texto` de propósito: texto é o que o lead
+                    # escreveu, isto é o que a máquina entendeu. Misturar os dois faria
+                    # o operador (e o corpus, spec 18) lerem palpite de IA como se fosse
+                    # a fala literal do lead.
+                    "ALTER TABLE conversas ADD COLUMN transcricao TEXT"):
             try:
                 self.conn.execute(mig)
             except sqlite3.OperationalError:
@@ -378,22 +384,37 @@ class Estado:
 
     # ------------------------------------------------------------ conversas
     def add_conversa(self, card_id, papel, texto, tipo="texto", media_id=None,
-                     wamid=None, status=None, autor=None, destino=None):
+                     wamid=None, status=None, autor=None, destino=None, transcricao=None):
         """autor: quem produziu a fala do 'agente' — 'humano:<usuario>' (digitada na
         Central), 'llm' (cérebro), 'template', 'coordenacao'. É o que permite ao corpus
-        aprender com as resoluções humanas (spec 18)."""
+        aprender com as resoluções humanas (spec 18).
+        transcricao: leitura automática da mídia (áudio/imagem) — nunca fala do lead."""
         with self._lock:
             self.conn.execute(
-                "INSERT INTO conversas(card_id,papel,texto,tipo,media_id,wamid,status,ts,autor,destino)"
-                " VALUES(?,?,?,?,?,?,?,?,?,?)",
-                (card_id, papel, texto, tipo, media_id, wamid, status, _agora(), autor, destino))
+                "INSERT INTO conversas(card_id,papel,texto,tipo,media_id,wamid,status,ts,autor,"
+                "destino,transcricao) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+                (card_id, papel, texto, tipo, media_id, wamid, status, _agora(), autor,
+                 destino, transcricao))
             self.conn.commit()
+
+    def set_transcricao(self, conversa_id, transcricao):
+        """Transcreve depois do fato: áudio que chegou antes desta função existir (ou
+        quando a API falhou na hora) ainda pode ser lido pelo operador na Central."""
+        with self._lock:
+            self.conn.execute("UPDATE conversas SET transcricao=? WHERE id=?",
+                              (transcricao, conversa_id))
+            self.conn.commit()
+
+    def get_conversa(self, conversa_id):
+        with self._lock:
+            r = self.conn.execute("SELECT * FROM conversas WHERE id=?", (conversa_id,)).fetchone()
+        return dict(r) if r else None
 
     def historico(self, card_id):
         with self._lock:
             rows = self.conn.execute(
-                "SELECT id,papel,texto,tipo,media_id,wamid,status,ts,autor,reacao FROM conversas"
-                " WHERE card_id=? ORDER BY id",
+                "SELECT id,papel,texto,tipo,media_id,wamid,status,ts,autor,reacao,transcricao"
+                " FROM conversas WHERE card_id=? ORDER BY id",
                 (card_id,)).fetchall()
         return [dict(r) for r in rows]
 

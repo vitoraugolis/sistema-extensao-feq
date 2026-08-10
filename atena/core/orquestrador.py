@@ -193,13 +193,15 @@ class Orquestrador:
         self.faro = faro or Faro()
         self.brain = brain or (lambda lead, msg, hist=None: brain_deterministico(self.ont, lead, msg, hist))
 
-    def processar_mensagem(self, card_id, mensagem_lead, tipo="texto", media_id=None):
+    def processar_mensagem(self, card_id, mensagem_lead, tipo="texto", media_id=None,
+                           transcricao=None):
         """Serializa por lead: a 2ª mensagem só é tratada depois que a 1ª virou resposta
         gravada, então o cérebro sempre vê o histórico completo (ver _lock_do_lead)."""
         with _lock_do_lead(card_id):
-            return self._processar_mensagem(card_id, mensagem_lead, tipo, media_id)
+            return self._processar_mensagem(card_id, mensagem_lead, tipo, media_id, transcricao)
 
-    def _processar_mensagem(self, card_id, mensagem_lead, tipo="texto", media_id=None):
+    def _processar_mensagem(self, card_id, mensagem_lead, tipo="texto", media_id=None,
+                            transcricao=None):
         lead = self.est.get_lead(card_id)
         if not lead:
             raise ValueError(f"lead {card_id} não existe")
@@ -213,7 +215,8 @@ class Orquestrador:
         if pend and (pend.get("mensagem") or "").strip():
             historico = historico + [{"papel": "agente", "texto": pend["mensagem"],
                                       "ts": pend.get("ts")}]
-        self.est.add_conversa(card_id, "lead", mensagem_lead, tipo=tipo, media_id=media_id)
+        self.est.add_conversa(card_id, "lead", mensagem_lead, tipo=tipo, media_id=media_id,
+                              transcricao=transcricao)
 
         # Modo manual (por conversa): o humano conduz. Registramos a mensagem do lead
         # (o operador precisa vê-la) mas NÃO acionamos o cérebro nem geramos proposta.
@@ -229,6 +232,17 @@ class Orquestrador:
         # do lead — mandar esse JSON cru ao LLM seria pior que um rótulo genérico.
         if tipo == "contatos":
             entrada = "[o lead compartilhou um contato]"
+        elif transcricao and tipo == "audio":
+            # A transcrição vai MARCADA como automática: Whisper erra nome, número e
+            # valor, e o agente não pode repetir "você disse R$ 3.000" com a confiança
+            # de quem leu texto digitado. O marcador segue o padrão já usado no projeto
+            # para contexto de sistema ([INFORMAÇÃO DA COORDENAÇÃO], [GANCHO ...]).
+            entrada = ("[áudio do lead, transcrito automaticamente — pode conter erros de "
+                       f"transcrição] {transcricao}")
+        elif transcricao and tipo in ("image", "sticker"):
+            legenda = f' A legenda escrita pelo lead foi: "{mensagem_lead}"' if mensagem_lead else ""
+            entrada = ("[imagem enviada pelo lead, descrita automaticamente — a descrição é "
+                       f"de um leitor automático, não do lead] {transcricao}{legenda}")
         else:
             entrada = mensagem_lead or {
                 "audio": "[o lead enviou um áudio]", "image": "[o lead enviou uma imagem]",

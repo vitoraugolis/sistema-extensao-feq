@@ -110,3 +110,47 @@ cursor em `#convInput`.
 
 - AC8 Reação recebida nunca aciona o cérebro nem vira mensagem nova na thread.
 - AC9 Conteúdo estruturado (JSON de contato) nunca vaza cru para o LLM como fala do lead.
+
+## Percepção de mídia — áudio e imagem (✅ implementado — `agentes/percepcao.py`)
+Muito lead manda áudio em vez de digitar. O cérebro recebia só o rótulo cego
+`"[o lead enviou um áudio]"` e respondia no vácuo: na prática, **quem prefere áudio era
+mal atendido**. Agora:
+
+| entrada | processador | resultado |
+|---|---|---|
+| áudio (`audio/ogg` de voz do WhatsApp, mp3, m4a, wav, webm) | **OpenAI Whisper** (`whisper-1`) | transcrição do que o lead falou |
+| imagem (`jpeg/png/gif/webp`) e figurinha | **Claude (visão)** | descrição objetiva + transcrição do texto visível |
+
+Imagem fica no Claude porque é o provedor que **já** processa todo o conteúdo das
+conversas — não faz sentido abrir um segundo processador de dados pessoais só para isso.
+Áudio vai ao Whisper porque o Claude não transcreve áudio.
+
+Detalhes que a implementação precisou resolver:
+- **Extensão do arquivo**: as mídias são gravadas como `data/media/<media_id>`, sem
+  extensão, e o Whisper deduz o formato pelo NOME do arquivo — sem remontar a extensão a
+  partir do mime, a API recusa todo áudio do WhatsApp. `amr` fica de fora do mapa: o
+  Whisper não aceita.
+- **Viés de vocabulário**: sem o `prompt` de domínio o Whisper erra justamente os termos
+  que importam ("Extecamp", "FEQ"). Com ele, sai correto.
+- **`language=pt` fixo**: sem isso, áudio com ruído às vezes é "detectado" como espanhol
+  e volta traduzido.
+
+**Degrada em silêncio, sempre**: sem chave, formato não suportado, arquivo grande demais,
+timeout ou erro da API → devolve `None` e a conversa segue com o rótulo antigo. Perceber
+mídia melhora o atendimento; não pode virar um ponto novo de falha dele.
+
+**Honestidade da origem**: o resultado vive na coluna `conversas.transcricao`, SEPARADA de
+`texto` (que é o que o lead escreveu). A Central mostra com selo "transcrição/descrição
+automática" e o cérebro recebe com marcador explícito — transcrição erra (na verificação,
+a visão leu "368h" como "38h"), e nem o operador nem o agente podem tratar palpite de
+máquina como fala literal do lead. O áudio original fica na thread para conferência.
+
+`POST /api/conversas/transcrever/<id>` relê sob demanda — cobre o passivo de áudios que
+chegaram antes da função existir e os casos em que a API falhou na hora. Só relê o que
+ainda não foi lido.
+
+LGPD: áudio e imagem do lead saem para processador externo, mesma natureza do texto que
+já vai ao cérebro (ver `specs/07`).
+
+- AC10 Falha de transcrição nunca deixa o lead sem resposta — cai no rótulo e segue.
+- AC11 Saída de transcrição/descrição nunca se apresenta como texto digitado pelo lead.

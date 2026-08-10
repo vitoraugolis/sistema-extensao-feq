@@ -279,6 +279,23 @@ class WhatsApp:
         except Exception as e:
             print(f"[wa-midia] {media_id} falhou: {e}", flush=True)
 
+    def _perceber(self, tipo, media_id, mime):
+        """Áudio -> transcrição, imagem -> descrição (agentes/percepcao.py). Roda ANTES
+        do cérebro, para que a fala do lead que veio em áudio chegue lá como texto em vez
+        do rótulo cego "[o lead enviou um áudio]".
+
+        Best-effort por definição: qualquer falha devolve None e a conversa segue com o
+        rótulo antigo — nenhum lead fica sem resposta porque uma API de transcrição caiu."""
+        caminho = _MEDIA_DIR / media_id
+        if not caminho.exists():
+            return None
+        try:
+            from atena.agentes.percepcao import perceber
+            return perceber(tipo, caminho, mime)
+        except Exception as e:
+            print(f"[wa-percepcao] {media_id}: {type(e).__name__}: {e}", flush=True)
+            return None
+
     def receber(self, payload):
         """Extrai telefone + conteúdo (texto/botão/mídia) e encaminha ao orquestrador."""
         out = []
@@ -300,8 +317,10 @@ class WhatsApp:
                         continue
                     tel = m.get("from", "")
                     tipo, texto, media_id, mime = extrair_mensagem(m)
+                    transcricao = None
                     if media_id:
                         self._baixar_midia(media_id, mime)
+                        transcricao = self._perceber(tipo, media_id, mime)
                     card_id = self.est.lead_por_telefone(tel)
                     if not card_id:
                         # Número desconhecido = quase sempre o botão de WhatsApp das LPs.
@@ -320,7 +339,9 @@ class WhatsApp:
                         self.est.log_acao("whatsapp", f"lead novo pelo WhatsApp (curso: {curso or 'a descobrir'})",
                                           card_id)
                     out.append({"card_id": card_id,
-                                **self.orq.processar_mensagem(card_id, texto, tipo=tipo, media_id=media_id)})
+                                **self.orq.processar_mensagem(card_id, texto, tipo=tipo,
+                                                              media_id=media_id,
+                                                              transcricao=transcricao)})
                 for s in v.get("statuses", []):        # status das NOSSAS mensagens enviadas
                     self._processar_status(s, out)
         return out
