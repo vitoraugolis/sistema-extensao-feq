@@ -41,9 +41,11 @@ echo "==> configurando o VPS"
 set -e
 # pacotes (apt=Ubuntu/Debian · dnf=Amazon Linux)
 if command -v apt-get >/dev/null; then
-  sudo apt-get update -qq && sudo apt-get install -y -qq python3-pip python3-venv sqlite3 curl
+  # libpango/gdk-pixbuf/libffi: exigidas pelo WeasyPrint (guia do curso em PDF, spec 08)
+  sudo apt-get update -qq && sudo apt-get install -y -qq python3-pip python3-venv sqlite3 curl \
+    libpango-1.0-0 libpangocairo-1.0-0 libgdk-pixbuf2.0-0 libffi-dev
 elif command -v dnf >/dev/null; then
-  sudo dnf install -y -q python3-pip sqlite curl
+  sudo dnf install -y -q python3-pip sqlite curl pango gdk-pixbuf2 libffi-devel
 fi
 # swap de 1G se RAM < 1GB (pyshacl/rdflib pesam na instalação)
 if [ "$(awk '/MemTotal/{print $2}' /proc/meminfo)" -lt 1000000 ] && [ ! -f /swapfile ]; then
@@ -55,7 +57,7 @@ fi
 cd ~/atena-feq
 python3 -m venv .venv
 ./.venv/bin/pip install -q --upgrade pip
-./.venv/bin/pip install -q flask requests rdflib pyshacl waitress
+./.venv/bin/pip install -q flask requests rdflib pyshacl waitress weasyprint
 # caddy (binário estático — HTTPS automático)
 if [ ! -x /usr/local/bin/caddy ]; then
   curl -fsSL -o /tmp/caddy "https://caddyserver.com/api/download?os=linux&arch=$(uname -m | sed -e 's/x86_64/amd64/' -e 's/aarch64/arm64/')"
