@@ -1817,7 +1817,11 @@ def _operacoes():
                 EST.set_config("op_fb_alerta", str(_t.time()))
                 EST.add_alerta("degradacao",
                                f"{len(recentes)} respostas caíram no fallback determinístico em 15 min — verificar journalctl")
-            h = datetime.datetime.utcnow().hour
+            # utcnow() aqui era o bug: o comentário sempre disse "BRT" mas a leitura
+            # era UTC — os 5 jobs por hora (backup/LGPD/canário/curador/pacing) rodavam
+            # 3h mais cedo que o documentado (ex.: "06h BRT" na prática era 03h BRT).
+            # now() já sai em BRT (atena/__init__.py fixa o TZ do processo no import).
+            h = datetime.datetime.now().hour
             if h == 6 and not _rodou_hoje("op_backup"):       # 06h BRT (o processo já roda em BRT)
                 fazer_backup()
             if h == 7 and not _rodou_hoje("op_lgpd"):
