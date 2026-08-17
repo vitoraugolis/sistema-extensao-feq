@@ -15,6 +15,7 @@ import html
 import json
 import uuid
 import base64
+import hashlib
 import pathlib
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2]))
@@ -24,13 +25,12 @@ from atena.growth import funil
 _WEB = pathlib.Path(__file__).resolve().parents[1] / "web"
 _EVENT_ID_RE = re.compile(r"^[A-Za-z0-9._-]{8,64}$")
 _RAW_TOKENS = {"URL_CURSO", "CURSO", "TURMA", "CONTEUDO_HTML", "INVESTIMENTO_ITENS", "WA_LINK",
-               "BARRA_PROMO", "HERO_PRECO", "HERO_SELOS", "EMPRESAS_TOPO_HTML", "HERO_REFORCO",
-               "INVEST_DESTAQUE",
+               "BARRA_PROMO", "HERO_PRECO", "HERO_SELOS", "HERO_REFORCO", "INVEST_DESTAQUE",
               "FOTO_PROFESSOR_HTML", "PROFESSOR_CREDENCIAL_HTML", "CURSOS_RELACIONADOS_HTML",
-              "OUTROS_PROFESSORES_HTML", "SECAO_OBJETIVOS", "SECAO_HABILIDADES",
-              "SECAO_DEPOIMENTOS", "EMPRESAS_HTML", "PROFESSORES_BIO_HTML", "GARANTIA_HTML",
-              "SALARIO_HTML", "PASSOS_HTML", "FAQ_EXTRA_HTML", "NAV_DEPOIMENTOS",
-              "PRAZO_LINHA", "SECAO_INSCRICAO", "NAV_INSCRICAO", "FAQ_COMO_INSCREVER",
+              "OUTROS_PROFESSORES_HTML", "SECAO_OBJETIVOS",
+              "SECAO_DEPOIMENTOS", "PROFESSORES_BIO_HTML", "GARANTIA_HTML",
+              "SALARIO_HTML", "PASSOS_HTML", "FAQ_EXTRA_HTML",
+              "PRAZO_LINHA", "SECAO_INSCRICAO", "FAQ_COMO_INSCREVER",
               "PERIODO_OFERECIMENTO"}
 WA_NUMERO_DEFAULT = "551931672313"   # WABA da Extensão FEQ (+55 19 3167-2313)
 # Texto do requisito POR NÍVEL da ontologia (feq:nivelMinimo). Sem isto a LP dizia
@@ -72,6 +72,34 @@ EMPRESA_LOGO = {
 # Formação de Especialistas — o mapa abaixo foi conferido lendo o texto de cada imagem.
 # FEQ-0331, FEQ-0499 e FEQ-0580 ainda não têm modelo publicado: a seção sai sem a
 # imagem neles (some, não inventa — mesma regra do resto do sistema).
+# Foto do currículo (seção "Seu currículo no futuro"): imagem de engenharia que a
+# PRÓPRIA FEQ já publica na biblioteca de mídia do site (mesma regra dos logos e das
+# fotos de docente — nada de banco de imagem novo, nada gerado). Não representa
+# nenhum aluno específico: é o retrato ilustrativo do currículo que o lead monta.
+CV_FOTO_URL = (f"{_UPLOADS}/2026/01/"
+               "pexels-thisisengineering-3861970-1-scaled-e1768404648529-300x293.jpg")
+
+# Imagem de cada curso nos cards da home. São as MESMAS que a FEQ já usava na grade
+# antiga da home (extraídas do backup do Elementor), então cada curso ficou com a
+# imagem que a coordenação escolheu para ele. Duas exceções: FEQ-0299 e FEQ-0670
+# apontavam para servidores de TERCEIROS (agencia.fapesp.br e ictq.com.br) — hotlink
+# que quebra quando o outro site mexe no arquivo; troquei pelas equivalentes da
+# própria biblioteca de mídia da FEQ (microscópio eletrônico e modelo molecular).
+CURSO_IMAGEM = {
+    "FEQ-0360": f"{_UPLOADS}/2024/07/offshore.webp",
+    "FEQ-1000": f"{_UPLOADS}/2026/02/engenharia-quimica-ead.jpg",
+    "FEQ-0480": f"{_UPLOADS}/2024/05/inteligencia-artificial-1.jpg",
+    "FEQ-0499": f"{_UPLOADS}/2024/01/engenharia-de-processos-1.jpg",
+    "FEQ-0580": (f"{_UPLOADS}/2025/08/engineer-working-on-chip-development-"
+                 "2025-03-06-13-42-24-utc-scaled.jpg"),
+    "FEQ-0331": f"{_UPLOADS}/2024/08/risk.png",
+    "FEQ-0333": (f"{_UPLOADS}/2026/02/9e740d8e-54c4-469a-b8e5-e7fa8452b5ab_"
+                 "Climeworks-direct-air-capture_plant-Orca.webp"),
+    "FEQ-0670": (f"{_UPLOADS}/2025/03/scientist-holding-a-molecular-model-"
+                 "2022-12-16-22-03-15-utc-678x381-1.jpg"),
+    "FEQ-0299": f"{_UPLOADS}/2025/05/microscopio-eletronico-766x1024-1.jpeg",
+}
+
 CERTIFICADO_MODELO = {
     "FEQ-0480": f"{_UPLOADS}/2025/06/Modelo-Declaracao-Curso-de-Difusao-a-Distancia-1.pdf-2.png",
     "FEQ-0360": f"{_UPLOADS}/2025/06/Modelo-Declaracao-Curso-de-Difusao-a-Distancia-1.pdf-1-1.png",
@@ -260,6 +288,30 @@ PROFESSOR_BIO = {
 }
 
 
+# Congelado em 09/08/2026 — cópia ESTÁTICA de cursos_metas.turma NAQUELE momento,
+# conferida ao vivo no banco de produção. NÃO importar de METAS: essa lista segue
+# crescendo com cursos futuros, que devem nascer no slug perene desde a primeira
+# turma, não herdar tratamento "legado". As URLs abaixo já circulam em campanha —
+# não mudam nunca. Qualquer turma DIFERENTE da listada usa o slug perene.
+# ponytail: comparação por valor de turma — assume que a Extecamp nunca reaproveita
+# um número dentro do mesmo curso. Se acontecer, vira coluna cursos_metas.evergreen.
+LEGADO_TURMA = {
+    "FEQ-0480": "009", "FEQ-0580": "001", "FEQ-0333": "001", "FEQ-1000": "018",
+    "FEQ-0360": "007", "FEQ-0331": "004", "FEQ-0299": "001", "FEQ-0670": "001",
+    "FEQ-0499": "001",
+}
+
+
+def slug_lp(curso, turma):
+    """URL da LP do curso. Uma regra só para todo mundo: deploy, cross-sell da LP e
+    bloco de cursos da home. Duas implementações já produziram links divergentes."""
+    turma = (turma or "").strip()
+    legado = LEGADO_TURMA.get((curso or "").upper())
+    if legado is not None and turma == legado.strip():
+        return f"inscricao-{curso.lower()}-{turma}"      # URL já publicada: nunca muda
+    return f"inscricao-{curso.lower()}"                   # oferecimento novo: URL perene
+
+
 def url_inscricao(meta_row, c):
     """Destino do modal: SEMPRE o formulário /curso/inscricao/ (spec 17 §2).
     Preferência: url_extecamp da ontologia (governada); fallback cursos_metas.
@@ -298,45 +350,81 @@ def _secao_empresas(c):
         itens.append(f'<img src="{url}" alt="{_esc(e)}" loading="lazy" class="logo-empresa">'
                      if url else f'<span class="logo-empresa-txt">{_esc(e)}</span>')
     return (
-        '<section data-secao="empresas" class="secao-divisor max-w-4xl mx-auto px-6 py-16 text-center">'
-        '<p class="text-xs uppercase tracking-widest text-slate-400 font-bold">Onde nossos alunos atuam</p>'
-        '<h2 class="mt-2 text-2xl font-bold">Profissionais de empresas que você conhece</h2>'
+        '<section id="empresas" data-secao="empresas" class="banda">'
+        '<div class="faixa faixa-curta centro">'
+        '<p class="kicker">Onde nossos alunos atuam</p>'
+        '<h2 class="titulo-3 mt-2">Profissionais de empresas que você conhece</h2>'
         f'<div class="empresas-grid">{"".join(itens)}</div>'
-        '</section>')
+        '</div></section>')
 
 
 def _secao_curriculo(c):
     """"Seu Currículo no Futuro": o que o lead leva daqui — remuneração de referência,
     competências e o modelo do certificado. Cada bloco some sozinho sem o dado
-    correspondente; se nenhum existir, a seção inteira some."""
+    correspondente; se nenhum existir, a seção inteira some.
+    Absorveu a antiga seção "O que você vai dominar", que listava as MESMAS
+    habilidades em chips algumas seções abaixo (redesign monochrome, ago/2026)."""
     cod = (c or {}).get("codigo", "")
     salario = (c or {}).get("salario_ref")
     habs = (c or {}).get("habilidades") or []
     cert = CERTIFICADO_MODELO.get(cod)
-    if not (salario or habs or cert):
+    nome, carga = (c or {}).get("nome") or cod, (c or {}).get("carga_horas")
+    # Sem NENHUM dos quatro não há currículo a mostrar (a folha teria só o nome do
+    # curso, que a página inteira já repete).
+    if not (salario or habs or cert or carga):
         return ""
-    blocos = []
-    if salario:
-        blocos.append(
-            '<div class="curriculo-salario">'
-            '<p class="text-xs uppercase tracking-widest text-amber-400 font-bold">Referência de mercado</p>'
-            f'<p class="curriculo-salario-num">{_esc(salario)}</p></div>')
+    area = (c or {}).get("tipo") or "Extensão"
+    blocos = [
+        '<div class="cv-bloco"><p class="cv-rot">Formação complementar'
+        '<span class="cv-tag">novo</span></p>'
+        f'<p class="cv-item"><strong>{_esc(nome)}</strong>'
+        f'<span>Extensão FEQ · Unicamp — {area}'
+        + (f' · {carga}h' if carga else '') + '</span></p></div>']
     if habs:
         blocos.append(
-            '<div class="curriculo-habs"><p class="font-semibold mb-3">O que você passa a dominar</p><ul>'
+            '<div class="cv-bloco"><p class="cv-rot">Competências'
+            '<span class="cv-tag">novo</span></p><ul class="cv-habs">'
             + "".join(f'<li>{_esc(h)}</li>' for h in habs) + '</ul></div>')
-    cert_html = (
-        '<div class="curriculo-cert">'
-        '<p class="font-semibold mb-3">O certificado que você recebe</p>'
+    if salario:
+        blocos.append(
+            '<div class="cv-bloco"><p class="cv-rot">Referência de mercado</p>'
+            f'<p class="cv-salario numero">{_esc(salario)}</p></div>')
+    # Sem modelo publicado para o curso (a FEQ ainda não gerou o arquivo), a seção
+    # DESCREVE o certificado em vez de mostrar a imagem de outro curso: emitir aqui um
+    # "modelo" fabricado seria inventar um documento oficial da Unicamp.
+    corpo_cert = (
         f'<img src="{cert}" alt="Modelo do certificado de {_esc(cod)}" loading="lazy">'
-        '<p class="mt-2 text-xs text-slate-400">Modelo ilustrativo emitido pela Escola de '
-        'Extensão da Unicamp ao concluir o curso.</p></div>') if cert else ""
+        '<p class="fraco mt-2">Modelo ilustrativo emitido pela Escola de '
+        'Extensão da Unicamp ao concluir o curso.</p>' if cert else
+        '<div class="cv-cert-txt">'
+        '<p class="cv-cert-uni">Universidade Estadual de Campinas</p>'
+        '<p class="cv-cert-linha">A Escola de Extensão declara que <strong>SEU NOME</strong> '
+        # o tipo já vem como "Curso de Extensão"/"Formação de Especialistas": sem tirar
+        # o "curso de" da frente sai "concluiu o curso de curso de extensão em"
+        f'concluiu o curso de {_esc(re.sub(r"^curso de ", "", ((c or {}).get("tipo") or "extensão").lower()))} em</p>'
+        f'<p class="cv-cert-curso">{_esc(nome)}</p>'
+        + (f'<p class="cv-cert-linha">com carga horária total de <strong>{carga} horas</strong>.</p>'
+           if carga else '') +
+        '</div>'
+        '<p class="fraco mt-2">Conteúdo da declaração emitida pela Escola de Extensão da '
+        'Unicamp ao concluir o curso.</p>')
+    cert_html = ('<aside class="cv-cert">'
+                 '<p class="kicker">O certificado que você anexa</p>'
+                 f'{corpo_cert}</aside>')
+    # decorativa: o enquadramento (zoom/posição) mora no CSS, junto do resto do sistema
+    foto = '<div class="cv-foto" aria-hidden="true"></div>'
     return (
-        '<section data-secao="curriculo" class="secao-divisor max-w-4xl mx-auto px-6 py-16">'
-        '<h2 class="text-2xl font-bold text-center">Seu currículo no futuro</h2>'
-        '<p class="mt-2 text-center text-slate-300 text-sm">O que muda no seu perfil profissional '
-        'depois deste curso.</p>'
-        f'<div class="curriculo-grid">{"".join(blocos)}</div>{cert_html}'
+        '<section id="curriculo" data-secao="curriculo" class="faixa regua-topo">'
+        '<p class="kicker kicker-marca">Depois do curso</p>'
+        '<h2 class="titulo mt-2">Seu currículo no futuro</h2>'
+        '<p class="sub mt-2">O que muda no seu perfil profissional depois deste curso.</p>'
+        '<div class="cv-grid"><article class="cv">'
+        f'<header class="cv-topo">{foto}<div>'
+        '<p class="cv-nome">Seu nome aqui</p>'
+        f'<p class="cv-cargo">Profissional formado pela Extensão FEQ Unicamp</p>'
+        '</div></header>'
+        + "".join(blocos) +
+        f'</article>{cert_html}</div>'
         '</section>')
 
 
@@ -353,39 +441,33 @@ def _opcoes_pagamento(c):
     if p.get("a_vista"):
         ops.append(f"01 PARCELA(S) DE {_moeda(p['a_vista'])} À VISTA, "
                    f"ATRAVÉS DE BOLETO BANCÁRIO")
-    # Campanha vigente: as ofertas promocionais entram ALÉM das de tabela — o lead
-    # escolhe, e o operador confirma na transcrição (o desconto é aplicado depois,
-    # nos boletos; o formulário da Extecamp mostra o valor cheio — ver promocao.como_aplicar).
-    for o in ((c or {}).get("promocao") or {}).get("ofertas", []):
+    # Campanha vigente: as ofertas promocionais entram ALÉM das de tabela, JÁ COM O
+    # PREÇO COM DESCONTO — este formulário é nosso, então o lead escolhe aqui o valor
+    # que vai valer (não existe mais o "o formulário mostra o valor cheio" da Extecamp).
+    # Cada linha leva o nome da campanha: sem isso, uma oferta cujo rótulo fala em
+    # grupo faz o lead achar que o preço à vista também exige grupo.
+    pr = (c or {}).get("promocao") or {}
+    campanha = pr.get("rotulo") or "promoção"
+    for o in pr.get("ofertas", []):
+        pct = f" −{o['desconto_pct']}%" if o.get("desconto_pct") else ""
+        cond = f": {o['rotulo']}" if o.get("rotulo") else ""
         if o.get("n") and o.get("valor_parcela"):
             ops.append(f"{int(o['n']):02d} PARCELA(S) DE {_moeda(o['valor_parcela'])} "
-                       f"— {o.get('rotulo') or 'promoção'}")
+                       f"ATRAVÉS DE BOLETO BANCÁRIO — {campanha}{cond}{pct}")
         if o.get("a_vista"):
-            ops.append(f"01 PARCELA(S) DE {_moeda(o['a_vista'])} À VISTA "
-                       f"— {o.get('rotulo') or 'promoção'}")
-    return "\n".join(f'<option>{_esc(o)}</option>' for o in ops)
-
-
-def _promo_aviso(c):
-    """Aviso da campanha dentro do formulário: sem ele o lead vê no boleto um valor
-    diferente do que a LP prometeu e acha que foi enganado."""
-    pr = (c or {}).get("promocao")
-    if not pr or not pr.get("como_aplicar"):
-        return ""
-    return ('<p class="text-xs text-amber-300/90 border-l-2 border-amber-400 pl-3">'
-            f'<strong>{_esc(pr.get("rotulo") or "Campanha vigente")}:</strong> '
-            f'{_esc(pr["como_aplicar"])}</p>')
+            ops.append(f"01 PARCELA(S) DE {_moeda(o['a_vista'])} À VISTA, ATRAVÉS DE "
+                       f"BOLETO BANCÁRIO — {campanha}{pct}")
+    # dedupe preservando a ordem: duas ofertas podem repetir o mesmo à vista
+    return "\n".join(f'<option>{_esc(o)}</option>' for o in dict.fromkeys(ops))
 
 
 def _conteudo_html(texto):
     """'(1) A; (2) B; ...' -> <li> numerados. Sem programa na ontologia -> item neutro."""
     if not texto:
-        return ('<li class="bg-white/5 border border-white/10 rounded-xl p-4 text-sm '
-                'text-slate-300">Programa completo na página oficial da Extecamp.</li>')
+        return '<li class="prog-item">Programa completo na página oficial da Extecamp.</li>'
     itens = [i.strip(" ;.") for i in re.split(r"\(\d+\)", texto) if i.strip(" ;.")]
     return "\n    ".join(
-        f'<li class="bg-white/5 border border-white/10 rounded-xl p-4 text-sm text-slate-300">'
-        f'<span class="text-amber-400 font-semibold mr-2">{i + 1:02d}</span>{_esc(t)}</li>'
+        f'<li class="prog-item"><span class="prog-n">{i + 1:02d}</span>{_esc(t)}</li>'
         for i, t in enumerate(itens))
 
 
@@ -429,16 +511,6 @@ def _invest_destaque(c, aberto):
     return (f'<div class="invest-destaque"><p class="invest-destaque-tag">{_esc(pr["rotulo"])}</p>'
             f'{eco}<p class="invest-destaque-prazo" data-prazo-dias data-fim="{pr["fim"]}">'
             f'termina em {_ddmm(pr["fim"])}</p></div>')
-
-
-def _empresas_topo_html(empresas):
-    """Faixa compacta de prova social logo abaixo da dobra."""
-    if not empresas:
-        return ""
-    chips = "".join(f'<span class="chip-empresa">{_esc(e)}</span>' for e in empresas)
-    return ('<section data-secao="empresas-topo" class="faixa-empresas">'
-            '<p class="faixa-empresas-tit">Nossos alunos atuam em empresas como</p>'
-            f'<div class="faixa-empresas-lista">{chips}</div></section>')
 
 
 def _melhor_oferta(pr):
@@ -519,23 +591,20 @@ def _hero_preco(c, aberto):
     return ""
 
 
-_SELO_RE = None
-
-
 def _hero_selos(c):
     """Selos de confiança na dobra: o que o visitante checa antes de considerar
-    o preço. Só entra o que existe na ontologia — nada de badge inventado."""
+    o preço. Só entra o que existe na ontologia — nada de badge inventado.
+    Sem ícone: emoji é a única cor que entraria fora da paleta da marca."""
     selos = []
     if c.get("carga_horas"):
-        selos.append(("⏱", f"{c['carga_horas']}h de curso"))
-    selos.append(("🎓", "Certificado Unicamp"))
+        selos.append(f"{c['carga_horas']}h de curso")
+    selos.append("Certificado Unicamp")
     if c.get("formato_aulas_resumo") or c.get("modalidade"):
-        selos.append(("💻", c.get("formato_aulas_resumo") or c["modalidade"]))
+        selos.append(c.get("formato_aulas_resumo") or c["modalidade"])
     vagas = (c.get("vagas") or {}).get("max")
     if vagas:
-        selos.append(("👥", f"Turma de até {vagas} alunos"))
-    return "".join(f'<span class="selo"><span class="selo-ic">{i}</span>{_esc(txt)}</span>'
-                   for i, txt in selos)
+        selos.append(f"Turma de até {vagas} alunos")
+    return "".join(f'<span class="selo">{_esc(txt)}</span>' for txt in selos)
 
 
 def _promo_ofertas_html(pr):
@@ -548,11 +617,11 @@ def _promo_ofertas_html(pr):
             partes.append(f"{o['n']}x de {_moeda(o['valor_parcela'])}")
         if o.get("a_vista"):
             partes.append(f"{_moeda(o['a_vista'])} à vista")
-        pct = f' <span class="text-amber-400">−{o["desconto_pct"]}%</span>' if o.get("desconto_pct") else ""
+        pct = f' <span class="destaque">−{o["desconto_pct"]}%</span>' if o.get("desconto_pct") else ""
         # UM só filho: o <li> da lista é flex, então dois filhos virariam duas COLUNAS e
         # o preço quebraria no meio. O <div> segura preço e condição em fluxo normal.
         out.append(f'<div><strong>{" ou ".join(partes)}</strong>{pct}<br>'
-                   f'<span class="text-slate-400 text-sm">{_esc(o["rotulo"])} — {_esc(o["condicao"])}</span></div>')
+                   f'<span class="fraco">{_esc(o["rotulo"])} — {_esc(o["condicao"])}</span></div>')
     return out
 
 
@@ -563,16 +632,16 @@ def _investimento_itens(c):
     if pr:
         # o valor de tabela vira referência riscada: é o que dá tamanho ao desconto
         if p.get("n") and p.get("valor_parcela"):
-            itens.append(f'<span class="line-through text-slate-500">De {p["n"]}x de '
+            itens.append(f'<span class="risco fraco">De {p["n"]}x de '
                          f'{_moeda(p["valor_parcela"])}</span>')
         itens += _promo_ofertas_html(pr)
         if pr.get("fim"):
             fim = "/".join(reversed(pr["fim"].split("-")))
-            itens.append(f'<span class="text-amber-400 font-semibold">Promoção válida até {fim}</span>')
-        if pr.get("como_aplicar"):
-            # sem isto o visitante vê o valor CHEIO no formulário da Extecamp e conclui
-            # que a página mentiu — foi a dúvida que o operador teve de responder à mão
-            itens.append(f'<span class="text-slate-300">{_esc(pr["como_aplicar"])}</span>')
+            itens.append(f'<span class="destaque">Promoção válida até {fim}</span>')
+        # `como_aplicar` (o aviso de que o formulário da Extecamp mostra o valor cheio)
+        # NÃO entra mais: a ficha de inscrição agora é nossa e já lista os preços com
+        # desconto. O texto segue na ontologia porque os agentes ainda o usam quando
+        # mandam o link oficial da Extecamp (inscrição fora do prazo).
     else:
         if p.get("n") and p.get("valor_parcela"):
             itens.append(f"Em até <strong>{p['n']}x de {_moeda(p['valor_parcela'])}</strong>")
@@ -602,9 +671,9 @@ def _professor_credencial_html(nome):
     cred = PROFESSOR_CREDENCIAL.get((nome or "").strip())
     if not cred:
         return ""
-    return (f'<p class="mt-3 text-xs text-slate-400">{_esc(cred["departamento"])} · '
+    return (f'<p class="fraco mt-2">{_esc(cred["departamento"])} · '
             f'<a href="{cred["lattes"]}" target="_blank" rel="noopener" '
-            f'class="text-amber-400 hover:text-amber-300 underline">Currículo Lattes</a></p>')
+            f'class="link">Currículo Lattes</a></p>')
 
 
 def _outros_professores_html(nomes):
@@ -618,13 +687,13 @@ def _outros_professores_html(nomes):
         link = PROFESSOR_LINK.get(nome)
         if link:
             itens.append(f'<a href="{_esc(link["url"])}" target="_blank" rel="noopener" '
-                          f'class="text-amber-400 hover:text-amber-300 underline">{_esc(nome)}</a>')
+                          f'class="link">{_esc(nome)}</a>')
         else:
             itens.append(f'<span>{_esc(nome)}</span>')
     return (
-        '<div class="mt-6 pt-6 border-t border-white/10">\n'
-        '      <p class="text-xs uppercase tracking-widest text-slate-400 mb-3">Mais professores do curso</p>\n'
-        '      <div class="flex flex-wrap gap-x-4 gap-y-2 text-sm text-slate-300">\n'
+        '<div class="prof-mais">\n'
+        '      <p class="kicker">Mais professores do curso</p>\n'
+        '      <div class="linha-itens mt-2">\n'
         '        ' + '\n        '.join(itens) + '\n'
         '      </div>\n'
         '    </div>'
@@ -632,28 +701,17 @@ def _outros_professores_html(nomes):
 
 
 def _secao_objetivos_html(objetivos):
-    """Seção 'Objetivos do curso' (2 cards) — texto literal das páginas oficiais."""
+    """'Objetivos do curso' — texto literal das páginas oficiais. Era uma seção
+    própria; virou item do FAQ (redesign monochrome): a promessa do curso já é a
+    dobra, e repeti-la em cards no meio da página só empurrava o preço pra baixo.
+    O data-secao continua no <details> — a telemetria de interesse não se perde."""
     if not objetivos:
         return ""
-    cards = "\n    ".join(
-        '<div class="bg-white/5 border border-white/10 rounded-2xl p-6">'
-        f'<p class="font-semibold text-amber-400">{_esc(o["t"])}</p>'
-        f'<p class="mt-2 text-sm text-slate-300">{_esc(o["d"])}</p></div>'
-        for o in objetivos)
-    return ('<section data-secao="objetivos" class="secao-divisor max-w-4xl mx-auto px-6 py-16">\n'
-            '  <h2 class="text-2xl font-bold mb-6 text-center">Objetivos do curso</h2>\n'
-            f'  <div class="grid sm:grid-cols-2 gap-4">\n    {cards}\n  </div>\n</section>')
-
-
-def _secao_habilidades_html(habilidades):
-    """'O que você vai dominar' — chips com as habilidades publicadas."""
-    if not habilidades:
-        return ""
-    chips = "\n    ".join(
-        f'<span class="hab-chip">{_esc(h)}</span>' for h in habilidades)
-    return ('<section data-secao="habilidades" class="secao-divisor max-w-4xl mx-auto px-6 py-16">\n'
-            '  <h2 class="text-2xl font-bold mb-6 text-center">O que você vai dominar</h2>\n'
-            f'  <div class="flex flex-wrap gap-2 justify-center">\n    {chips}\n  </div>\n</section>')
+    itens = "\n      ".join(
+        f'<li><strong>{_esc(o["t"])}</strong> — {_esc(o["d"])}</li>' for o in objetivos)
+    return ('<details class="qa" data-secao="objetivos">\n'
+            '    <summary>Quais são os objetivos do curso?</summary>\n'
+            f'    <ul>\n      {itens}\n    </ul>\n  </details>')
 
 
 def _programa_html(c):
@@ -668,7 +726,7 @@ def _programa_html(c):
         corpo = f'<ul class="prog-subs">{subs}</ul>' if subs else ""
         itens.append(
             '<details class="prog-mod">'
-            f'<summary><span class="text-amber-400 font-semibold mr-2">{i + 1:02d}</span>'
+            f'<summary><span class="prog-n">{i + 1:02d}</span>'
             f'{_esc(m["t"])}</summary>{corpo}</details>')
     return "\n    ".join(itens)
 
@@ -694,23 +752,11 @@ def _secao_depoimentos_html(depoimentos):
         f'<span class="muted-cap">{_esc(d.get("cargo") or "")}</span></span>'
         '</figcaption></figure>'
         for d in depoimentos)
-    return ('<section id="depoimentos" data-secao="depoimentos" '
-            'class="secao-divisor max-w-4xl mx-auto px-6 py-16">\n'
-            '  <h2 class="text-2xl font-bold mb-2 text-center">Quem fez, recomenda</h2>\n'
-            '  <p class="text-sm text-slate-400 mb-6 text-center">Depoimentos publicados por '
-            'ex-alunos da Extensão FEQ Unicamp.</p>\n'
-            f'  <div class="grid sm:grid-cols-2 gap-4 items-start">\n    {cards}\n  </div>\n</section>')
-
-
-def _secao_empresas_html(empresas):
-    """Prova social oficial: 'nossos alunos atuam em' (lista publicada pela FEQ)."""
-    if not empresas:
-        return ""
-    tags = "\n    ".join(f'<span class="empresa-tag">{_esc(e)}</span>' for e in empresas)
-    return ('<div class="mt-8 text-center">\n'
-            '  <p class="text-xs uppercase tracking-widest text-slate-400 mb-3">'
-            'Nossos alunos atuam em empresas como</p>\n'
-            f'  <div class="flex flex-wrap gap-2 justify-center">\n    {tags}\n  </div>\n</div>')
+    return ('<section id="depoimentos" data-secao="depoimentos" class="faixa regua-topo">\n'
+            '  <p class="kicker kicker-marca">Quem fez, recomenda</p>\n'
+            '  <h2 class="titulo mt-2">Depoimentos de ex-alunos</h2>\n'
+            '  <p class="fraco mt-2">Publicados pelos próprios alunos da Extensão FEQ Unicamp.</p>\n'
+            f'  <div class="grid-2 mt-4">\n    {cards}\n  </div>\n</section>')
 
 
 def _iniciais(nome):
@@ -733,26 +779,26 @@ def _professores_bio_html(c):
         link = PROFESSOR_LINK.get(nome)
         rotulo = ""
         if not cred and link:
-            rotulo = (f'<p class="mt-3 text-xs text-slate-400"><a href="{_esc(link["url"])}" '
-                      'target="_blank" rel="noopener" class="text-amber-400 hover:text-amber-300 '
-                      f'underline">{_esc(link["tipo"])}</a></p>')
-        bio = f'<p class="mt-3 text-sm text-slate-300">{_esc(b["bio"])}</p>' if b.get("bio") else ""
-        cargo = (f'<p class="text-xs text-amber-400">{_esc(b["cargo"])}</p>' if b.get("cargo")
-                 else '<p class="text-xs text-slate-400">Professor do curso</p>')
+            rotulo = (f'<p class="fraco mt-2"><a href="{_esc(link["url"])}" '
+                      'target="_blank" rel="noopener" class="link">'
+                      f'{_esc(link["tipo"])}</a></p>')
+        bio = f'<p class="fraco mt-2">{_esc(b["bio"])}</p>' if b.get("bio") else ""
+        cargo = (f'<p class="kicker">{_esc(b["cargo"])}</p>' if b.get("cargo")
+                 else '<p class="kicker">Professor do curso</p>')
         cards.append(
-            '<div class="bg-white/5 border border-white/10 rounded-2xl p-6">'
-            f'<div class="flex items-center gap-4">{foto}<div>'
-            f'<p class="font-semibold text-slate-100">{_esc(nome)}</p>'
+            '<div class="card">'
+            f'<div class="prof-topo">{foto}<div>'
+            f'<p class="titulo-3">{_esc(nome)}</p>'
             f'{cargo}</div></div>{bio}{cred or rotulo}</div>')
     if not cards:
         return ""
-    return '<div class="grid sm:grid-cols-2 gap-4 mt-6 items-start">\n    ' + "\n    ".join(cards) + "\n  </div>"
+    return '<div class="grid-2 mt-4">\n    ' + "\n    ".join(cards) + "\n  </div>"
 
 
 def _garantia_html(c):
     if not c.get("garantia_7d"):
         return ""
-    return ('<p class="mt-4 garantia-selo">🛡️ Garantia de 7 dias — reembolso de 100% da '
+    return ('<p class="garantia-selo">Garantia de 7 dias — reembolso de 100% da '
             'matrícula se você não gostar do curso na primeira semana.</p>')
 
 
@@ -760,40 +806,39 @@ def _salario_html(c):
     s = c.get("salario_ref")
     if not s:
         return ""
-    return ('<p class="mt-3 text-xs text-slate-400">Perspectiva profissional: salário de '
+    return ('<p class="fraco mt-3">Perspectiva profissional: salário de '
             f'referência {_esc(s)}.</p>')
 
 
 def _periodo_html(c, aberto=True):
-    """Faixa com o PERÍODO DE OFERECIMENTO (início e fim das aulas) — dado oficial
-    da Extecamp, guardado na ontologia (janelaOferecimento). Some se o curso não
-    tiver as datas. Curso sem turma aberta: rotula como 'última turma' para não dar
-    a entender que essas datas valem para quem entra na lista de espera agora."""
+    """PERÍODO DE OFERECIMENTO (início e fim das aulas) — dado oficial da Extecamp,
+    guardado na ontologia (janelaOferecimento). Some se o curso não tiver as datas.
+    Curso sem turma aberta: rotula como 'última turma' para não dar a entender que
+    essas datas valem para quem entra na lista de espera agora.
+    Era faixa própria; virou item do FAQ (redesign monochrome) — é informação de
+    consulta, não argumento de venda."""
     ini, fim = _ddmm(c.get("aulas_inicio")), _ddmm(c.get("aulas_fim"))
     if not (ini and fim):
         return ""
     rotulo = "Período do curso" if aberto else "Período da última turma"
     return (
-        '<section data-secao="periodo" class="secao-divisor max-w-4xl mx-auto px-6 py-10">\n'
-        '  <div class="periodo-faixa">\n'
-        '    <span class="periodo-icone" aria-hidden="true">📅</span>\n'
-        '    <div>\n'
-        f'      <p class="periodo-rotulo">{rotulo}</p>\n'
-        f'      <p class="periodo-datas">As aulas acontecem de <strong>{ini}</strong> '
-        f'a <strong>{fim}</strong>.</p>\n'
-        '    </div>\n'
-        '  </div>\n</section>')
+        '<details class="qa" data-secao="periodo">\n'
+        f'    <summary>Quando começam e terminam as aulas?</summary>\n'
+        f'    <p>{rotulo}: as aulas acontecem de <strong>{ini}</strong> '
+        f'a <strong>{fim}</strong>.</p>\n  </details>')
 
 
 def _passos_html(c):
     """Como se inscrever — 5 passos publicados nas páginas oficiais (Extecamp)."""
     taxa = _moeda((c.get("plano") or {}).get("taxa")) or "o valor publicado na Extecamp"
+    # data do boleto desta turma, quando a coordenação a declarou (spec 17 §3e)
+    quando = f" O boleto desta turma é de {_ddmm(c.get('boleto_data'))}." if c.get("boleto_data") else ""
     passos = [
         "Preencha o formulário de inscrição no sistema oficial da Unicamp (Extecamp) e aguarde "
         "o e-mail com as instruções de acesso ao portal do aluno e o termo de compromisso.",
         "Baixe e preencha o termo de compromisso e envie os documentos na aba "
         "“Documentos” do portal do aluno.",
-        f"Pague o boleto da taxa de inscrição ({taxa}).",
+        f"Pague o boleto da taxa de inscrição ({taxa}).{quando}",
         "Aguarde a validação da documentação e a confirmação de abertura da turma "
         "(ao encerramento das inscrições).",
         "Com a turma confirmada, a secretaria entra em contato por e-mail para o pagamento "
@@ -807,19 +852,18 @@ def _passos_html(c):
 def _secao_inscricao_html(c, aberto):
     """'Como se inscrever' (5 passos oficiais da Extecamp) — só com turma aberta.
     Sem turma, prometer um passo a passo de inscrição seria falso; a captação
-    acontece pelo modal de lista de espera."""
+    acontece pelo modal de lista de espera.
+    Deixou de ser seção própria: mora DENTRO do bloco de investimento, que é onde a
+    pergunta 'e como eu faço?' nasce — a sequência de blocos da página não ganha um
+    degrau a mais por causa disso."""
     if not aberto:
         return ""
     return (
-        '<section id="inscricao" data-secao="inscricao" class="secao-divisor max-w-4xl mx-auto px-6 py-16">\n'
-        '  <h2 class="text-2xl font-bold mb-2">Como se inscrever</h2>\n'
-        '  <p class="text-sm text-slate-400 mb-6">O processo acontece no sistema oficial da '
+        '<div id="inscricao" data-secao="inscricao" class="passos-bloco">\n'
+        '  <p class="kicker">Como se inscrever</p>\n'
+        '  <p class="fraco mt-1">O processo acontece no sistema oficial da '
         'Unicamp (Extecamp) — leva poucos minutos.</p>\n'
-        f'  <ol class="space-y-3 list-none">\n    {_passos_html(c)}\n  </ol>\n'
-        '  <div class="text-center">\n'
-        '    <button data-cta class="mt-8 bg-amber-400 hover:bg-amber-300 text-slate-900 '
-        'font-bold px-8 py-4 rounded-xl">Começar minha inscrição →</button>\n'
-        '  </div>\n</section>')
+        f'  <ol class="mt-2">\n    {_passos_html(c)}\n  </ol>\n</div>')
 
 
 def _faq_extra_html(c):
@@ -839,9 +883,7 @@ def _faq_extra_html(c):
         "a ementa é constantemente atualizada com as tendências do mercado e o corpo docente "
         "inclui profissionais com ampla experiência na indústria."))
     return "\n    ".join(
-        '<details class="bg-white/5 border border-white/10 rounded-xl p-5">'
-        f'<summary class="cursor-pointer font-semibold">{p}</summary>'
-        f'<p class="mt-2 text-sm text-slate-300">{r}</p></details>'
+        f'<details class="qa"><summary>{p}</summary><p>{r}</p></details>'
         for p, r in itens)
 
 
@@ -868,15 +910,14 @@ def _cursos_relacionados_html(g, ont, curso_atual, limite=3, hoje=None):
             c = {}
         nome = c.get("nome") or m["curso"]
         tipo = c.get("tipo") or "Curso"
-        # mesmo padrão de slug do wp_deploy_bridge.py — link relativo funciona
-        # tanto publicado (mesma origem no WP) quanto localmente via /ponte.
-        slug = f"inscricao-{m['curso'].lower()}-{m['turma']}"
+        # MESMA função de slug do deploy — link relativo funciona tanto publicado
+        # (mesma origem no WP) quanto localmente via /ponte.
+        slug = slug_lp(m["curso"], m["turma"])
         itens.append(
-            '<a href="/%s/" class="bg-white/5 border border-white/10 rounded-2xl p-6 '
-            'hover:border-amber-400/40 transition-colors block">'
-            '<p class="text-xs uppercase tracking-widest text-amber-400 mb-2">%s</p>'
-            '<p class="font-semibold text-slate-100">%s</p>'
-            '<p class="mt-2 text-sm text-amber-400">Conhecer curso →</p></a>'
+            '<a href="/%s/" class="rel-card">'
+            '<p class="kicker">%s</p>'
+            '<p class="titulo-3 mt-1">%s</p>'
+            '<p class="rel-seta">Conhecer curso →</p></a>'
             % (slug, _esc(tipo), _esc(nome)))
     return "\n    ".join(itens)
 
@@ -896,10 +937,7 @@ def render_tokens(meta_row, c, aberto=True, recuperavel=False):
     if promo and promo["ofertas"]:
         # o destaque do topo passa a ser o preço da campanha: é o que o lead compara
         o = promo["ofertas"][0]
-        n_p, vp_p = o.get("n"), o.get("valor_parcela")
-        plano_curto = (f"{n_p}x de {_moeda(vp_p)}" if n_p and vp_p
-                       else (_moeda(o["a_vista"]) if o.get("a_vista") else "Unicamp"))
-        # card pequeno: só o essencial. O detalhe completo (todas as ofertas, condições,
+        # resumo curto: só o essencial. O detalhe completo (todas as ofertas, condições,
         # tabela riscada) fica na seção Investimento — repetir tudo aqui virava parágrafo.
         melhor = _melhor_oferta(promo)
         plano_det = f"{promo['rotulo']}, até {_ddmm(promo.get('fim'))}."
@@ -912,13 +950,12 @@ def render_tokens(meta_row, c, aberto=True, recuperavel=False):
         if n and vp:
             plano_det += f" Valor de tabela: {n}x de {_moeda(vp)}."
     elif n:
-        plano_curto = f"{n}x" + (f" de {_moeda(vp)}" if vp else "")
         plano_det = f"Pagamento em até {n} parcelas" + (f" de {_moeda(vp)}" if vp else "")
         if taxa:
             plano_det += f" + taxa de inscrição de {_moeda(taxa)}"
         plano_det += "."
     else:
-        plano_curto, plano_det = "Unicamp", "Condições de pagamento na página oficial da Extecamp."
+        plano_det = "Condições de pagamento na página oficial da Extecamp."
     if c.get("descontos") and not promo:      # com campanha, isto já está no Investimento
         plano_det += " " + c["descontos"]
     formato_resumo = c.get("formato_aulas_resumo") or (
@@ -949,7 +986,6 @@ def render_tokens(meta_row, c, aberto=True, recuperavel=False):
         "HORARIO": horario or "consulte a Extecamp",
         "FORMATO_AULAS_RESUMO": formato_resumo,
         "FORMATO_AULAS_DETALHE": formato_detalhe,
-        "PLANO": plano_curto,
         "PLANO_DETALHE": plano_det,
         "PROFESSOR": c.get("professor") or "Corpo docente FEQ/Unicamp",
         "PROFESSOR_DESC": (PROFESSOR_BIO.get((c.get("professor") or "").strip()) or {}).get("bio")
@@ -963,12 +999,7 @@ def render_tokens(meta_row, c, aberto=True, recuperavel=False):
         "OUTROS_PROFESSORES_HTML": _outros_professores_html(c.get("professores_adicionais")),
         # Conteúdo rico das páginas oficiais preexistentes (seções somem se sem dado):
         "SECAO_OBJETIVOS": _secao_objetivos_html(c.get("objetivos")),
-        "SECAO_HABILIDADES": _secao_habilidades_html(c.get("habilidades")),
         "SECAO_DEPOIMENTOS": _secao_depoimentos_html(c.get("depoimentos")),
-        "NAV_DEPOIMENTOS": ('<a href="#depoimentos">Depoimentos</a>'
-                            if c.get("depoimentos") else ""),
-        "EMPRESAS_HTML": _secao_empresas_html(c.get("empresas")),
-        "EMPRESAS_TOPO_HTML": _empresas_topo_html(c.get("empresas")),
         "BARRA_PROMO": _barra_promo(c, aberto),
         "HERO_PRECO": _hero_preco(c, aberto),
         "HERO_SELOS": _hero_selos(c),
@@ -987,13 +1018,13 @@ def render_tokens(meta_row, c, aberto=True, recuperavel=False):
         "CTA_LABEL": ("Inscreva-se →" if aberto else
                       ("Quero uma vaga remanescente →" if recuperavel else "Quero ser avisado →")),
         "PRAZO_LINHA": (
-            f"Inscrições abertas até <strong class=\"text-white\">{_ddmm(c.get('inscricoes_fim')) or 'a data publicada na Extecamp'}</strong> · turma {meta_row['turma']}"
+            f"Inscrições abertas até <strong>{_ddmm(c.get('inscricoes_fim')) or 'a data publicada na Extecamp'}</strong> · turma {meta_row['turma']}"
             if aberto else
-            ("Prazo de inscrição <strong class=\"text-white\">encerrado</strong> — mas a turma "
-             "ainda não começou e há <strong class=\"text-white\">vagas remanescentes</strong>. "
+            ("Prazo de inscrição <strong>encerrado</strong> — mas a turma "
+             "ainda não começou e há <strong>vagas remanescentes</strong>. "
              "Deixe seu contato que a coordenação gera um link de inscrição fora do prazo."
              if recuperavel else
-             "Inscrições <strong class=\"text-white\">encerradas no momento</strong> — entre na "
+             "Inscrições <strong>encerradas no momento</strong> — entre na "
              "lista de espera e avisamos assim que a próxima turma abrir.")),
         "MODAL_TITULO": ("Para iniciar sua inscrição no sistema da Unicamp, informe seu contato rápido:"
                          if aberto else
@@ -1002,21 +1033,13 @@ def render_tokens(meta_row, c, aberto=True, recuperavel=False):
                           if recuperavel else
                           "Entre na lista de espera deste curso. Assim que a próxima turma abrir, "
                           "a gente te avisa pelo WhatsApp:")),
-        "MODAL_BOTAO": ("Continuar para Extecamp →" if aberto else
+        # o botão da etapa 1 abre a ETAPA 2 — prometer "para a Extecamp" aqui virou
+        # falso quando o formulário passou a ter duas etapas (spec 17 §7)
+        "MODAL_BOTAO": ("Continuar →" if aberto else
                         ("Quero meu link fora do prazo" if recuperavel else "Entrar na lista de espera")),
-        "CTA_FINAL_TITULO": (f"Garanta sua vaga na turma {meta_row['turma']}" if aberto
-                             else ("Ainda há vagas remanescentes" if recuperavel
-                                   else "Fique sabendo em primeira mão")),
-        "CTA_FINAL_SUB": (
-            f"Inscrições até {_ddmm(c.get('inscricoes_fim')) or 'a data publicada'} no sistema oficial da Unicamp."
-            if aberto else
-            ("O prazo oficial encerrou, mas as aulas ainda não começaram. Deixe seu contato "
-             "que a coordenação gera um link de inscrição fora do prazo."
-             if recuperavel else
-             "Sem turma aberta agora. Deixe seu contato e avisamos assim que as inscrições reabrirem.")),
-        # A seção "Como se inscrever" (passos da Extecamp) só faz sentido com turma aberta.
+        # O passo a passo da Extecamp só faz sentido com turma aberta (vai dentro do
+        # bloco de Investimento; o CTA final é o do próprio bloco, não uma seção extra).
         "SECAO_INSCRICAO": _secao_inscricao_html(c, aberto),
-        "NAV_INSCRICAO": '<a href="#inscricao">Inscrição</a>' if aberto else "",
         "INVEST_DESTAQUE": _invest_destaque(c, aberto),
         "INVEST_TARJA": (f"Inscrições abertas até {_ddmm(c.get('inscricoes_fim'))}" if aberto
                          else ("Prazo encerrado · vagas remanescentes" if recuperavel
@@ -1030,24 +1053,24 @@ def render_tokens(meta_row, c, aberto=True, recuperavel=False):
              "Valores praticados na última turma, para você se planejar — podem ser reajustados "
              "quando a próxima abrir. Entre na lista de espera para receber as condições oficiais.")),
         "FAQ_COMO_INSCREVER": (
-            '<details class="bg-white/5 border border-white/10 rounded-xl p-5">'
-            '<summary class="cursor-pointer font-semibold">Como funciona a inscrição?</summary>'
-            '<p class="mt-2 text-sm text-slate-300">Ao clicar em Inscreva-se, você informa um '
-            'contato rápido e segue direto para o formulário oficial da Extecamp (sistema da '
-            f'Unicamp), onde a inscrição da turma {meta_row["curso"]}/{meta_row["turma"]} é '
-            'concluída — com taxa de inscrição, envio de documentos e boletos gerados por lá.'
-            '</p></details>'
+            '<details class="qa">'
+            '<summary>Como funciona a inscrição?</summary>'
+            '<p>Ao clicar em Inscreva-se, você preenche a ficha desta página (nome e contato, '
+            'depois os dados da matrícula) e segue para o formulário oficial da Extecamp '
+            f'(sistema da Unicamp), onde a inscrição da turma {meta_row["curso"]}/'
+            f'{meta_row["turma"]} é concluída — com taxa de inscrição, envio de documentos e '
+            'boletos gerados por lá.</p></details>'
             if aberto else
-            ('<details class="bg-white/5 border border-white/10 rounded-xl p-5">'
-             '<summary class="cursor-pointer font-semibold">O prazo acabou. Ainda dá para entrar?</summary>'
-             '<p class="mt-2 text-sm text-slate-300">Sim. A turma ainda não começou e costumam '
+            ('<details class="qa">'
+             '<summary>O prazo acabou. Ainda dá para entrar?</summary>'
+             '<p>Sim. A turma ainda não começou e costumam '
              'sobrar vagas remanescentes: deixe seu contato no botão desta página que a '
              'coordenação gera um link de inscrição fora do prazo no seu e-mail. O link é '
              'individual e vale 24 horas.</p></details>'
              if recuperavel else
-             '<details class="bg-white/5 border border-white/10 rounded-xl p-5">'
-             '<summary class="cursor-pointer font-semibold">Como entro na lista de espera?</summary>'
-             '<p class="mt-2 text-sm text-slate-300">Basta deixar nome e WhatsApp no botão desta '
+             '<details class="qa">'
+             '<summary>Como entro na lista de espera?</summary>'
+             '<p>Basta deixar nome e WhatsApp no botão desta '
              'página. Assim que a próxima turma for confirmada na Extecamp, avisamos você com as '
              'datas e o link oficial de inscrição — sem compromisso e sem custo.</p></details>')),
         "FAQ_PRAZO": (
@@ -1072,7 +1095,9 @@ def _bridge_bootstrap(tokens, webhook_url, pixel_id, aberto=True):
     entrada na lista de espera em vez de redirecionar (spec 17 §2b)."""
     config_js = "window.BRIDGE=" + json.dumps({
         "curso": tokens["CURSO"],
-        "destino": tokens["URL_CURSO"] if aberto else "",
+        # `destino` (URL do formulário da Extecamp) saiu: a etapa 2 não repassa mais o
+        # lead para lá. O link oficial segue existindo para o time transcrever e para o
+        # agente mandar em inscrição fora do prazo — mas isso não é assunto do navegador.
         "aberto": bool(aberto),
         "webhook": webhook_url,
         # etapa 2 mora ao lado da etapa 1 no mesmo host (o webhook_url já traz o
@@ -1108,14 +1133,15 @@ def render(g, ont, curso, webhook_url="/webhook/ponte", hoje=None):
     pixel_id = os.environ.get("META_PIXEL_ID", "")
     hero_bg = os.environ.get("GROWTH_HERO_BG_URL") or HERO_BG_URL_DEFAULT
     logo = os.environ.get("GROWTH_LOGO_URL") or LOGO_URL_DEFAULT
-    css = (_WEB / "bridge.css").read_text().replace("{{HERO_BG_URL}}", hero_bg)
+    css = ((_WEB / "bridge.css").read_text()
+           .replace("{{HERO_BG_URL}}", hero_bg)
+           .replace("{{CV_FOTO_URL}}", os.environ.get("GROWTH_CV_FOTO_URL") or CV_FOTO_URL))
     return (pagina
             .replace("{{CURSOS_RELACIONADOS_HTML}}", _cursos_relacionados_html(g, ont, curso))
             .replace("{{WEBHOOK_URL}}", webhook_url)
             .replace("{{SECAO_EMPRESAS}}", _secao_empresas(c))
             .replace("{{SECAO_CURRICULO}}", _secao_curriculo(c))
             .replace("{{OPCOES_PAGAMENTO}}", _opcoes_pagamento(c))
-            .replace("{{PROMO_AVISO}}", _promo_aviso(c))
             .replace("{{REQUISITO_AVISO}}",
                      _esc(_REQUISITO_TEXTO.get((c or {}).get("requisito"), "")))
             .replace("{{LOGO_URL}}", logo)
@@ -1123,22 +1149,16 @@ def render(g, ont, curso, webhook_url="/webhook/ponte", hoje=None):
             .replace("{{BRIDGE_B64}}", _bridge_bootstrap(tokens, webhook_url, pixel_id, aberto)))
 
 
-def _pagina_obrigado_bootstrap():
-    """Lê ?to= e segue pro destino real após o pageview disparar o GTM (mesma
-    técnica base64 de _bridge_bootstrap — imune ao convert_chars do WP)."""
-    js = ('var p=new URLSearchParams(window.location.search);'
-          'var to=p.get("to");'
-          'if(to){setTimeout(function(){window.location.href=to;},600);}')
-    return base64.b64encode(js.encode()).decode()
-
-
 def pagina_obrigado_html():
-    """/lp-thank-you-page/ (spec 16/17 + conversão de Lead do Google Ads/GTM):
-    interstício entre o modal e o formulário oficial da Extecamp — existe só
-    pra dar ao GTM (GTM-WPXLCWJ, já instalado no <head> do site) uma URL com
-    'thank-you-page' pra observar antes de seguir pro destino real (?to=).
-    Mesmos seletores de bridge.css pra tirar cabeçalho/faixa de título do tema
-    (página órfã, sem saída pro resto do site — igual às 4 LPs)."""
+    """/lp-thank-you-page/ — FIM da jornada da LP (spec 17 §7).
+
+    Deixou de ser interstício para a Extecamp: o lead entregou a ficha completa na
+    etapa 2, então mandá-lo preencher tudo de novo no formulário oficial seria pedir
+    a mesma coisa duas vezes. A transcrição é trabalho do time (aba Verificação), e
+    esta página diz exatamente isso — que a Extensão FEQ entra em contato.
+    O path continua começando com 'thank-you-page' porque é o que o gatilho de
+    conversão do Google Ads/GTM (GTM-WPXLCWJ, já no <head> do site) observa.
+    Mesmos seletores de bridge.css pra tirar cabeçalho/faixa de título do tema."""
     gtm_id = os.environ.get("GROWTH_GTM_ID") or GTM_ID_DEFAULT
     logo = os.environ.get("GROWTH_LOGO_URL") or LOGO_URL_DEFAULT
     return (
@@ -1152,33 +1172,163 @@ def pagina_obrigado_html():
         '  padding: 0 !important; border: none !important; box-shadow: none !important;\n'
         '  background: transparent !important;\n'
         '}\n'
+        # mesma paleta/disciplina do redesign monochrome das LPs (raio 0, tinta FEQ)
         '.lp-obrigado {\n'
         '  min-height: 100vh; display: flex; align-items: center; justify-content: center;\n'
-        '  flex-direction: column; text-align: center; background: #020617; color: #f1f5f9;\n'
-        '  padding: 3rem 1.5rem;\n'
+        '  flex-direction: column; text-align: center; background: #FFFFFF; color: #094567;\n'
+        '  padding: 3rem 1.5rem; font-family: Montserrat, "Helvetica Neue", Arial, sans-serif;\n'
         '}\n'
         '.lp-obrigado img { height: 36px; margin-bottom: 2.5rem; }\n'
-        '.lp-obrigado .spinner {\n'
-        '  width: 28px; height: 28px; border-radius: 999px; margin-bottom: 1.5rem;\n'
-        '  border: 3px solid rgba(241,245,249,.15); border-top-color: #fbbf24;\n'
-        '  animation: lp-obrigado-girar 0.8s linear infinite;\n'
+        # selo de conclusão no lugar do spinner: não há mais nada carregando —
+        # girar um spinner aqui prometeria um redirecionamento que não vem.
+        '.lp-obrigado .selo {\n'
+        '  width: 56px; height: 56px; margin-bottom: 1.75rem; display: flex;\n'
+        '  align-items: center; justify-content: center; background: #19ABB5;\n'
+        '  color: #094567; font-size: 1.8rem; font-weight: 800;\n'
         '}\n'
-        '@keyframes lp-obrigado-girar { to { transform: rotate(360deg); } }\n'
-        '.lp-obrigado p:first-of-type { font-size: 1.5rem; font-weight: 700; margin-bottom: .75rem; }\n'
-        '.lp-obrigado p:last-of-type { color: #94a3b8; max-width: 28rem; }\n'
+        '.lp-obrigado p:first-of-type { font-size: 1.6rem; font-weight: 800; color: #065BAA;\n'
+        '  letter-spacing: -0.03em; margin-bottom: .75rem; }\n'
+        '.lp-obrigado p:last-of-type { color: rgba(9,69,103,.68); max-width: 30rem;\n'
+        '  line-height: 1.6; }\n'
         '</style>\n'
         f'<div class="lp-obrigado">\n'
         f'  <img src="{logo}" alt="FEQ Unicamp">\n'
-        '  <div class="spinner"></div>\n'
-        '  <p>Recebemos seus dados!</p>\n'
-        '  <p>Redirecionando você para o formulário oficial da Unicamp...</p>\n'
+        '  <div class="selo">✓</div>\n'
+        '  <p>Inscrição recebida!</p>\n'
+        '  <p>O time da Extensão FEQ Unicamp entra em contato em breve pelo WhatsApp '
+        'para ajudar você a concluir a matrícula. Não precisa preencher mais nada '
+        'agora — seus dados já estão com a gente.</p>\n'
         '</div>\n'
         f'<noscript><iframe src="https://www.googletagmanager.com/ns.html?id={gtm_id}" '
-        'height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>\n'
-        '<script>(function(){var s=document.createElement("script");'
-        f's.textContent=atob("{_pagina_obrigado_bootstrap()}");'
-        'document.body.appendChild(s);})();</script>'
-    )
+        'height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>'
+    )   # sem JS próprio: o redirecionamento para a Extecamp deixou de existir, e o
+        # pageview que o GTM observa é o do próprio carregamento da página
+
+
+HOME_MARCA = "<!-- FEQ-CARDS-CURSOS"   # marcador do bloco que o deploy substitui
+
+
+def home_marca_versao(html):
+    """Carimbo de VERSÃO do bloco (hash do conteúdo). Sem ele, o deploy só conseguia
+    perguntar "existe um bloco nosso na home?" — e respondia "publicado" mesmo quando
+    o que estava no ar era a versão anterior, servida do cache do Elementor."""
+    return hashlib.sha1(html.encode()).hexdigest()[:8]
+
+
+def _card_home(m, c, cap):
+    """Um card do bloco de cursos da home. Três estados, todos ancorados:
+    aberto (prazo real), fora do prazo (a turma não começou — pedido de vaga
+    remanescente) e sem turma (lista de espera). Nada de preço/prazo inventado."""
+    nome = (c or {}).get("nome") or m["curso"]
+    tipo = (c or {}).get("tipo") or "Curso"
+    aberto, recuperavel = bool(cap.get("captavel")), bool(cap.get("recuperavel"))
+    linha = " · ".join(x for x in (
+        f"{c['carga_horas']}h" if (c or {}).get("carga_horas") else "",
+        (c or {}).get("formato_aulas_resumo") or (c or {}).get("modalidade") or "") if x)
+    if aberto:
+        selo, selo_cls = "Inscrições abertas", "aberto"
+        prazo = _ddmm((c or {}).get("inscricoes_fim"))
+        rodape = f"Inscrições até {prazo}" if prazo else "Prazo na página do curso"
+        cta = "Ver curso e inscrever-se"
+    elif recuperavel:
+        selo, selo_cls = "Fora do prazo", "prazo"
+        rodape = "Prazo encerrado, mas a turma ainda não começou — peça uma vaga remanescente"
+        cta = "Pedir inscrição fora do prazo"
+    else:
+        selo, selo_cls = "Sem turma aberta", "espera"
+        rodape = "Entre na lista de espera e avisamos quando a próxima turma abrir"
+        cta = "Entrar na lista de espera"
+    # preço só com turma aberta: valor de turma encerrada não é oferta
+    preco = ""
+    if aberto:
+        pr, p = (c or {}).get("promocao"), (c or {}).get("plano") or {}
+        o = (pr or {}).get("ofertas", [{}])[0] if pr else {}
+        if o.get("n") and o.get("valor_parcela"):
+            preco = f'<p class="feq-preco">{o["n"]}x de <strong>{_moeda(o["valor_parcela"])}</strong></p>'
+        elif p.get("n") and p.get("valor_parcela"):
+            preco = f'<p class="feq-preco">{p["n"]}x de <strong>{_moeda(p["valor_parcela"])}</strong></p>'
+    img = CURSO_IMAGEM.get(m["curso"])
+    capa = (f'<span class="feq-capa"><img src="{img}" alt="" aria-hidden="true" '
+            f'loading="lazy"></span>') if img else ""
+    return (
+        f'<a class="feq-card" href="/{slug_lp(m["curso"], m["turma"])}/">'
+        f'{capa}'
+        f'<span class="feq-selo feq-selo-{selo_cls}">{selo}</span>'
+        f'<span class="feq-tipo">{_esc(tipo)}</span>'
+        f'<span class="feq-nome">{_esc(nome)}</span>'
+        + (f'<span class="feq-meta">{_esc(linha)}</span>' if linha else "")
+        + preco +
+        f'<span class="feq-rodape">{_esc(rodape)}</span>'
+        f'<span class="feq-cta">{cta} →</span></a>')
+
+
+def home_cursos_html(g, ont, hoje=None):
+    """Bloco de cursos da HOME, gerado da ontologia (spec 17 §3d).
+
+    Substitui a grade fixa de 4 imagens que apontava para as páginas antigas: aqui
+    todo curso do catálogo vira card, com o estado REAL de captação, e o link é a LP
+    (mesma função de slug do deploy). CSS embutido e escopado em .feq-cards — o resto
+    da home (hero, diferenciais, menu, rodapé) não é tocado."""
+    abertos, prazo, espera = [], [], []
+    for m in g.cursos():
+        try:
+            c = ont.curso(m["curso"]) or {}
+        except Exception:
+            c = {}
+        try:
+            cap = ont.captavel(m["curso"], hoje) or {}
+        except Exception:
+            cap = {"captavel": True}
+        card = _card_home(m, c, cap)
+        (abertos if cap.get("captavel") else
+         prazo if cap.get("recuperavel") else espera).append(card)
+    cards = abertos + prazo + espera
+    if not cards:
+        return ""
+    corpo = _home_corpo(cards)
+    return f"{HOME_MARCA} v={home_marca_versao(corpo)} -->{corpo}"
+
+
+def _home_corpo(cards):
+    return ('<div class="feq-cards"><style>'
+            '.feq-cards{font-family:Montserrat,"Helvetica Neue",Arial,sans-serif;'
+            'display:grid;gap:1px;background:rgba(6,91,170,.18);border:1px solid rgba(6,91,170,.18);'
+            'grid-template-columns:1fr}'
+            '@media(min-width:700px){.feq-cards{grid-template-columns:1fr 1fr}}'
+            '@media(min-width:1000px){.feq-cards{grid-template-columns:1fr 1fr 1fr}}'
+            '.feq-cards .feq-card{display:flex;flex-direction:column;gap:.35rem;background:#fff;'
+            'padding:0 1.4rem 1.6rem;text-decoration:none;color:#094567;'
+            'transition:background-color 90ms linear,color 90ms linear}'
+            '.feq-cards .feq-card:hover{background:#094567;color:#fff}'
+            # capa sangra até as bordas do card (margin negativa compensa o padding)
+            # quem define a altura é a IMAGEM (aspect-ratio nela): com o aspect-ratio no
+            # container e height:100% no <img>, a altura percentual não resolve e a capa
+            # renderiza vazia — só o fundo cinza aparecia.
+            '.feq-cards .feq-capa{display:block;margin:0 -1.4rem 1.3rem;overflow:hidden;'
+            'background:#F5F7F9}'
+            '.feq-cards .feq-capa img{width:100%;aspect-ratio:16/9;object-fit:cover;'
+            'display:block;transition:opacity 90ms linear}'
+            '.feq-cards .feq-card:hover .feq-capa img{opacity:.82}'
+            '.feq-cards .feq-selo{align-self:flex-start;font-size:.62rem;font-weight:800;'
+            'text-transform:uppercase;letter-spacing:.12em;padding:.22rem .5rem;margin-bottom:.5rem}'
+            '.feq-cards .feq-selo-aberto{background:#19ABB5;color:#094567}'
+            '.feq-cards .feq-selo-prazo{background:#FBBF24;color:#094567}'
+            '.feq-cards .feq-selo-espera{background:#A2DADB;color:#094567}'
+            '.feq-cards .feq-tipo{font-size:.66rem;font-weight:800;text-transform:uppercase;'
+            'letter-spacing:.14em;color:#065BAA}'
+            '.feq-cards .feq-card:hover .feq-tipo{color:#19ABB5}'
+            '.feq-cards .feq-nome{font-size:1.08rem;font-weight:800;letter-spacing:-.02em;'
+            'line-height:1.25;color:#065BAA}'
+            '.feq-cards .feq-card:hover .feq-nome{color:#fff}'
+            '.feq-cards .feq-meta{font-size:.8rem;opacity:.7}'
+            '.feq-cards .feq-preco{margin:.35rem 0 0;font-size:.95rem}'
+            '.feq-cards .feq-preco strong{font-size:1.15rem;font-weight:800;letter-spacing:-.02em}'
+            '.feq-cards .feq-card:hover .feq-preco strong{color:#FBBF24}'
+            '.feq-cards .feq-rodape{margin-top:auto;padding-top:.9rem;font-size:.76rem;opacity:.72}'
+            '.feq-cards .feq-cta{margin-top:.9rem;font-size:.72rem;font-weight:800;'
+            'text-transform:uppercase;letter-spacing:.08em;color:#065BAA}'
+            '.feq-cards .feq-card:hover .feq-cta{color:#19ABB5}'
+            '</style>' + "".join(cards) + '</div>')
 
 
 def fragmento(html_completo):
@@ -1260,9 +1410,10 @@ CAMPOS_ETAPA2 = (
     "experiencia_anos", "superior",
     # financeiro
     "forma_pagamento", "comprovante_em",
-    # extras
-    "interesses", "como_soube", "como_soube_outro", "contato_pref",
 )
+# "Para finalizar" (como ficou sabendo / preferência de contato) saiu do formulário:
+# a origem já vem dos UTMs e do fbclid, e o canal de contato é o WhatsApp que ele
+# acabou de informar — eram dois campos a mais numa ficha que já é longa.
 OBRIGATORIOS_ETAPA2 = ("cpf", "nascimento", "escolaridade", "forma_pagamento")
 
 
@@ -1305,8 +1456,14 @@ def processar_etapa2(dados, est, g, ads, ing, ont=None):
     funil.registrar(g, ads, est, card_id, "inicio_inscricao",
                     curso=curso, event_id=eid, contexto=contexto)
     if est:
-        est.log_acao("ponte", f"ficha completa recebida ({curso}) — aguardando transcrição "
-                              f"na Extecamp", card_id)
+        # Ficha completa = o lead virou INSCRITO no kanban (pediu a vaga e entregou
+        # CPF, endereço e forma de pagamento). Move só a FASE: o evento de funil
+        # `inscricao_confirmada` — que é o que reporta conversão à Meta e tira o card
+        # da fila de transcrição — continua sendo o gesto humano na aba Verificação,
+        # depois de lançar a inscrição na Extecamp de fato.
+        est.upsert_lead(card_id, fase="Inscrito")
+        est.log_acao("ponte", f"ficha completa recebida ({curso}) — fase movida para "
+                              f"Inscrito, aguardando transcrição na Extecamp", card_id)
         est.add_alerta("inscricao", f"Ficha completa de {curso} pronta para transcrever na "
                                     f"Extecamp (lead {card_id})")
     return {"ok": True, "card_id": card_id, "event_id": eid}

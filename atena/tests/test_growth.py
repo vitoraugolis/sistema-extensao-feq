@@ -74,8 +74,8 @@ check(pacing.calcular(91, 10, None, 1, HOJE)["status"] == "sem_prazo", "sem praz
 g = Growth(":memory:")
 check({c["curso"] for c in g.cursos()} == {"FEQ-0480", "FEQ-0580", "FEQ-0333", "FEQ-1000",
                                            "FEQ-0360", "FEQ-0331", "FEQ-0299", "FEQ-0670",
-                                           "FEQ-0499"},
-      "seed cobre os 9 cursos com LP (4 turmas-alvo + demais do portfólio)")
+                                           "FEQ-0499", "FEQ-0295"},
+      "seed cobre os 10 cursos com LP (4 turmas-alvo + demais do portfólio)")
 check([c for c in g.cursos() if c["curso"] == "FEQ-1000"][0]["meta_seg"] == 91,
       "meta de segurança = meta real +30% (FEQ-1000: 91)")
 
@@ -287,8 +287,9 @@ check("&&" not in lp, "sem '&&' cru no HTML — WordPress normaliza '&' p/ '&#03
       " (o operador lógico só existe DENTRO do payload base64, imune a esse filtro)")
 b64 = re.search(r'atob\("([^"]+)"\)', lp).group(1)
 decodificado = base64.b64decode(b64).decode()
-check("/webhook/ponte" in decodificado and "FEQ-0480/009" in decodificado and "&&" in decodificado,
-      "webhook e destino Extecamp injetados no payload base64 (decodificado corretamente)")
+check("/webhook/ponte" in decodificado and "/webhook/inscricao" in decodificado
+      and '"curso": "FEQ-0480"' in decodificado and "&&" in decodificado,
+      "webhooks das duas etapas injetados no payload base64 (decodificado corretamente)")
 check(ponte.render(g5, FakeOnt(), "FEQ-9999") is None, "curso fora do cursos_metas não renderiza")
 
 # --- payload do bridge-logic ({whatsapp, curso_id}) é aceito ---------------------
@@ -300,10 +301,12 @@ check(r["ok"] and r["card_id"],
 
 # --- deploy WP: renderiza todas e, sem credenciais, não publica ------------------
 pgs = wpd.renderizar(g5, FakeOnt(), g5.cursos(), tempfile.mkdtemp())
-check(len(pgs) == 9 and all(pathlib.Path(p["arquivo"]).exists() for p in pgs),
-      "deploy renderiza as 9 LPs do portfólio em disco")
+check(len(pgs) == 10 and all(pathlib.Path(p["arquivo"]).exists() for p in pgs),
+      "deploy renderiza as 10 LPs do portfólio em disco")
 check(all(x["status"] == "dry_run" for x in wpd.publicar(pgs)),
       "sem credenciais WP o deploy é dry-run (não publica nada)")
+
+# (o bloco de cursos da HOME é testado mais abaixo, onde a ontologia real já existe)
 
 # --- /thank-you-page-lp/: interstício pro pixel de Lead do Google Ads/GTM --------
 # Sufixo, não prefixo: "lp-thank-you-page" não disparou o Lead no GTM (usuário
@@ -313,16 +316,20 @@ check(all(x["status"] == "dry_run" for x in wpd.publicar(pgs)),
 _logica = (pathlib.Path(__file__).resolve().parents[1] / "web" / "bridge-logic.js").read_text()
 # casa o destino, não a formatação: o redirect é montado em mais de uma linha, e o que
 # precisa ser verdade é o PATH pelo qual o fluxo passa
-check(f'"/{wpd.OBRIGADO_SLUG}/?to="' in _logica and "encodeURIComponent(CFG.destino" in _logica,
-      "ao concluir, o fluxo passa por /thank-you-page-lp/ antes do destino real")
+# A jornada TERMINA aqui: quem entregou a ficha completa na etapa 2 não é mandado ao
+# formulário da Extecamp (seria preencher tudo de novo). A transcrição é do time.
+check(f'"/{wpd.OBRIGADO_SLUG}/"' in _logica and "?to=" not in _logica
+      and "CFG.destino" not in _logica,
+      "ao concluir a etapa 2 o lead para na página de obrigado (sem repasse à Extecamp)")
 check(wpd.OBRIGADO_SLUG.startswith("thank-you-page"),
       "slug COMEÇA com thank-you-page (não só contém) — gatilho do GTM exige prefixo de path")
 obrigado = ponte.pagina_obrigado_html()
 check('ns.html?id=GTM-WPXLCWJ' in obrigado, "noscript do GTM (body code) presente na página de obrigado")
-b64_obrigado = re.search(r'atob\("([^"]+)"\)', obrigado).group(1)
-dec_obrigado = base64.b64decode(b64_obrigado).decode()
-check('URLSearchParams' in dec_obrigado and 'p.get("to")' in dec_obrigado and "&&" not in obrigado,
-      "bootstrap lê ?to= e nunca tem '&' cru fora do base64 (imune ao convert_chars do WP)")
+check("<script" not in obrigado and "?to=" not in obrigado and "&&" not in obrigado,
+      "página de obrigado sem JS de redirecionamento (a jornada acaba nela) e sem '&' cru")
+check("entra em contato" in obrigado and "matrícula" in obrigado
+      and "Redirecionando" not in obrigado,
+      "página de obrigado avisa que o time da FEQ entra em contato para concluir a matrícula")
 check(".page-header, .pre-content { display: none !important; }" in obrigado
       and "#site-header, #header-container" in obrigado,
       "página de obrigado também esconde cabeçalho/faixa de título do tema (mesmos seletores das LPs)")
@@ -437,7 +444,12 @@ lp2 = ponte.render(g5, FakeOnt(), "FEQ-0480")
 check('id="beneficios"' in lp2 and 'id="programa"' in lp2 and 'id="professor"' in lp2
       and 'id="investimento"' in lp2 and 'id="faq"' in lp2,
       "âncoras da nav de atalhos existem nas seções correspondentes")
-check('href="#beneficios"' in lp2 and 'href="#faq"' in lp2, "nav-âncora aponta pros ids certos")
+# o cabeçalho é UMA faixa só, com o menu real do site (não mais uma segunda barra de
+# âncoras da própria página, que lia como cabeçalho duplicado)
+check('class="lp-site-nav"' in lp2 and lp2.count('class="lp-head-in"') == 1
+      and "cursos-extensao.feq.unicamp.br/contato-2/" in lp2
+      and 'id="menu-tgl"' in lp2,
+      "cabeçalho: uma faixa, menu do site + sanduíche (CSS puro, sem depender de JS)")
 check('id="cta-fixo"' in lp2, "barra de CTA fixa presente")
 
 # --- demais professores (LinkedIn/Lattes reais, achados por busca) -----------------
@@ -474,10 +486,15 @@ check("Mais professores do curso" in lp_real and "lattes.cnpq.br/041956192668924
       "LP renderizada com ontologia real: seção de outros professores presente")
 
 # --- período de oferecimento (datas de início/fim das aulas, fonte Extecamp) -------
-check('data-secao="periodo"' in lp_real and "14/09/2026" in lp_real and "15/03/2028" in lp_real
+check('data-secao="periodo"' in lp_real and "18/01/2027" in lp_real and "19/06/2028" in lp_real
       and "Período do curso" in lp_real,
       "0480 (aberto): faixa com o período de oferecimento (início e fim) da Extecamp")
-_lp_espera = ponte.render(g5, _ont_real, "FEQ-0499")
+# curso SEM turma aberta descoberto no catálogo (o 0499 era o exemplo até reabrir
+# em 11/08/2026) — o rótulo é sobre o estado, não sobre um código específico
+_FECHADO = next(c for c in sorted(_ont_real.cursos())
+                if _ont_real.captavel(c)["status"] == "encerrada"
+                and any(m["curso"] == c for m in g5.cursos()))
+_lp_espera = ponte.render(g5, _ont_real, _FECHADO)
 check("Período da última turma" in _lp_espera,
       "curso em lista de espera: período rotulado como 'última turma' (não engana o lead)")
 _lp_0670 = ponte.render(g5, _ont_real, "FEQ-0670")
@@ -490,15 +507,27 @@ check(ponte._periodo_html({"aulas_inicio": None, "aulas_fim": None}) == "",
 # --- conteúdo rico importado das páginas oficiais preexistentes (spec 17) ----------
 check('data-secao="objetivos"' in lp_real and "Tornar os profissionais diferenciados" in lp_real,
       "0480: objetivos oficiais na LP")
-check('class="hab-chip"' in lp_real and "Machine Learning e Deep Learning" in lp_real,
-      "0480: habilidades oficiais em chips")
+# redesign monochrome: as habilidades vivem SÓ dentro de "Seu currículo no futuro" —
+# a antiga seção "O que você vai dominar" repetia a mesma lista algumas dobras abaixo.
+check('class="cv-habs"' in lp_real and lp_real.count("Machine Learning e Deep Learning") == 1
+      and 'data-secao="habilidades"' not in lp_real,
+      "0480: habilidades aparecem UMA vez, dentro de 'Seu currículo no futuro'")
+# a seção é uma FOLHA DE CURRÍCULO: o lead tem que se ver no documento
+check('class="cv"' in lp_real and "Seu nome aqui" in lp_real
+      and "Formação complementar" in lp_real
+      and lp_real.index('class="cv-nome"') < lp_real.index("Machine Learning e Deep Learning"),
+      "0480: 'Seu currículo no futuro' tem forma de currículo (cabeçalho -> formação -> competências)")
 check('class="prog-mod"' in lp_real and "Processo de Decisão de Markov (MDP)" in lp_real,
       "0480: programa em accordion com subtópicos oficiais")
 check('id="depoimentos"' in lp_real and "Luiz Octavio" in lp_real and "Juliana Panizza" in lp_real,
       "0480: depoimentos REAIS transcritos da página oficial")
-check('href="#depoimentos"' in lp_real, "0480: nav-âncora ganha o atalho Depoimentos")
-check("Nossos alunos atuam em empresas como" in lp_real and "Braskem" in lp_real,
-      "0480: prova social oficial de empresas")
+check(lp_real.index('data-secao="depoimentos"') < lp_real.index('data-secao="beneficios"'),
+      "0480: depoimentos entram antes dos diferenciais (prova social antes do argumento)")
+# uma única faixa de empresas (a de LOGOS, logo abaixo da dobra) — antes havia também
+# uma faixa de chips com os mesmos nomes poucos pixels acima
+check("Onde nossos alunos atuam" in lp_real and 'class="logo-empresa"' in lp_real
+      and lp_real.count("braskem") == 1 and 'class="chip-empresa"' not in lp_real,
+      "0480: prova social de empresas em UMA faixa de logos")
 check('id="inscricao"' in lp_real and 'class="passo-n"' in lp_real and "termo de compromisso" in lp_real,
       "0480: passo a passo oficial de inscrição")
 check("lato-sensu" in lp_real and "reconhecida pelo MEC" in lp_real,
@@ -536,8 +565,8 @@ check("guilherme-300x300-1.png" in lp_1000 and "edneu.png" in lp_1000,
 check(lp_1000.count("2025/09/D-Flavio-Vasconcelos") == 1,
       "1000: Flavio em destaque com foto (só 1 card; responsável é o Osvaldir)")
 lp_0580b = ponte.render(g5, _ont_real, "FEQ-0580")
-check('id="depoimentos"' not in lp_0580b and 'href="#depoimentos"' not in lp_0580b,
-      "0580: sem depoimentos publicados -> seção e âncora somem (nunca inventa)")
+check('id="depoimentos"' not in lp_0580b and 'data-secao="depoimentos"' not in lp_0580b,
+      "0580: sem depoimentos publicados -> a seção some inteira (nunca inventa)")
 check('class="prog-mod"' not in lp_0580b and "<li" in lp_0580b,
       "0580: sem detalhe oficial de programa -> lista numerada de sempre (sem accordion vazio)")
 check('data-secao="objetivos"' in lp_0580b, "0580: objetivos oficiais presentes")
@@ -564,40 +593,47 @@ check("Fabio Marcelo Brogna" in _lp0360 and "HAZOP" in _lp0360
       and "15.883" in _lp0360,
       "0360: docentes, programa e salário de referência oficiais")
 
-# curso SEM turma aberta -> lista de espera (nada de inscrição prometida)
-_lp0499 = ponte.render(g5, _ont_real, "FEQ-0499")
+# curso SEM turma aberta -> lista de espera (nada de inscrição prometida).
+# Usa o _FECHADO descoberto acima, não um código fixo: quem está fechado muda a cada
+# oferecimento que a coordenação declara.
+_lp0499 = ponte.render(g5, _ont_real, _FECHADO)
 check("Quero ser avisado" in _lp0499 and "Inscreva-se" not in _lp0499,
-      "0499 (fechado): CTA vira 'Quero ser avisado', sem prometer inscrição")
+      "fechado: CTA vira 'Quero ser avisado', sem prometer inscrição")
 check("lista de espera" in _lp0499.lower() and 'id="inscricao"' not in _lp0499,
-      "0499: some a seção 'Como se inscrever' (não há inscrição aberta)")
-check('href="#inscricao"' not in _lp0499, "0499: nav-âncora sem atalho de Inscrição")
-# fallback: os depoentes do 0499 não têm foto publicada -> iniciais, nunca rosto inventado
-check('class="depo-avatar"' in _lp0499 and 'class="depo-foto"' not in _lp0499,
-      "0499: depoentes sem foto oficial ficam com as iniciais")
-# prova social (professor + depoimentos) vem ANTES do conteúdo programático
-check(lp_real.index('data-secao="professor"') < lp_real.index('data-secao="depoimentos"')
-      < lp_real.index('data-secao="conteudo"') < lp_real.index('data-secao="investimento"'),
-      "ordem: professor -> depoimentos -> conteúdo -> investimento")
+      "fechado: some a seção 'Como se inscrever' (não há inscrição aberta)")
+check('class="passo-n"' not in _lp0499, "fechado: sem o passo a passo de inscrição da Extecamp")
+# fallback do avatar (iniciais quando não há foto publicada) é exercitado na LP do
+# 0499, que tem depoimentos SEM foto oficial no catálogo
+check('class="depo-avatar"' in ponte.render(g5, _ont_real, "FEQ-0499"),
+      "depoente sem foto publicada fica com as iniciais, nunca com rosto inventado")
+# Sequência EXATA dos blocos das páginas antigas da FEQ (redesign monochrome):
+# hero -> empresas -> currículo -> depoimentos -> por que a FEQ -> professores ->
+# conteúdo -> FAQ -> investimento -> relacionados. A prova social (empresas, alunos,
+# docentes) vem toda ANTES do conteúdo longo; o preço fecha.
+_ordem = ["hero", "empresas", "curriculo", "depoimentos", "beneficios", "professor",
+          "conteudo", "faq", "investimento", "relacionados"]
+_pos = [lp_real.index('data-secao="%s"' % s) for s in _ordem]
+check(_pos == sorted(_pos), f"sequência dos blocos: {' -> '.join(_ordem)}")
 _b64 = re.search(r'atob\("([^"]+)"\)', _lp0499).group(1)
 _cfg = base64.b64decode(_b64).decode()
-check('"aberto": false' in _cfg and '"destino": ""' in _cfg,
-      "0499: window.BRIDGE marca aberto=false e destino vazio (JS não redireciona)")
+check('"aberto": false' in _cfg and "destino" not in _cfg,
+      "fechado: window.BRIDGE marca aberto=false (e não carrega URL da Extecamp)")
 check("confirmarEspera" in _cfg and "espera-ok" in _cfg,
-      "0499: JS confirma a lista de espera na própria página")
+      "fechado: JS confirma a lista de espera na própria página")
 check("Valores da última turma" in _lp0499,
-      "0499: investimento fica informativo, sem prometer preço da próxima turma")
+      "fechado: investimento fica informativo, sem prometer preço da próxima turma")
 # ...e o curso ABERTO segue com o fluxo de inscrição intacto
 _b64a = re.search(r'atob\("([^"]+)"\)', lp_real).group(1)
 _cfga = base64.b64decode(_b64a).decode()
-check('"aberto": true' in _cfga and "/curso/inscricao/FEQ-0480/009" in _cfga,
-      "0480 (aberto): destino da Extecamp preservado, aberto=true")
+check('"aberto": true' in _cfga and "ins.extecamp" not in _cfga,
+      "0480 (aberto): aberto=true, e a URL da Extecamp não trafega mais pelo navegador")
 check('id="inscricao"' in lp_real and "Inscreva-se →" in lp_real,
       "0480 (aberto): seção de inscrição e CTA normais")
 
 # lead de lista de espera NÃO pode virar checkout: senão cairia na aba Verificação
 # (pedindo pro operador conferir uma inscrição inexistente) e na régua de recuperação.
 g8, est8, wa8 = Growth(":memory:"), Estado(":memory:"), FakeWA()
-r = ponte.processar({"nome": "Espera", "whatsapp": "19955559999", "curso_id": "FEQ-0499",
+r = ponte.processar({"nome": "Espera", "whatsapp": "19955559999", "curso_id": _FECHADO,
                      "event_id": "espera-aaaa-bbbb-cccc-dddddddddddd"},
                     est8, g8, ads, Ingestao(est8, _ont_real), ont=_ont_real)
 check(r["ok"], "lead de curso fechado é capturado (lista de espera)")
@@ -634,6 +670,69 @@ check('href="https://www.linkedin.com/in/claudio-vieira-neto"' in lp_0580,
 op580 = ponte._outros_professores_html(_c0580["professores_adicionais"])
 check('href="https://www.linkedin.com/in/claudio-vieira-neto"' in op580,
       "PROFESSOR_LINK vale pro nome em qualquer curso (mesma pessoa, mesma entrada)")
+
+# --- bloco de cursos da HOME (gerado da ontologia) -------------------------------
+_home = ponte.home_cursos_html(g5, _ont_real)
+check(_home.count('class="feq-card"') == len(g5.cursos()) == 10,
+      "home: um card por curso do catálogo")
+check(_home.startswith(ponte.HOME_MARCA) and "<style>" in _home,
+      "home: bloco marcado e com CSS escopado (não vaza no resto da página)")
+for _cod, _t in (("FEQ-0480", "009"), ("FEQ-0499", "001")):
+    check(f'href="/{ponte.slug_lp(_cod, _t)}/"' in _home,
+          f"home: card do {_cod} aponta para a MESMA URL que o deploy publica")
+check(wpd._slug is ponte.slug_lp,
+      "deploy e LP usam a mesma função de slug (eram duas implementações)")
+check('feq-selo-aberto">Inscrições abertas' in _home
+      and 'feq-selo-espera">Sem turma aberta' in _home
+      and 'feq-selo-prazo">Fora do prazo' in _home,
+      "home: os três estados (aberto · fora do prazo · lista de espera) saem da ontologia")
+_nome_fechado = (_ont_real.curso(_FECHADO) or {}).get("nome", "")[:25]
+_ifech = _home.index(_nome_fechado)
+check("R$" not in _home[_ifech:_ifech + 400],
+      "home: curso sem turma aberta não anuncia preço (valor de turma encerrada não é oferta)")
+# a guarda que impede recortar o pedaço errado da home (estrutura real: título com a
+# âncora #cursos, grades de cards, espaçador, e a seção de diferenciais como limite)
+_home_secoes = [
+    {"settings": {}, "elements": [{"widgetType": "heading", "settings": {"title": "Hero"}}]},
+    {"settings": {"_element_id": "cursos"},
+     "elements": [{"widgetType": "heading", "settings": {"title": "Cursos de Formação..."}}]},
+    {"settings": {}, "elements": [{"widgetType": "image",
+                                   "settings": {"link": {"url": "https://x/cursos-longa-duracao/y"}}}]},
+    {"settings": {}, "elements": [{"elType": "column"}]},                       # espaçador
+    {"settings": {}, "elements": [{"widgetType": "heading", "settings": {"title": "Cursos de Extensão..."}}]},
+    {"settings": {}, "elements": [{"widgetType": "image",
+                                   "settings": {"link": {"url": "https://x/cursos-curta-duracao/z"}}}]},
+    {"settings": {}, "elements": [{"widgetType": "heading", "settings": {"title": "Saia na frente"}}]},
+]
+check(wpd._fatia_de_cursos(_home_secoes) == (1, 2, 6),
+      "home: a fatia vai do fim do título até a seção de diferenciais")
+_intruso = [dict(s) for s in _home_secoes]
+_intruso.insert(3, {"settings": {}, "elements": [{"widgetType": "video",
+                                                  "settings": {"title": "Depoimento"}}]})
+check(wpd._fatia_de_cursos(_intruso) == (None, None, None),
+      "home: conteúdo estranho no meio do bloco ABORTA o deploy (não recorta às cegas)")
+check(wpd._fatia_de_cursos(_home_secoes[:-1]) == (None, None, None),
+      "home: sem a seção-limite de diferenciais, não publica")
+check(wpd.publicar_home_cursos(g5, _ont_real)["status"] == "dry_run",
+      "sem credenciais WP, o bloco da home também é dry-run")
+# imagens dos cards: uma por curso, todas na biblioteca de mídia da PRÓPRIA FEQ
+# (a grade antiga hotlinkava agencia.fapesp.br e ictq.com.br — servidor de terceiro
+# muda o arquivo e o card fica quebrado sem ninguém perceber). FEQ-0295 (12/08/2026)
+# ainda não tem imagem curada na biblioteca da FEQ — mesmo tratamento do
+# CERTIFICADO_MODELO: some do card, nunca inventa hotlink.
+check(all(ponte.CURSO_IMAGEM.get(m["curso"]) for m in g5.cursos() if m["curso"] != "FEQ-0295"),
+      "home: todo curso com imagem curada tem card ilustrado")
+check(all(u.startswith("https://cursos-extensao.feq.unicamp.br/")
+          for u in ponte.CURSO_IMAGEM.values()),
+      "home: nenhuma imagem de card vem de servidor de terceiro")
+check(_home.count('class="feq-capa"') == len(g5.cursos()) - 1,
+      "home: a capa aparece em todo card com imagem curada (FEQ-0295 ainda não tem)")
+# data do boleto (spec 17 §3e): só entra quando a coordenação declarou
+check("boleto" in ponte._passos_html(_ont_real.curso("FEQ-0360")).lower()
+      and "07/01/2027" in ponte._passos_html(_ont_real.curso("FEQ-0360")),
+      "0360: a data do boleto declarada aparece no passo a passo da inscrição")
+check("07/01/2027" not in ponte._passos_html(_ont_real.curso("FEQ-0480")),
+      "curso sem data de boleto não inventa uma")
 
 # --- auditoria sistêmica: toda classe usada no template tem que existir no CSS -----
 # (achado real: bridge-template.html usava "pt-10 pb-14" no wrapper da hero, mas o CSS

@@ -173,6 +173,10 @@ class Ontologia:
                 "taxa": str(self.g.value(plano, FEQ.taxaInscricao) or "") if plano else "",
             },
             "inscricoes_fim": fim_i.isoformat() if fim_i else None,
+            # Data do boleto da inscrição (o lead pergunta "até quando pago?"). Some
+            # quando o curso não a declara — nunca é derivada do prazo de inscrição.
+            "boleto_data": (str(self.g.value(u, FEQ.dataBoleto))
+                            if self.g.value(u, FEQ.dataBoleto) else None),
             "aulas_inicio": ini_o.isoformat() if ini_o else None,
             "aulas_fim": fim_o.isoformat() if fim_o else None,
             "url_extecamp": str(self.g.value(u, FEQ.urlExtecamp) or ""),

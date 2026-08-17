@@ -15,6 +15,7 @@ Env: WP_URL (ex.: https://site.com.br) · WP_USER · WP_APP_PASSWORD ·
      ATENA_PUBLIC_URL (URL pública do hub — vira o {{WEBHOOK_URL}} da LP)
 """
 import os
+import re
 import sys
 import json
 import pathlib
@@ -25,28 +26,11 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2]))
 from atena.growth import ponte
 
 
-# Congelado em 09/08/2026 (dia desta feature) — cópia ESTÁTICA de cursos_metas.turma
-# NAQUELE momento, conferida ao vivo no banco de produção. NÃO importar de METAS: essa
-# lista segue crescendo com cursos futuros, que devem nascer no slug perene desde a
-# primeira turma, não herdar tratamento "legado". As URLs abaixo já circulam em
-# campanha — não mudam nunca. Qualquer turma DIFERENTE da listada aqui (ou seja, todo
-# oferecimento novo declarado a partir de agora) usa o slug perene.
-# ponytail: comparação por valor de turma — assume que a Extecamp nunca reaproveita um
-# número dentro do mesmo curso. Se isso acontecer, trocar por uma coluna
-# cursos_metas.evergreen (setada por Growth.set_oferecimento, nunca desfeita).
-LEGADO_TURMA = {
-    "FEQ-0480": "009", "FEQ-0580": "001", "FEQ-0333": "001", "FEQ-1000": "018",
-    "FEQ-0360": "007", "FEQ-0331": "004", "FEQ-0299": "001", "FEQ-0670": "001",
-    "FEQ-0499": "001",
-}
-
-
-def _slug(curso, turma):
-    turma = (turma or "").strip()
-    legado = LEGADO_TURMA.get(curso.upper())
-    if legado is not None and turma == legado.strip():
-        return f"inscricao-{curso.lower()}-{turma}"      # URL já publicada: nunca muda
-    return f"inscricao-{curso.lower()}"                   # oferecimento novo: URL perene
+# A regra de slug mora em ponte.py: a LP (cross-sell), o bloco de cursos da home e o
+# deploy têm de produzir a MESMA URL — quando eram duas implementações, o cross-sell
+# apontava para um slug que o deploy não publicava.
+LEGADO_TURMA = ponte.LEGADO_TURMA
+_slug = ponte.slug_lp
 
 
 def _webhook_url():
@@ -183,6 +167,145 @@ def publicar_obrigado():
     return {"slug": OBRIGADO_SLUG, "status": "publicado", "link": r.get("link")}
 
 
+HOME_PAGE_ID = 8157          # "nova-home" — a home do site (Elementor)
+HOME_ANCORA = "cursos"       # seção-título com a âncora #cursos, que o menu usa
+HOME_TITULO = "Cursos da Extensão FEQ Unicamp"
+# Fim do bloco: a seção de diferenciais. É o limite que garante que hero (antes) e
+# diferenciais/logos/CTA (depois) fiquem intactos.
+HOME_FIM = "Saia na frente"
+_HOME_IDS = ("feqcards1", "feqcards2", "feqcards3")   # 'q' não é hex: não colide com id do Elementor
+
+
+def _texto(no):
+    return json.dumps(no, ensure_ascii=False)
+
+
+def _e_bloco_de_cursos(no):
+    """Seção que faz parte da grade de cursos? Aceita: grade original (links para as
+    páginas antigas), título de curso, seção vazia (espaçador) e a nossa (já marcada).
+    Qualquer outra coisa no meio do caminho aborta o deploy — é conteúdo que não é meu."""
+    if (no.get("settings") or {}).get("_element_id") == _HOME_IDS[0]:
+        return True
+    t = _texto(no)
+    if "cursos-longa-duracao" in t or "cursos-curta-duracao" in t:
+        return True
+    if _tem_titulo(no, "Curso"):
+        return True
+    return '"widgetType"' not in t          # seção sem widget nenhum (espaçador)
+
+
+def _tem_titulo(no, texto):
+    # \s* depois do ':' — json.dumps separa com espaço, o Elementor não; a regex tem
+    # de casar as duas formas, senão o título do 2º bloco não é reconhecido.
+    return bool(re.search(r'"title":\s*"[^"]*%s' % re.escape(texto), _texto(no)))
+
+
+def _fatia_de_cursos(dados):
+    """(i_titulo, ini, fim): a seção-título com a âncora #cursos, e o intervalo de
+    seções [ini, fim) que forma a grade — do que vem depois do título até a seção de
+    diferenciais. Devolve (None, None, None) se não reconhecer: melhor não publicar
+    do que recortar o pedaço errado da home."""
+    i_tit = next((i for i, s in enumerate(dados)
+                  if (s.get("settings") or {}).get("_element_id") == HOME_ANCORA), None)
+    i_fim = next((i for i, s in enumerate(dados) if _tem_titulo(s, HOME_FIM)), None)
+    if i_tit is None or i_fim is None or i_fim <= i_tit + 1:
+        return None, None, None
+    if not all(_e_bloco_de_cursos(s) for s in dados[i_tit + 1:i_fim]):
+        return None, None, None
+    return i_tit, i_tit + 1, i_fim
+
+
+def _secao_cards(html):
+    return {"id": _HOME_IDS[0], "elType": "section", "isInner": False,
+            "settings": {"_element_id": _HOME_IDS[0]},
+            "elements": [{"id": _HOME_IDS[1], "elType": "column", "isInner": False,
+                          "settings": {"_column_size": 100, "_inline_size": None},
+                          "elements": [{"id": _HOME_IDS[2], "elType": "widget",
+                                        "widgetType": "html", "isInner": False,
+                                        "settings": {"html": html}, "elements": []}]}]}
+
+
+def publicar_home_cursos(g, ont, backup_dir=None):
+    """Troca APENAS o bloco de cursos da home pelos cards gerados da ontologia.
+
+    A home é uma página Elementor: quem manda no que aparece é o `_elementor_data`
+    (o `post_content` é só o snapshot que o Elementor grava junto). O bloco ocupa
+    VÁRIAS seções — dois títulos e duas grades — e vira uma só, com o widget HTML dos
+    cards; hero, diferenciais, logos, menu e rodapé não são tocados.
+    O `_elementor_data` original é salvo em disco antes de escrever: restaurar é subir
+    o arquivo de volta. Sem credenciais, dry-run.
+    A conferência é pelo `content.rendered` da API (render do Elementor, sem cache de
+    página no meio) — a home no ar pode demorar a atualizar se houver cache."""
+    html = ponte.home_cursos_html(g, ont)
+    if not html:
+        return {"status": "falhou", "motivo": "nenhum curso no cursos_metas"}
+    base = (os.environ.get("WP_URL") or "").rstrip("/")
+    user, senha = os.environ.get("WP_USER"), os.environ.get("WP_APP_PASSWORD")
+    if not (base and user and senha):
+        return {"status": "dry_run", "cards": html.count('class="feq-card"')}
+    import requests
+    s = requests.Session()
+    s.auth = (user, senha)
+    pg = _wp(s, base, "GET", f"pages/{HOME_PAGE_ID}?context=edit&_fields=id,link,meta")
+    if not pg:
+        return {"status": "falhou", "motivo": "não consegui ler a home"}
+    try:
+        dados = json.loads((pg.get("meta") or {}).get("_elementor_data") or "[]")
+    except ValueError:
+        return {"status": "falhou", "motivo": "_elementor_data ilegível"}
+    if backup_dir:
+        bkp = pathlib.Path(backup_dir) / "home_elementor_antes.json"
+        bkp.parent.mkdir(parents=True, exist_ok=True)
+        if not bkp.exists():          # nunca sobrescreve o backup do estado ORIGINAL
+            bkp.write_text(json.dumps(dados, ensure_ascii=False))
+            print(f"[wp-deploy] backup do Elementor da home em {bkp}", flush=True)
+    i_tit, ini, fim = _fatia_de_cursos(dados)
+    if ini is None:
+        return {"status": "falhou",
+                "motivo": "não reconheci o bloco de cursos (âncora #cursos, seção de "
+                          f"'{HOME_FIM}' ou conteúdo estranho no meio) — nada publicado"}
+
+    def _retitula(no):
+        if no.get("widgetType") == "heading" and (no.get("settings") or {}).get("title"):
+            no["settings"]["title"] = HOME_TITULO
+            return True
+        return any(_retitula(f) for f in no.get("elements") or [])
+    _retitula(dados[i_tit])
+    trocadas = fim - ini
+    dados[ini:fim] = [_secao_cards(html)]
+    r = _wp(s, base, "POST", f"pages/{HOME_PAGE_ID}",
+            json={"meta": {"_elementor_data": json.dumps(dados, ensure_ascii=False)}})
+    if not r:
+        return {"status": "falhou", "motivo": "POST recusado (meta _elementor_data)"}
+    # confere no DADO gravado (o render do Elementor é servido de cache e só é
+    # invalidado por um save do próprio Elementor — ver retorno abaixo)
+    depois = _wp(s, base, "GET", f"pages/{HOME_PAGE_ID}?context=edit&_fields=meta") or {}
+    gravado = (depois.get("meta") or {}).get("_elementor_data") or ""
+    if ponte.HOME_MARCA not in gravado:
+        return {"status": "falhou", "motivo": "o POST voltou 200 mas o bloco não ficou gravado"}
+    resto = json.dumps(dados[fim - trocadas + 1:], ensure_ascii=False)
+    vivo = _paginapublicada(s, pg.get("link") or base + "/")
+    # carimbo de VERSÃO, não só a presença do bloco: o Elementor serve a versão
+    # anterior do cache, e "existe um bloco nosso" respondia publicado do mesmo jeito.
+    versao = html.split(" -->")[0].split("v=")[-1]
+    if versao in vivo:
+        return {"status": "publicado", "link": pg.get("link"), "versao": versao,
+                "cards": vivo.count('class="feq-card"'), "secoes_trocadas": trocadas}
+    return {"status": "gravado_aguardando_cache", "link": pg.get("link"), "versao": versao,
+            "no_ar_agora": ("versão anterior do bloco" if ponte.HOME_MARCA in vivo
+                            else "grade antiga"),
+            # sem as aspas: dentro do JSON do Elementor elas vêm escapadas
+            "cards": gravado.count("feq-card\\\" href") or gravado.count("feq-card"),
+            "secoes_trocadas": trocadas,
+            "resto_da_home_intacto": {"diferenciais": HOME_FIM in resto,
+                                      "logos": "braskem-1" in resto,
+                                      "cta_final": "Pronto para iniciar" in resto},
+            "acao": "o bloco está no builder; o Elementor serve HTML em cache e só o "
+                    "invalida no save dele — abrir a home no Elementor e clicar em "
+                    "Update (ou Elementor > Ferramentas > Regenerar arquivos e dados) "
+                    "publica o bloco na tela"}
+
+
 def _paginapublicada(sessao, link):
     if not link:
         return ""
@@ -197,6 +320,9 @@ def main(argv):
     ap.add_argument("--config", help="JSON com [{curso, turma, url}] p/ sobrescrever o default")
     ap.add_argument("--saida", default=str(pathlib.Path(__file__).resolve().parents[1]
                                            / "data" / "bridge_pages"))
+    ap.add_argument("--home", action="store_true",
+                    help="publica TAMBÉM o bloco de cursos da home (só a grade de cards)")
+    ap.add_argument("--so-home", action="store_true", help="publica só o bloco da home")
     args = ap.parse_args(argv)
 
     from atena.growth.db import Growth
@@ -210,9 +336,13 @@ def main(argv):
                 g.conn.execute("INSERT OR IGNORE INTO cursos_metas(curso,turma,url) VALUES(?,?,?)",
                                (m["curso"], m.get("turma", ""), m.get("url", "")))
         g.conn.commit()
+    if args.so_home:
+        return [publicar_home_cursos(g, ont, backup_dir=args.saida)]
     paginas = renderizar(g, ont, cursos, args.saida)
     resultados = publicar(paginas)
     resultados.append(publicar_obrigado())
+    if args.home:
+        resultados.append(publicar_home_cursos(g, ont, backup_dir=args.saida))
     return resultados
 
 

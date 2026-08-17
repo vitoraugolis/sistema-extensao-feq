@@ -30,7 +30,7 @@ def test_carga_real_aprovada():
 
 
 def test_data_real_aprovada():
-    assert _ok("FEQ-0480", "As inscrições vão até 16/08/2026.")
+    assert _ok("FEQ-0480", "As inscrições vão até 03/01/2027.")
 
 
 # ------------------------------------------------------------- bloqueios (fatos)
@@ -135,8 +135,8 @@ def test_data_sem_ano_tambem_e_verificada():
     """Precedente do corpus (spec 18) traz data de turma antiga em DD/MM. Antes,
     só DD/MM/AAAA era checado e '07/08' chegava ao lead como se fosse verdade."""
     assert not _ok("FEQ-0480", "As inscrições se encerram em 07/08.")
-    assert _ok("FEQ-0480", "As inscrições vão até 16/08.")            # data real do curso
-    assert _ok("FEQ-0480", "As inscrições vão até 16/08/2026.")
+    assert _ok("FEQ-0480", "As inscrições vão até 03/01.")            # data real do curso
+    assert _ok("FEQ-0480", "As inscrições vão até 03/01/2027.")
     # não pode virar caça-fantasma: proporção não é data
     assert _ok("FEQ-0480", "Já temos 20/26 vagas preenchidas.")
 

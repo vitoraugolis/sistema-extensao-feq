@@ -300,11 +300,14 @@ input:focus,select:focus,textarea:focus{outline:none;box-shadow:3px 3px 0 var(--
   <div class="layout">
     <nav class="g nav">
       <button class="navi on" data-sec="painel"><i class="ti ti-layout-dashboard"></i> Painel</button>
+      <!-- Caixa de entrada única: o agente comercial abria 5 abas para descobrir se
+           tinha trabalho. Fica no topo porque é por onde o dia começa. -->
+      <button class="navi" data-sec="notificacoes"><i class="ti ti-bell"></i> Notificações <span class="tag t-bad" id="ntCount" style="display:none;margin-left:auto;"></span></button>
+      <button class="navi" data-sec="inscricoes"><i class="ti ti-file-text"></i> Inscrições <span class="tag t-warn" id="inCount" style="display:none;margin-left:auto;"></span></button>
       <button class="navi" data-sec="kanban"><i class="ti ti-layout-columns"></i> Funil</button>
       <button class="navi" data-sec="conversas"><i class="ti ti-messages"></i> Conversas <span class="tag t-ok" id="cvCount" style="display:none;margin-left:auto;"></span></button>
       <button class="navi" data-sec="aprovacoes"><i class="ti ti-inbox"></i> Aprovações <span class="tag t-bad" id="apCount" style="display:none;margin-left:auto;"></span></button>
       <button class="navi" data-sec="duvidas"><i class="ti ti-help-circle"></i> Dúvidas <span class="tag t-warn" id="dvCount" style="display:none;margin-left:auto;"></span></button>
-      <button class="navi" data-sec="verificacao"><i class="ti ti-checklist"></i> Verificação <span class="tag t-warn" id="vfCount" style="display:none;margin-left:auto;"></span></button>
       <button class="navi" data-sec="injetor"><i class="ti ti-database-import"></i> Injetor</button>
       <button class="navi" data-sec="medicao"><i class="ti ti-chart-arrows-vertical"></i> Medição</button>
       <button class="navi" data-sec="lps"><i class="ti ti-browser"></i> LPs</button>
@@ -339,6 +342,7 @@ input:focus,select:focus,textarea:focus{outline:none;box-shadow:3px 3px 0 var(--
               <span class="trilho"><span class="btn-chave"></span></span>
               <span>Mover leads</span>
             </label>
+            <button class="btn btn-p" onclick="kbNovoAbrir()"><i class="ti ti-user-plus"></i> Novo lead</button>
           </div>
           <p class="muted" style="margin:6px 2px 10px;"><span id="kbDica">Clique num card para abrir a conversa.</span> A busca ignora acentos e a máscara do telefone; o filtro considera todos os cursos de interesse do lead.</p>
           <div class="kb-board" id="kbBoard"></div>
@@ -377,16 +381,33 @@ input:focus,select:focus,textarea:focus{outline:none;box-shadow:3px 3px 0 var(--
         </div>
       </section>
 
-      <section id="verificacao" class="hidden">
+      <section id="notificacoes" class="hidden">
         <div class="g sec">
-          <h2><i class="ti ti-checklist"></i> Verificação de inscrição (Extecamp)</h2>
-          <p class="muted" style="margin:0 0 10px;">Leads que preencheram o modal da página do curso e
-            seguiram para a Extecamp. Confira no sistema da Extecamp se a inscrição foi concluída e
-            registre o desfecho: <strong>Inscreveu</strong> move o lead para Inscrito no funil (e reporta
-            a conversão à Meta); <strong>Não inscreveu</strong> mantém como Lead e o agente envia a
-            mensagem de recuperação imediatamente.</p>
-          <div id="vfAuto"></div>
-          <div id="vfs"></div>
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+            <h2 style="margin:0;"><i class="ti ti-bell"></i> Notificações</h2>
+            <span class="muted" id="ntResumo" style="margin-left:auto;"></span>
+            <button class="btn btn-g" onclick="ntLerTudo()"><i class="ti ti-checks"></i> Marcar tudo como lido</button>
+          </div>
+          <p class="muted" style="margin:6px 2px 10px;">Tudo que espera por você, numa fila só. As fichas e
+            aprovações saem daqui sozinhas quando o trabalho é feito — só os alertas precisam ser marcados.</p>
+          <div id="ntLista"></div>
+        </div>
+      </section>
+
+      <section id="inscricoes" class="hidden">
+        <div class="g sec">
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+            <h2 style="margin:0;"><i class="ti ti-file-text"></i> Inscrições recebidas</h2>
+            <select id="inFiltro" onchange="inCarregar()" style="width:auto;padding:5px 9px;font-size:12.5px;margin-left:auto;">
+              <option value="recebida">A transcrever</option>
+              <option value="transcrita">Já transcritas</option>
+              <option value="">Todas</option>
+            </select>
+          </div>
+          <p class="muted" style="margin:6px 2px 10px;">A ficha que o lead preencheu na etapa 2 da página do
+            curso, pronta para ser lançada no sistema da Extecamp. Ao marcar <strong>Transcrita</strong>, a
+            conversão é reportada à Meta e o card fica registrado como inscrito.</p>
+          <div id="inLista"></div>
         </div>
       </section>
 
@@ -416,6 +437,17 @@ input:focus,select:focus,textarea:focus{outline:none;box-shadow:3px 3px 0 var(--
           <div id="mdCursos"></div>
           <h3 style="margin:14px 0 8px;"><i class="ti ti-timeline"></i> Série diária</h3>
           <div id="mdSerie"></div>
+        </div>
+        <div class="g sec">
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+            <h3 style="margin:0;"><i class="ti ti-target-arrow"></i> Otimização do funil</h3>
+            <span id="otModo" style="margin-left:auto;"></span>
+          </div>
+          <p class="muted" style="margin:6px 2px 10px;">Objetivo de controle:
+            <strong>maximizar inscritos por curso</strong> e <strong>minimizar CPL</strong>.
+            O otimizador roda em sombra — calcula e mostra a escolha, sem mexer na operação —
+            até haver evidência suficiente.</p>
+          <div id="otPainel"></div>
         </div>
       </section>
 
@@ -583,6 +615,29 @@ input:focus,select:focus,textarea:focus{outline:none;box-shadow:3px 3px 0 var(--
       </section>
     </main>
 
+    <!-- Novo lead manual no Funil -->
+    <div id="kbNovoModal" class="pf-modal hidden">
+      <div class="pf-card-modal g" style="max-width:420px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <h2 style="margin:0;">Novo lead</h2>
+          <button class="conv-tpl-x" onclick="kbNovoFechar()" title="Fechar">✕</button>
+        </div>
+        <p class="muted" style="margin:6px 0 12px;">Cadastra um lead que não veio pela captação
+          automática (indicação, contato feito fora do WhatsApp). Idempotente: se o telefone já
+          tiver um card, esta tela abre o card existente em vez de duplicar.</p>
+        <div class="pf-grid" style="grid-template-columns:1fr;">
+          <label>Nome<input id="kbNovoNome" placeholder="Nome completo"></label>
+          <label>WhatsApp *<input id="kbNovoTel" placeholder="(19) 99999-0000"></label>
+          <label>Curso de interesse<select id="kbNovoCurso"><option value="">(a descobrir)</option></select></label>
+        </div>
+        <p id="kbNovoErro" class="muted hidden" style="color:var(--bad);margin:8px 0 0;"></p>
+        <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px;">
+          <button class="btn btn-g" onclick="kbNovoFechar()">Cancelar</button>
+          <button class="btn btn-p" onclick="kbNovoSalvar()"><i class="ti ti-check"></i> Criar</button>
+        </div>
+      </div>
+    </div>
+
     <!-- Ficha do professor (criar/editar) -->
     <div id="pfModal" class="pf-modal hidden">
       <div class="pf-card-modal g">
@@ -686,23 +741,8 @@ async function carregar(){
     }
   }
 
-  const vf = await api('/api/verificacao');
-  const vc = document.getElementById('vfCount');
-  if(vf && Array.isArray(vf.pendentes)){
-    const lst = vf.pendentes;
-    vc.style.display = lst.length ? 'inline-flex' : 'none'; vc.textContent = lst.length;
-    if(!VF_MEXENDO) renderVerifAuto(vf);           // não recriar o controle enquanto o operador mexe
-    $('#vfs').innerHTML = lst.length ? lst.map(v=>`
-      <div class="row">
-        <i class="ti ti-user-search"></i>
-        <span><strong>${v.nome||'(sem nome)'}</strong> · ${fmtTel(v.telefone)} · ${v.curso}
-          <span class="muted">iniciou em ${(v.ultimo_checkout||'').slice(0,16).replace('T',' ')}</span></span>
-        <span style="margin-left:auto;display:flex;gap:6px;">
-          <button class="btn btn-p" onclick="verificar('${v.card_id}',true)"><i class="ti ti-check"></i> Inscreveu</button>
-          <button class="btn btn-g" onclick="verificar('${v.card_id}',false)"><i class="ti ti-x"></i> Não inscreveu</button>
-        </span>
-      </div>`).join('') : '<div class="muted">Nenhum lead aguardando verificação. 🎉</div>';
-  }
+  await inCarregar();          // fila de fichas (substituiu a Verificação)
+  await ntCarregar();          // caixa de entrada única
 
   const ap = await api('/api/aprovacoes');
   renderAprovacoes(ap);
@@ -773,6 +813,7 @@ async function mdCarregar(){
   if(sel && sel.options.length <= 1 && window.CURSOS_ALL)
     sel.innerHTML = '<option value="">Todos os cursos</option>' +
       window.CURSOS_ALL.map(c=>`<option value="${c}">${c}</option>`).join('');
+  otCarregar();   // o painel de otimização não depende da coorte selecionada
   if(!m.coorte){ $('#mdFunil').innerHTML = '<div class="muted">Nenhum lead criado nesta janela.</div>';
     ['#mdSaude','#mdTempos','#mdCursos','#mdSerie'].forEach(s=>$(s).innerHTML=''); return; }
 
@@ -1044,65 +1085,211 @@ async function proporOferecimento(){
 }
 
 // -------------------------------------- Verificação: veredito automático
-// Diferente da chave do funil, esta é config de SERVIDOR: a decisão roda no
-// agendador, sem navegador aberto. Por isso vai para /api/config, não localStorage.
-let VF_MEXENDO = false;   // trava o re-render do polling enquanto o operador ajusta
+// ---------------------------------------------------------------- Inscrições
+// Substituiu a Verificação: a pergunta deixou de ser "ele se inscreveu na Extecamp?"
+// (que exigia sair daqui para conferir) e passou a ser "já transcrevi a ficha que ele
+// entregou?". O dado que faltava agora está no sistema.
+let IN_ABERTA = null;   // card_id da ficha expandida (sobrevive ao polling)
 
-function renderVerifAuto(vf){
-  const cx = $('#vfAuto'); if(!cx) return;
-  const opcoes = [0, 6, 12, 24, 48, 72, 168].filter(h => h >= (vf.min_horas||0));
-  const rotulo = h => h === 0 ? 'imediatamente' : (h < 24 ? h+'h' : (h/24)+' dia'+(h>24?'s':''));
-  const imediato = vf.horas === 0;
-  cx.innerHTML = `
-    <div class="vf-auto ${vf.auto?'on':''}">
-      <label class="chave" title="Decide sozinho 'não inscreveu' para pendências antigas, no mesmo caminho do botão.">
-        <input type="checkbox" id="vfAutoChk" ${vf.auto?'checked':''} onchange="vfAutoSalvar()">
-        <span class="trilho"><span class="btn-chave"></span></span>
-        <span>Decidir "não inscreveu" automaticamente</span>
-      </label>
-      <label class="muted" style="display:flex;align-items:center;gap:6px;">
-        <select id="vfAutoH" onchange="vfAutoSalvar()" style="width:auto;padding:4px 8px;font-size:12px;">
-          ${opcoes.map(h=>`<option value="${h}" ${h===vf.horas?'selected':''}>${rotulo(h)}</option>`).join('')}
-        </select> ${imediato ? 'ao chegar da LP' : 'sem confirmação'}
-      </label>
-      ${vf.auto?`<button class="btn btn-g" style="padding:5px 10px;" onclick="vfAutoAgora()"><i class="ti ti-player-play"></i> Aplicar agora (${vf.elegiveis})</button>`:''}
-      <span class="muted" style="flex-basis:100%;font-size:11.5px;margin-top:2px;">
-        ${!vf.auto
-          ? 'Desligada: cada pendência espera o seu veredito. Ligue para limpar sozinho a fila de quem não concluiu.'
-          : imediato
-            ? `<strong>Modo imediato:</strong> assim que o lead envia o formulário da LP, ele já sai da fila e recebe no WhatsApp o template de abertura com o link (<em>feq_lead</em>) — não é uma cobrança de "você não terminou". Em troca, não sobra janela para conferir na Extecamp antes. Quem falou com a gente nos últimos 15 min é pulado, para não repetir o mesmo template.`
-            : `<strong>${vf.elegiveis}</strong> de ${vf.pendentes.length} pendência(s) já passaram de ${rotulo(vf.horas)}. Roda a cada 15 min, só no horário comercial (dispara o toque de recuperação), no máximo 15 por vez.`}
-      </span>
-      <div id="vfAutoOut" style="flex-basis:100%;"></div>
+async function inCarregar(){
+  const f = $('#inFiltro') ? $('#inFiltro').value : 'recebida';
+  const r = await api('/api/inscricoes' + (f ? '?status='+f : ''));
+  const lst = (r && r.inscricoes) || [];
+  const c = document.getElementById('inCount');
+  if(c){ c.style.display = r.pendentes ? 'inline-flex' : 'none'; c.textContent = r.pendentes || ''; }
+  const cx = $('#inLista'); if(!cx) return;
+  if(!lst.length){
+    cx.innerHTML = '<div class="muted">Nenhuma ficha nesta fila. 🎉</div>';
+    return;
+  }
+  cx.innerHTML = lst.map(i=>{
+    const aberta = IN_ABERTA === i.card_id;
+    const feita = i.status === 'transcrita';
+    return `
+    <div class="g sec" style="padding:12px 14px;margin-bottom:10px;">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+        <i class="ti ti-file-text"></i>
+        <strong>${escapeHtml(i.nome||'(sem nome)')}</strong>
+        <span class="muted">${fmtTel(i.telefone)} · ${escapeHtml(i.email||'')}</span>
+        <span class="chip ${feita?'t-ok':'t-warn'}">${feita?'transcrita':'a transcrever'}</span>
+        <span class="chip t-acc">${escapeHtml(i.curso)}/${escapeHtml(i.turma||'')}</span>
+        <span class="muted">${(i.criado||'').slice(0,16).replace('T',' ')}</span>
+        <span style="margin-left:auto;display:flex;gap:6px;">
+          <button class="btn btn-g" onclick="inAlternar('${i.card_id}')">
+            <i class="ti ti-${aberta?'chevron-up':'chevron-down'}"></i> ${aberta?'ocultar':'ver ficha'}</button>
+          <button class="btn btn-g" onclick="abrirConversa('${i.card_id}')"><i class="ti ti-messages"></i> conversa</button>
+          ${feita?'':`<button class="btn btn-p" onclick="inTranscrita('${i.card_id}')"><i class="ti ti-check"></i> Transcrita</button>`}
+        </span>
+      </div>
+      ${aberta ? inFicha(i) : ''}
     </div>`;
-}
-async function vfAutoSalvar(){
-  VF_MEXENDO = true;
-  const body = {verif_auto: $('#vfAutoChk').checked,
-                verif_auto_horas: parseInt($('#vfAutoH').value, 10)};
-  const r = await api('/api/config',{method:'POST',headers:{'Content-Type':'application/json'},
-                                     body:JSON.stringify(body)});
-  VF_MEXENDO = false;
-  if(r.erro){ $('#vfAutoOut').innerHTML = `<span class="chip t-bad">${escapeHtml(r.erro)}</span>`; return; }
-  carregar();
-}
-async function vfAutoAgora(){
-  if(!confirm('Aplicar "não inscreveu" nas pendências vencidas agora? Cada uma recebe o toque de recuperação.')) return;
-  $('#vfAutoOut').innerHTML = '<span class="chip t-acc"><i class="ti ti-loader"></i> aplicando…</span>';
-  const r = await api('/api/verificacao/auto',{method:'POST'});
-  if(r.erro){ $('#vfAutoOut').innerHTML = `<span class="chip t-bad">${escapeHtml(r.erro)}</span>`; return; }
-  const n = (r.aplicados||[]).length, com = (r.aplicados||[]).filter(a=>a.toque).length;
-  await carregar();          // recria a faixa ANTES de escrever, senão o resultado some
-  const cx = $('#vfAutoOut');
-  if(cx) cx.innerHTML = `<span class="chip t-ok"><i class="ti ti-check"></i> ${n} decidida(s), ${com} com toque de recuperação enviado</span>`;
+  }).join('');
 }
 
-async function verificar(id, sim){
-  const r = await api('/api/leads/'+id+'/verificar',{method:'POST',
-    headers:{'Content-Type':'application/json'}, body:JSON.stringify({inscrito:sim})});
-  if(r.erro) alert(r.erro);
-  else if(!sim && r.ativacao && !r.ativacao.ok) alert('Registrado. Ativação não enviada: '+r.ativacao.motivo);
+// Limiar acima do qual o valor ganha a linha inteira (ex.: "19 PARCELA(S) DE R$ ...
+// — Campanha de Agosto 2026"): numa coluna de ~200px isso quebrava em 6-8 linhas
+// curtas e desalinhava a grade inteira — mais legível ocupando a largura toda.
+const IN_VALOR_LONGO = 40;
+
+function inFicha(i){
+  if(!i.grupos || !i.grupos.length) return '<div class="muted" style="margin-top:8px;">Ficha vazia.</div>';
+  return `<div style="margin-top:10px;display:grid;gap:16px;">` + i.grupos.map(gr=>`
+    <div>
+      <div class="muted" style="font-size:11.5px;text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px;">${escapeHtml(gr.titulo)}</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:10px 16px;align-items:start;">
+        ${gr.itens.map(it=>{
+          const valor = String(it.valor);
+          const largo = valor.length > IN_VALOR_LONGO;
+          // rótulo SEMPRE em cima do valor: lado a lado (o layout anterior) fazia a
+          // célula vizinha herdar a altura de quem quebrou em 2+ linhas e desalinhar
+          // a grade inteira — em blocos, cada item flui sozinho, sem depender da
+          // altura de ninguém ao lado.
+          return `
+          <div style="min-width:0;${largo?'grid-column:1/-1;':''}">
+            <div class="muted" style="font-size:11px;margin-bottom:2px;">${escapeHtml(it.rotulo)}</div>
+            <div style="display:flex;align-items:flex-start;gap:6px;flex-wrap:wrap;">
+              <strong style="font-size:12.5px;line-height:1.35;word-break:break-word;">${escapeHtml(valor)}</strong>
+              <button class="btn btn-g" style="padding:1px 5px;font-size:10px;flex-shrink:0;"
+                      onclick="inCopiar(this,'${escapeHtml(valor).replace(/'/g,"\\'")}')">copiar</button>
+            </div>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>`).join('') + `</div>`;
+}
+
+function inAlternar(id){ IN_ABERTA = (IN_ABERTA === id) ? null : id; inCarregar(); }
+
+// Transcrever é digitar campo a campo na Extecamp — copiar com 1 clique evita o
+// erro de digitação que faria a inscrição do lead sair errada lá.
+function inCopiar(btn, valor){
+  navigator.clipboard.writeText(valor).then(()=>{
+    const antes = btn.textContent; btn.textContent = 'copiado';
+    setTimeout(()=>{ btn.textContent = antes; }, 900);
+  });
+}
+
+async function inTranscrita(id){
+  if(!confirm('Confirmar que a ficha foi lançada na Extecamp?\n\nIsto reporta a conversão à Meta e registra o lead como inscrito.')) return;
+  const r = await api('/api/inscricoes/'+id+'/transcrita',{method:'POST'});
+  if(r.erro){ alert(r.erro); return; }
+  IN_ABERTA = null;
   carregar();
+}
+
+// ------------------------------------------------------------- Notificações
+const NT_ICONE = {
+  ficha_nova: {i:'ti-file-text', c:'t-ok'},
+  escalonamento: {i:'ti-hand-stop', c:'t-bad'},
+  manual: {i:'ti-user-edit', c:'t-warn'},
+  proposta: {i:'ti-robot', c:'t-acc'},
+  duvida: {i:'ti-help-circle', c:'t-warn'},
+  inscricao: {i:'ti-file-text', c:'t-ok'},
+};
+
+async function ntCarregar(){
+  const r = await api('/api/notificacoes');
+  const itens = (r && r.itens) || [];
+  const c = document.getElementById('ntCount');
+  if(c){ c.style.display = itens.length ? 'inline-flex' : 'none'; c.textContent = itens.length || ''; }
+  const res = $('#ntResumo');
+  if(res) res.textContent = itens.length
+    ? Object.entries(r.por_fonte||{}).map(([k,v])=>`${v} ${k}`).join(' · ')
+    : '';
+  const cx = $('#ntLista'); if(!cx) return;
+  cx.innerHTML = itens.length ? itens.map(n=>{
+    const est = NT_ICONE[n.tipo] || {i:'ti-bell', c:'t-acc'};
+    const acao = n.card_id
+      ? `<button class="btn btn-g" onclick="abrirConversa('${n.card_id}')"><i class="ti ti-messages"></i> abrir</button>`
+      : (n.acao ? `<button class="btn btn-g" onclick="irPara('${n.acao}')"><i class="ti ti-arrow-right"></i> ver</button>` : '');
+    return `
+    <div class="row">
+      <i class="ti ${est.i}"></i>
+      <span><span class="chip ${est.c}">${escapeHtml(n.tipo||'')}</span>
+        ${escapeHtml(n.texto||'')}
+        <span class="muted">${(n.ts||'').slice(0,16).replace('T',' ')}</span></span>
+      <span style="margin-left:auto;display:flex;gap:6px;">
+        ${n.fonte==='inscricao' ? `<button class="btn btn-g" onclick="irPara('inscricoes')"><i class="ti ti-arrow-right"></i> ficha</button>` : ''}
+        ${acao}
+        ${n.fonte==='alerta' ? `<button class="btn btn-g" onclick="ntLer(${n.id})"><i class="ti ti-check"></i></button>` : ''}
+      </span>
+    </div>`;
+  }).join('') : '<div class="muted">Nada esperando por você. 🎉</div>';
+}
+
+function irPara(sec){
+  const b = document.querySelector(`.navi[data-sec="${sec}"]`);
+  if(b) b.click();
+}
+async function ntLer(id){
+  await api('/api/notificacoes/ler',{method:'POST',headers:{'Content-Type':'application/json'},
+                                     body:JSON.stringify({id})});
+  ntCarregar();
+}
+async function ntLerTudo(){
+  await api('/api/notificacoes/ler',{method:'POST',headers:{'Content-Type':'application/json'},
+                                     body:JSON.stringify({})});
+  carregar();
+}
+
+// ------------------------------------------------------------- Otimização
+async function otCarregar(){
+  const r = await api('/api/otimizacao');
+  const cx = $('#otPainel'); if(!cx || !r || !r.gate) return;
+  const g = r.gate, o = r.objetivo, b = r.bandit;
+  const modo = $('#otModo');
+  if(modo) modo.innerHTML = `<span class="chip ${g.liberado?'t-ok':'t-warn'}">
+    <i class="ti ti-${g.liberado?'player-play':'eye'}"></i> modo ${g.modo}</span>`;
+  const pct = (n,d)=> d ? Math.min(100, Math.round(100*n/d)) : 0;
+  const barra = (n,d,rot)=>`
+    <div style="margin:4px 0 10px;">
+      <div style="display:flex;justify-content:space-between;font-size:11.5px;" class="muted">
+        <span>${rot}</span><span>${n} / ${d}</span></div>
+      <div style="height:6px;background:#eef1f4;border:1px solid var(--b);">
+        <div style="height:100%;width:${pct(n,d)}%;background:var(--acc);"></div></div>
+    </div>`;
+  cx.innerHTML = `
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px;">
+      <div>
+        <h4 style="margin:0 0 6px;">Gate de liberação</h4>
+        ${barra(g.episodios, g.episodios_necessarios, 'episódios com desfecho')}
+        ${barra(g.conversoes, g.conversoes_necessarias, 'conversões observadas')}
+        <p class="muted" style="font-size:11.5px;margin:0;">${escapeHtml(g.nota||'')}</p>
+      </div>
+      <div>
+        <h4 style="margin:0 0 6px;">Objetivo</h4>
+        <div class="row" style="padding:5px 0;"><span>ganho (inscritos/meta)</span>
+          <strong style="margin-left:auto;">${o.j_ganho}</strong></div>
+        <div class="row" style="padding:5px 0;"><span>custo (CPL/alvo)</span>
+          <strong style="margin-left:auto;">${o.cpl_disponivel ? o.j_custo : '—'}</strong></div>
+        ${o.cpl_disponivel ? '' : `<p class="muted" style="font-size:11.5px;margin:6px 0 0;">
+          <i class="ti ti-alert-triangle"></i> ${escapeHtml(o.motivo_sem_cpl||'')}</p>`}
+      </div>
+      <div>
+        <h4 style="margin:0 0 6px;">Variantes (Thompson)</h4>
+        ${(b.bracos||[]).length ? b.bracos.map(x=>`
+          <div class="row" style="padding:5px 0;">
+            <span>${escapeHtml(x.variante)}</span>
+            <span class="muted" style="margin-left:auto;">${x.sucessos}/${x.n}</span>
+            <strong style="min-width:64px;text-align:right;">${(100*x.media_posterior).toFixed(1)}%
+              <span class="muted" style="font-weight:400;">±${(100*x.desvio).toFixed(1)}</span></strong>
+          </div>`).join('') : '<div class="muted">Sem episódios ainda.</div>'}
+        ${r.sugestao_sombra ? `<p class="muted" style="font-size:11.5px;margin:6px 0 0;">
+          escolha em sombra agora: <strong>${escapeHtml(r.sugestao_sombra.escolhida)}</strong></p>` : ''}
+      </div>
+    </div>
+    <div style="margin-top:12px;">
+      <h4 style="margin:0 0 6px;">Por curso</h4>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:8px;">
+        ${(o.por_curso||[]).map(c=>`
+          <div class="g sec" style="padding:8px 10px;">
+            <strong>${escapeHtml(c.curso)}</strong>
+            <div class="muted" style="font-size:11.5px;">
+              ${c.fichas_etapa2} ficha(s) · meta ${c.meta}<br>
+              CPL ${c.cpl ? 'R$ '+c.cpl : '<em>sem dado</em>'}</div>
+          </div>`).join('')}
+      </div>
+    </div>`;
 }
 
 async function atualizarLista(){
@@ -1164,12 +1351,40 @@ function kbCard(c){
   if(origem) b.push(`<span class="chip" style="margin:0;background:var(--sky);" title="${escapeHtml(campanha||origem)}"><i class="ti ti-target-arrow"></i> ${escapeHtml(origem)}</span>`);
   if(c.tem_notas) b.push('<span class="chip" style="margin:0;background:var(--sun);" title="tem notas"><i class="ti ti-notes"></i></span>');
   return `<div class="kb-card" data-id="${escapeHtml(c.id)}" onclick="kbClique('${c.id}')">
-    <div class="kb-nome"><span class="conv-ava" style="width:22px;height:22px;font-size:9.5px;">${c.iniciais}</span>${escapeHtml(c.nome)}</div>
+    <div class="kb-nome"><span class="conv-ava" style="width:22px;height:22px;font-size:9.5px;">${c.iniciais}</span>${escapeHtml(c.nome || (c.telefone?fmtTel(c.telefone):'') || '(sem nome)')}</div>
     <div class="kb-sub">${cursoTxt} · ${c.ha}</div>
     ${contato}
     ${b.length?`<div class="kb-badges">${b.join('')}</div>`:''}
   </div>`;
 }
+// ------------------------------------------------- funil: criar card na mão
+function kbNovoAbrir(){
+  $('#kbNovoNome').value = ''; $('#kbNovoTel').value = '';
+  const sel = $('#kbNovoCurso');
+  if(sel.options.length <= 1 && window.CURSOS_ALL)
+    sel.innerHTML = '<option value="">(a descobrir)</option>'
+      + window.CURSOS_ALL.map(c=>`<option value="${c}">${c}</option>`).join('');
+  sel.value = '';
+  $('#kbNovoErro').classList.add('hidden');
+  $('#kbNovoModal').classList.remove('hidden');
+  $('#kbNovoNome').focus();
+}
+function kbNovoFechar(){ $('#kbNovoModal').classList.add('hidden'); }
+async function kbNovoSalvar(){
+  const corpo = {nome: $('#kbNovoNome').value.trim(), telefone: $('#kbNovoTel').value.trim(),
+                curso: $('#kbNovoCurso').value};
+  const erro = $('#kbNovoErro');
+  if(!corpo.telefone){ erro.textContent = 'O WhatsApp é obrigatório.'; erro.classList.remove('hidden'); return; }
+  const r = await api('/api/kanban/criar', {method:'POST', headers:{'Content-Type':'application/json'},
+                                            body: JSON.stringify(corpo)});
+  if(r.erro){ erro.textContent = r.erro; erro.classList.remove('hidden'); return; }
+  kbNovoFechar();
+  await renderKanban();
+  if(!r.criado) alert(`Este telefone já tinha um card: ${r.nome || r.card_id}. Nada foi duplicado — abrindo a conversa existente.`);
+  abrirConversa(r.card_id);
+  document.querySelector('.navi[data-sec="conversas"]').click();
+}
+
 // ------------------------------------------------- funil: modo mover (arrastar)
 // Pointer Events em vez do drag-and-drop nativo do HTML5: um caminho só atende
 // mouse e toque. O nativo não dispara em tela sensível ao toque, e a Central é
@@ -1300,6 +1515,16 @@ async function reativarLead(id){
   CONV_ERRO = {id, html:'<div class="conv-blocked" style="background:var(--mint);"><i class="ti ti-check"></i> Reengajamento enviado.</div>'};
   aposAcao();
 }
+// Iniciar/reiniciar a conversa a qualquer momento — cobre o lead que nunca recebeu
+// mensagem (ex.: só entregou a ficha da etapa 2 pela LP, sem passar pelo WhatsApp)
+// e o pedido do operador de recomeçar o atendimento mesmo já havendo histórico.
+// Mesmo template de abertura do 1º contato automático (feq_lead/feq_abertura_curso).
+async function conversaNova(id){
+  const r = await api('/api/conversas/'+id+'/nova',{method:'POST'});
+  if(r.envio && !r.envio.ok){ marcarErro(id, {}, 'não enviado — '+(r.envio.motivo||r.envio.erro||'')); return; }
+  CONV_ERRO = {id, html:'<div class="conv-blocked" style="background:var(--mint);"><i class="ti ti-check"></i> Conversa iniciada.</div>'};
+  aposAcao();
+}
 
 function renderListaConv(){
   const q = _busca(($('#convBusca')||{}).value);
@@ -1311,7 +1536,7 @@ function renderListaConv(){
     <div class="conv-item ${c.id===CONV_ABERTA?'on':''} ${c.nao_lidas?'nao-lida':''}" onclick="abrirConversa('${c.id}')">
       <div class="conv-ava">${c.iniciais}</div>
       <div class="conv-meta">
-        <div class="conv-nome"><span>${escapeHtml(c.lead||c.id)}</span><span class="muted" style="font-size:10.5px;">${c.ha}</span></div>
+        <div class="conv-nome"><span>${escapeHtml(c.lead || (c.telefone?fmtTel(c.telefone):'') || c.id)}</span><span class="muted" style="font-size:10.5px;">${c.ha}</span></div>
         <div class="conv-prev">${c.pendente?'<i class="ti ti-robot" style="color:var(--guara);"></i> proposta pronta para aprovação':(escapeHtml(c.preview)||'(sem mensagens)')}</div>
       </div>
       ${c.nao_lidas
@@ -1524,8 +1749,11 @@ function statusGlyph(t){   // ✓ enviado · ✓✓ entregue · ✓✓ azul lido
 function renderThread(d){
   // A "moldura" (cabeçalho + campo de escrita) é montada 1x por conversa; o polling só
   // atualiza as MENSAGENS. Assim o <textarea> nunca é recriado -> foco/cursor não se perdem.
+  // a ficha da etapa 2 pode CHEGAR com a conversa aberta (o lead preenche enquanto
+  // conversa): sem o status na chave, a moldura não se redesenha e ela não aparece
   const chromeKey = d.id + '|' + (d.optout ? 1 : 0) + '|' + (d.modo||'auto')
-                   + '|' + (d.email||'') + '|' + ((d.notas||'').length);   // opt-out/modo trocam a moldura
+                   + '|' + (d.email||'') + '|' + ((d.notas||'').length)
+                   + '|' + (d.inscricao ? d.inscricao.status : '');
   if(CONV_CHROME_ID !== chromeKey){ renderChrome(d); CONV_CHROME_ID = chromeKey; }
   renderMensagens(d);
 }
@@ -1536,7 +1764,7 @@ function renderChrome(d){
       <div style="display:flex;align-items:center;gap:10px;">
         <button class="conv-back" onclick="fecharConversa()" title="Voltar"><i class="ti ti-arrow-left"></i></button>
         <div class="conv-ava">${d.iniciais}</div>
-        <div><div style="font-weight:500;font-size:13.5px;">${escapeHtml(d.lead||d.id)}</div>
+        <div><div style="font-weight:500;font-size:13.5px;">${escapeHtml(d.lead || (d.telefone?fmtTel(d.telefone):'') || d.id)}</div>
         <div class="muted"><span id="convCurso">${d.curso}</span> · <span id="convEstado">${d.estado}</span>${d.optout?' · <span style="color:var(--bad);">opt-out</span>':''}</div></div>
         <div style="margin-left:auto;display:flex;gap:6px;align-items:center;">
           <button class="btn ${d.modo==='manual'?'btn-p':'btn-g'}" style="padding:6px 10px;" title="${d.modo==='manual'?'Modo manual: o agente NÃO responde — clique para voltar ao automático':'Modo automático: o agente propõe respostas — clique para assumir a conversa manualmente'}" onclick="setModo('${d.id}','${d.modo==='manual'?'auto':'manual'}')"><i class="ti ti-${d.modo==='manual'?'hand-stop':'robot'}"></i> ${d.modo==='manual'?'Manual':'Auto'}</button>
@@ -1544,6 +1772,7 @@ function renderChrome(d){
             ${['Lead','Prospect','Inscrito','Matriculado','Em espera','Perdido'].map(f=>`<option ${f===d.fase?'selected':''}>${f}</option>`).join('')}
           </select>
           <button class="btn btn-g" style="padding:6px 10px;" title="Enviar reengajamento" onclick="reativarLead('${d.id}')"><i class="ti ti-refresh"></i></button>
+          <button class="btn btn-g" style="padding:6px 10px;" title="Iniciar/reiniciar a conversa (envia a mensagem de abertura, com ou sem histórico)" onclick="conversaNova('${d.id}')"><i class="ti ti-message-plus"></i></button>
         </div>
       </div>
     </div>
@@ -1574,6 +1803,37 @@ function renderChrome(d){
 
 // Ficha do lead: contato, origem da campanha e notas — o que faz do painel um CRM
 // e não só um chat. A origem vem dos UTMs capturados no formulário da LP.
+// Ficha da ETAPA 2 dentro da conversa: durante o atendimento o agente é perguntado
+// "o que eu preenchi?" e precisava largar o chat e ir para outra aba. Nasce fechada
+// para não empurrar a thread para baixo em quem não precisa dela agora.
+function convInscricao(d){
+  const i = d.inscricao;
+  if(!i) return '';
+  const feita = i.status === 'transcrita';
+  return `
+    <div>
+      <button class="conv-notas-topo" onclick="alternarInscricao()" title="Dados que o lead preencheu na etapa 2">
+        <i class="ti ti-chevron-right" id="convIncSeta"></i>
+        <i class="ti ti-file-text"></i>
+        <span>Ficha de inscrição · ${escapeHtml(i.curso)}/${escapeHtml(i.turma||'')}</span>
+        <span class="chip ${feita?'t-ok':'t-warn'}" style="margin-left:auto;">${feita?'transcrita':'a transcrever'}</span>
+      </button>
+      <div id="convInc" class="hidden" style="padding:8px 12px 12px;">
+        ${inFicha(i)}
+        ${feita?'':`<button class="btn btn-p" style="margin-top:10px;" onclick="inTranscrita('${d.id}')">
+          <i class="ti ti-check"></i> Marcar como transcrita na Extecamp</button>`}
+      </div>
+    </div>`;
+}
+function alternarInscricao(){
+  const c = $('#convInc'), s = $('#convIncSeta');
+  if(!c) return;
+  const abrindo = c.classList.contains('hidden');
+  c.classList.toggle('hidden');
+  if(s) s.className = 'ti ti-chevron-' + (abrindo ? 'down' : 'right');
+  ajustarAltura();
+}
+
 function renderFicha(d){
   const cx = $('#convFicha'); if(!cx) return;
   const u = d.utm || {};
@@ -1604,7 +1864,8 @@ function renderFicha(d){
       </button>
       <textarea id="convNotas" class="hidden" placeholder="O que é útil lembrar deste lead…"
                 onblur="salvarNotas('${d.id}')">${escapeHtml(d.notas||'')}</textarea>
-    </div>`;
+    </div>
+    ${convInscricao(d)}`;
   if(NOTAS_ABERTAS) alternarNotas(true);
 }
 // Notas colapsadas por padrão: ocupavam um terço do painel mesmo vazias, comendo
@@ -1708,7 +1969,16 @@ function renderMensagens(d){
         <button class="btn btn-g" style="padding:6px 11px;color:var(--bad);" onclick="api('/api/conversas/${d.id}/recusar',{method:'POST'}).then(aposAcao)">Recusar</button>
       </div></div>`:'';
   const perto = th.scrollHeight - th.scrollTop - th.clientHeight < 80;   // usuário estava perto do fim?
-  th.innerHTML = (fios || '<div class="muted" style="margin:auto;">Sem mensagens ainda.</div>') + prop;
+  // Lead sem NENHUMA mensagem (ex.: só entregou a ficha da etapa 2, nunca falou no
+  // WhatsApp) — a tela vazia já oferece o botão de abrir a conversa, em vez de o
+  // operador precisar descobrir sozinho que precisa ir ao ícone de template.
+  const vazio = d.optout
+    ? '<div class="muted" style="margin:auto;">Sem mensagens ainda.</div>'
+    : `<div class="muted" style="margin:auto;text-align:center;">
+         <div style="margin-bottom:8px;">Sem mensagens ainda.</div>
+         <button class="btn btn-p" onclick="conversaNova('${d.id}')"><i class="ti ti-message-plus"></i> Iniciar conversa</button>
+       </div>`;
+  th.innerHTML = (fios || vazio) + prop;
   th.dataset.sig = sig;
   if(perto) th.scrollTop = th.scrollHeight;   // só "cola" no fim se já estava lá (não atrapalha leitura)
 }
@@ -1832,7 +2102,7 @@ async function enviarTemplate(id){
 // Espelha atena/core/contatos.py::CONTATOS_OFICIAIS — só 2 itens fixos e
 // institucionais; não vale um round-trip ao servidor para uma lista que não muda
 // por lead. Se a lista lá mudar de chave/rótulo, atualizar aqui também.
-const CONTATOS_UI = [{chave:'secretaria', rotulo:'Secretaria da Extensão FEQ', sub:'(19) 3521-4132'},
+const CONTATOS_UI = [{chave:'secretaria', rotulo:'Secretaria da Extensão FEQ', sub:'(19) 3521-3911'},
                      {chave:'whatsapp', rotulo:'WhatsApp da Extensão FEQ', sub:'(19) 98262-0072'}];
 
 function toggleContato(id){

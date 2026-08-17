@@ -162,7 +162,17 @@ class Estado:
                     # escreveu, isto é o que a máquina entendeu. Misturar os dois faria
                     # o operador (e o corpus, spec 18) lerem palpite de IA como se fosse
                     # a fala literal do lead.
-                    "ALTER TABLE conversas ADD COLUMN transcricao TEXT"):
+                    "ALTER TABLE conversas ADD COLUMN transcricao TEXT",
+                    # Central de Notificações: `notificado` já existia para o disparo
+                    # externo (WhatsApp do operador). `lido` é outra coisa — é a marca
+                    # de que um humano VIU o item na Central. Separados de propósito:
+                    # um alerta pode ter sido disparado e não lido, ou lido sem disparo.
+                    "ALTER TABLE alertas ADD COLUMN lido INTEGER DEFAULT 0",
+                    "ALTER TABLE alertas ADD COLUMN lido_por TEXT",
+                    "ALTER TABLE alertas ADD COLUMN lido_ts TEXT",
+                    # Alvo do alerta: sem isto a notificação é um texto solto e o
+                    # operador tem de caçar o lead pelo nome na mão.
+                    "ALTER TABLE alertas ADD COLUMN card_id TEXT"):
             try:
                 self.conn.execute(mig)
             except sqlite3.OperationalError:
@@ -422,11 +432,42 @@ class Estado:
         return r is not None
 
     # ----------------------------------------------------------------- alertas
-    def add_alerta(self, tipo, texto):
+    def add_alerta(self, tipo, texto, card_id=None):
         with self._lock:
-            self.conn.execute("INSERT INTO alertas(tipo,texto,criado) VALUES(?,?,?)",
-                              (tipo, texto, _agora()))
+            self.conn.execute("INSERT INTO alertas(tipo,texto,card_id,criado) VALUES(?,?,?,?)",
+                              (tipo, texto, card_id, _agora()))
             self.conn.commit()
+
+    def alertas_nao_lidos(self, limite=200):
+        """Fila da Central de Notificações. `lido` é a marca do HUMANO na Central —
+        não confundir com `notificado`, que é o disparo externo ao operador."""
+        with self._lock:
+            rows = self.conn.execute(
+                "SELECT * FROM alertas WHERE lido=0 ORDER BY id DESC LIMIT ?",
+                (limite,)).fetchall()
+        return [dict(r) for r in rows]
+
+    def marcar_alerta_lido(self, aid, usuario):
+        with self._lock:
+            n = self.conn.execute(
+                "UPDATE alertas SET lido=1, lido_por=?, lido_ts=? WHERE id=? AND lido=0",
+                (usuario, _agora(), aid)).rowcount
+            self.conn.commit()
+        return n > 0
+
+    def marcar_alertas_lidos(self, usuario, tipo=None):
+        """Marca tudo (ou só um tipo) como lido — o 'limpar' da caixa de entrada."""
+        with self._lock:
+            if tipo:
+                n = self.conn.execute(
+                    "UPDATE alertas SET lido=1, lido_por=?, lido_ts=? WHERE lido=0 AND tipo=?",
+                    (usuario, _agora(), tipo)).rowcount
+            else:
+                n = self.conn.execute(
+                    "UPDATE alertas SET lido=1, lido_por=?, lido_ts=? WHERE lido=0",
+                    (usuario, _agora())).rowcount
+            self.conn.commit()
+        return n
 
     def alertas_nao_notificados(self):
         with self._lock:

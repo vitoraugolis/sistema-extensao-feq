@@ -90,7 +90,7 @@ for cod in ("FEQ-0480", "FEQ-0331"):
 # ------------------------------------------------------- 4) o que o lead vê
 html = _investimento_itens(ONT.curso("FEQ-0480"))
 check("799,00" in html and "736,18" in html and "13.987,39" in html, "LP mostra as duas ofertas")
-check("866,09" in html and "line-through" in html, "LP mostra a tabela riscada como referência")
+check("866,09" in html and 'class="risco' in html, "LP mostra a tabela riscada como referência")
 check("16/08/2026" in html, "LP mostra o prazo da promoção")
 check("3 ou mais" in html, "LP diz a condição do preço de grupo")
 sem = _investimento_itens(ONT.curso("FEQ-0670"))
@@ -154,7 +154,7 @@ check(template_promocional("FEQ-0480", ONT, _WA(None)) == "feq_promo_0480",
       "sem conseguir consultar a Meta (dev/dry-run), não bloqueia")
 
 check(montar_params("feq_promo_0480", {"nome": "Ana", "curso": "FEQ-0480"}, ONT)
-      == ["Ana", "16/08/2026"], "params do template de campanha: nome + prazo")
+      == ["Ana", "03/01/2027"], "params do template de campanha: nome + prazo")
 
 # a retentativa usa o template da campanha antes dos genéricos
 env = [{"texto": "[template feq_lead] x", "status": "falhou", "destino": "5519996027820",
@@ -187,9 +187,12 @@ selos = P._hero_selos(c0480)
 check("368h" in selos and "Certificado Unicamp" in selos and "60 alunos" in selos,
       "selos de confiança saem da ontologia (nada inventado)")
 
-check("Nossos alunos atuam em empresas" in P._empresas_topo_html(c0480["empresas"]),
-      "prova social sobe para logo abaixo da dobra, com o texto oficial")
-check(P._empresas_topo_html(None) == "", "sem empresas, a faixa some")
+# prova social logo abaixo da dobra: UMA faixa, a de logos (a de chips com os mesmos
+# nomes saiu no redesign monochrome — eram duas seções dizendo a mesma coisa)
+check("Onde nossos alunos atuam" in P._secao_empresas(c0480)
+      and 'class="logo-empresa"' in P._secao_empresas(c0480),
+      "prova social fica logo abaixo da dobra, com os logos oficiais")
+check(P._secao_empresas(None) == "", "sem empresas, a faixa some")
 
 idst = P._invest_destaque(c0480, True)
 check("economiza" in idst and "2.468,36" in idst, "bloco de fechamento repete a economia")
@@ -197,7 +200,7 @@ check(P._invest_destaque(c0670, True) == "",
       "curso sem campanha não recebe urgência artificial")
 
 lp = P.render(Growth(":memory:"), ONT, "FEQ-0480")
-for frag in ("barra-promo", "hero-preco", "hero-selos", "faixa-empresas", "invest-destaque",
+for frag in ("barra-promo", "hero-preco", "hero-selos", "empresas-grid", "invest-destaque",
              "Tirar dúvidas no WhatsApp"):
     check(frag in lp, f"LP renderizada contém {frag}")
 check("{{" not in lp, "nenhum placeholder ficou sem substituição")
@@ -236,7 +239,14 @@ check("formulário" in b0480 and "boletos" in b0480,
       "agente sabe explicar por que o formulário mostra o valor cheio")
 check("como_aplicar" not in str(ONT.promocao("FEQ-1000") or {}),
       "curso sem campanha não herda a explicação")
-check("boletos" in _investimento_itens(ONT.curso("FEQ-0480")),
-      "a LP também explica, para o visitante não achar que o preço mudou no formulário")
+# A LP NÃO repete mais o aviso "o formulário da Extecamp mostra o valor cheio": a
+# ficha de inscrição agora é nossa e já lista as opções COM desconto. O texto segue na
+# ontologia porque o agente ainda o usa ao mandar o link oficial (fora do prazo).
+check("boletos" not in _investimento_itens(ONT.curso("FEQ-0480")),
+      "LP não carrega mais o aviso do valor cheio da Extecamp")
+_ops = P._opcoes_pagamento(ONT.curso("FEQ-0480"))
+check("799,00" in _ops and "13.987,39" in _ops and "À VISTA" in _ops
+      and _ops.count("Campanha de Agosto 2026") >= 3,
+      "formulário oferece as opções da campanha, parceladas E à vista, com o nome dela")
 
 print(f"\n{ok}/{ok} passaram.")

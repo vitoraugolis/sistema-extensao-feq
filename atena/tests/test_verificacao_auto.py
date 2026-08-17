@@ -9,6 +9,7 @@ que estes testes protegem.
 """
 import os
 import sys
+import json
 import datetime
 import tempfile
 from pathlib import Path
@@ -158,6 +159,37 @@ def test_etapa2_coloca_na_fila_de_transcricao():
     assert "inicio_inscricao" in tipos
     assert cid in {p["card_id"] for p in A.GRW.verificacoes_pendentes()}
     assert A.GRW.get_inscricao(cid)["status"] == "recebida"
+    # a ficha inteira fica guardada, não só o evento
+    ficha = json.loads(A.GRW.get_inscricao(cid)["dados_json"])
+    assert ficha["cpf"] == "123.456.789-00" and ficha["escolaridade"] == "Superior Completo"
+    # ...e o card anda para INSCRITO no kanban, sem reportar conversão à Meta:
+    # inscricao_confirmada continua sendo o gesto humano depois de lançar na Extecamp.
+    assert A.EST.get_lead(cid)["fase"] == "Inscrito"
+    assert "inscricao_confirmada" not in tipos
+
+
+def test_ficha_entregue_sai_da_regua_de_recuperacao():
+    """Quem concluiu a etapa 2 não recebe 'precisa de ajuda para concluir?': ele já
+    fez a parte dele e está esperando a transcrição. A bola está com a gente."""
+    import datetime
+    from atena.growth import funil as F
+
+    c = _cliente()
+    r = c.post("/webhook/ponte", json={"nome": "Ficha Ok", "whatsapp": "19997770003",
+                                       "curso": "FEQ-0480", "event_id": "ev-ficha-1"})
+    cid = r.get_json()["card_id"]
+    depois = datetime.datetime.now() + datetime.timedelta(hours=3)
+    # só com a etapa 1, a régua de 2h ALCANÇA o lead
+    assert cid in {p["card_id"] for p in A.GRW.checkouts_pendentes()}
+    p = next(x for x in A.GRW.checkouts_pendentes() if x["card_id"] == cid)
+    assert p["tipo_checkout"] == "etapa1" and F.RECUPERAR_APOS_H["etapa1"] == 2
+    # concluída a etapa 2, ele continua pendente de transcrição mas NÃO recebe toque
+    c.post("/webhook/inscricao", json={
+        "whatsapp": "19997770003", "curso_id": "FEQ-0480", "event_id": "ev-ficha-1",
+        "cpf": "111.222.333-44", "nascimento": "1990-01-01",
+        "escolaridade": "Superior Completo", "forma_pagamento": "19 PARCELA(S)"})
+    enviados = F.recuperar(A.GRW, A.EST, A.ONTO.ont, A.WA, agora=depois)["enviados"]
+    assert cid not in enviados, enviados
 
 
 def test_decisao_automatica_fica_auditada():

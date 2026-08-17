@@ -191,7 +191,7 @@ def test_pedido_de_link_envia_link():
     orq.processar_mensagem("c1", "Pode sim!")
     d = est.listar_decisoes("c1")[0]
     assert "ins.extecamp.unicamp.br" in (d["mensagem"] or "")     # mandou o link de verdade
-    assert "16/08/2026" in d["mensagem"]                          # com o prazo certo
+    assert "03/01/2027" in d["mensagem"]                          # com o prazo certo
 
 
 def test_anti_loop_escala_para_humano():

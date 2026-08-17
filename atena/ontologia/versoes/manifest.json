@@ -1,0 +1,44 @@
+[
+  {
+    "versao": "v0001",
+    "ts": "2026-08-11T10:00:16",
+    "autor": "supervisor",
+    "motivo": "Injetor: prorrogacao em FEQ-0360",
+    "pre_imagem": "catalogo_pre_v0001_1786453216.jsonld"
+  },
+  {
+    "versao": "v0002",
+    "ts": "2026-08-11T10:00:17",
+    "autor": "supervisor",
+    "motivo": "Injetor: prorrogacao em FEQ-0499",
+    "pre_imagem": "catalogo_pre_v0002_1786453217.jsonld"
+  },
+  {
+    "versao": "v0003",
+    "ts": "2026-08-13T14:44:50",
+    "autor": "vitor",
+    "motivo": "Injetor: prorrogacao em FEQ-0480",
+    "pre_imagem": "catalogo_pre_v0003_1786643090.jsonld"
+  },
+  {
+    "versao": "v0004",
+    "ts": "2026-08-13T14:45:40",
+    "autor": "vitor",
+    "motivo": "Novo curso FEQ-0295 (Gradação Composicional p/ Simulação de Reservatórios) — proposta Extecamp",
+    "pre_imagem": "catalogo_pre_v0004_1786643140.jsonld"
+  },
+  {
+    "versao": "v0005",
+    "ts": "2026-08-13T14:59:28",
+    "autor": "vitor",
+    "motivo": "Injetor: novo_oferecimento em FEQ-0295",
+    "pre_imagem": "catalogo_pre_v0005_1786643968.jsonld"
+  },
+  {
+    "versao": "v0006",
+    "ts": "2026-08-13T15:05:25",
+    "autor": "vitor",
+    "motivo": "FEQ-0295: seção 'Profissionais de empresas que você conhece' (mesma lista do portfólio)",
+    "pre_imagem": "catalogo_pre_v0006_1786644325.jsonld"
+  }
+]

@@ -22,6 +22,114 @@ humana** quando necessário, **estatísticas** do funil e a porta do **Injetor**
 4. **Injetor** (`13`) — submeter update → ver diff + relatório de impacto → aprovar/rejeitar.
 5. **Transparência** (`/inspecao`) — para qualquer mensagem: o trace de decisão + **âncoras** que a
    fundamentaram (preço/data/requisito → tripla do grafo).
+6. **Notificações** (11/08/2026) — caixa de entrada única do agente comercial.
+7. **Inscrições** (11/08/2026) — fila de fichas da etapa 2, prontas para transcrever.
+8. **Otimização** (dentro de Medição, 11/08/2026) — objetivo de controle, bandit e gate.
+
+### 6/7. Notificações e Inscrições — o que mudou e por quê (11/08/2026)
+
+**A aba Verificação saiu.** Ela existia para o operador ir conferir no sistema da
+Extecamp se o lead tinha concluído a inscrição — a única fonte de verdade disponível
+quando o formulário era de lá. Com a ficha da etapa 2 dentro do sistema (spec 17 §7),
+a pergunta deixou de ser *"ele se inscreveu?"* e passou a ser *"já transcrevi a ficha
+dele?"*. Trocar a aba, e não apenas removê-la, foi a decisão: remover deixaria o
+agente sem fila de trabalho.
+
+| | Verificação (saiu) | Inscrições (entrou) |
+|---|---|---|
+| Pergunta | ele se inscreveu na Extecamp? | já transcrevi a ficha? |
+| Fonte | operador conferindo em outro sistema | `inscricoes.dados_json` |
+| Ação | Inscreveu / Não inscreveu | ver ficha · copiar campo · Transcrita |
+| Conversão | veredito manual | o gesto de transcrever reporta à Meta |
+
+A ficha aparece **em dois lugares**, de propósito: na aba (fila de trabalho) e dentro
+do card da conversa (o agente é perguntado "o que eu preenchi?" durante o atendimento
+e não pode ter de largar o chat). Cada campo tem botão de **copiar** — transcrever é
+digitar campo a campo na Extecamp, e é aí que nasce o erro de digitação que faz a
+inscrição do lead sair errada lá.
+
+**Notificações** compõe a fila na LEITURA a partir do que já existe (alertas, fichas
+pendentes, aprovações) — não há um segundo caminho de escrita para desincronizar.
+Alerta de tipo `inscricao` é filtrado: a fila de fichas já representa o mesmo fato, e
+com estado melhor (some quando o trabalho é feito, em vez de depender de alguém
+marcar como lido). `lido` é coluna nova em `alertas`, separada de `notificado` — uma
+é a marca do humano na Central, a outra é o disparo externo ao operador.
+
+### 8. Otimização — estrutura de RL (spec 18 §3.2/3.3) em modo sombra
+
+Objetivo de controle explícito: **maximizar inscritos por curso** e **minimizar CPL**,
+em `atena/avaliacao/otimizacao.py`. O que destravou a estrutura foi o rótulo: até
+agora "inscrito" era digitado à mão na Verificação, e rótulo digitado não fecha ciclo
+de aprendizado. A conclusão da etapa 2 é automática, datada e por curso.
+
+- **Método**: bandit contextual (Thompson, Beta-Bernoulli) por variante de template
+  da cadência. Não é deep RL porque o espaço de ação tem 3 templates e o dado é
+  escasso — condições em que bandit responde com dezenas de amostras e PPO não
+  responderia com milhares.
+- **Gate (§3.4)**: ≥100 episódios com desfecho e ≥30 conversões. Abaixo disso o
+  módulo roda em **sombra** — calcula e mostra a escolha, sem tocar na operação.
+- **Corte do rótulo**: episódios só contam a partir do primeiro `etapa1` observado.
+  Antes disso `inicio_inscricao` significava "clicou para ir à Extecamp"; contar os
+  dois juntos envenenaria o treino com eventos de mesmo nome e sentido diferente.
+- **CPL pode estar INDISPONÍVEL**: `ad_desempenho` é populado pela API da Meta e fica
+  vazio sem `META_ADS_TOKEN`. Nesse caso o termo de custo é declarado indisponível na
+  tela, em vez de virar zero — zero silencioso faria o objetivo parecer ótimo
+  justamente quando se está cego.
+
+### 9. Criar card manualmente no Funil + nome do perfil do WhatsApp (11/08/2026)
+
+**Criar card** (`POST /api/kanban/criar`, botão "+ Novo lead" na aba Funil): cobre o
+lead que não veio por ingestão automática (indicação, contato feito fora do
+WhatsApp). Só telefone é obrigatório — nome e curso são opcionais (curso "a
+descobrir" já é um estado normal do sistema, o mesmo de um lead que chega pelo
+WhatsApp sem citar curso). **Idempotente por telefone**, a mesma regra de sempre
+(CLAUDE.md §7): número que já tem card não ganha um segundo —
+`EST.lead_por_telefone()` decide, exatamente a função que todo caminho de ingestão
+já usa. Card duplicado tentado vira **atualização** do existente: nome só entra se
+estava vazio (nunca sobrescreve o que já foi confirmado/corrigido), curso novo soma
+como interesse adicional (`EST.add_curso_interesse`) em vez de substituir o ativo. A
+tela mostra isso explicitamente — "este telefone já tinha um card" — e abre a
+conversa existente, nunca finge que criou algo novo.
+
+**Nome do perfil do WhatsApp** (`transporte/whatsapp.py::receber()`): a Meta manda,
+junto do lote de mensagens, um array `contacts` (`wa_id` → `profile.name`) — o nome
+que a PESSOA colocou no próprio perfil. É a única fonte de nome para quem chega
+sozinho pelo WhatsApp, sem formulário. Sem isso o card nascia "wa-554199515077" e
+ficava assim para sempre. Duas situações:
+- **Card novo**: nasce com `nome` já preenchido pelo perfil.
+- **Card já existente** (criado na mão, por outra integração, ou por uma mensagem
+  anterior sem `contacts`): a próxima mensagem completa o nome — **só se ainda
+  estiver vazio**. Essa guarda é a idempotência inteira: não existe tabela nova de
+  "já processado", o próprio estado (nome vazio ou não) é a marca. Roda de novo com
+  o mesmo resultado sempre, e **nunca** sobrescreve um nome que o operador já leu na
+  conversa e corrigiu — mesmo que o perfil do WhatsApp mude ou traga outro texto.
+
+**Fallback de exibição**: card sem nome nenhum (nem perfil, nem cadastro manual) não
+mostra mais o `card_id` cru na tela — mostra o telefone formatado
+(`/api/kanban`, `/api/conversas`, `/api/conversas/<id>` passaram a incluir
+`telefone` para isso); só cai para o id se nem telefone houver. O `card_id`
+("wa-...", "op-...", "meta-...") é chave interna — nunca é o que o operador lê como
+nome de alguém.
+
+### 10. Iniciar/reiniciar conversa a qualquer momento (16/08/2026)
+
+Antes, o único jeito de abrir conversa com um lead sem histórico (ex.: quem só
+entregou a ficha da etapa 2 pela LP e nunca passou pelo WhatsApp — spec 17 §7b) era
+o operador achar sozinho o ícone de template no compositor, escolher `feq_lead`/
+`feq_abertura_curso` na mão e preencher os parâmetros. `POST /api/conversas/<id>/nova`
+reaproveita o caminho único do 1º contato (`_primeiro_contato`, o mesmo da ingestão
+automática do Meta) atrás de **um botão só**, em dois lugares:
+
+- **Tela vazia da conversa** ("Sem mensagens ainda") ganha um CTA "Iniciar conversa".
+- **Cabeçalho da conversa** ganha um ícone sempre disponível (exceto opt-out) para
+  recomeçar o atendimento **mesmo havendo histórico** — "sempre que quiser".
+
+Não há conceito de thread separada por sessão (`conversas` continua um log único
+por `card_id`, spec 12): "nova conversa" é reenviar a mensagem de abertura na MESMA
+linha do tempo, sem apagar nada — o histórico anterior fica visível acima. Não exige
+histórico prévio nem checa captabilidade do curso (ato deliberado do operador, mesmo
+raciocínio de `conversa_enviar_template`); opt-out continua bloqueando (checado
+dentro de `enviar_template`). `estado_conversa` volta para `aguardando_resposta`.
 
 ## Tempo real
 SSE (ou WebSocket) para novas mensagens, mudança de contadores e novos itens na fila. Servido pelo
@@ -58,3 +166,6 @@ a UI crescer.
 - AC4 `/inspecao` mostra as âncoras de uma afirmação factual enviada.
 - AC5 Acesso exige autenticação; ações humanas ficam auditadas.
 - AC6 Envio manual respeita Revisor (salvo override auditado), opt-out e horário.
+- AC7 Lead sem nenhuma mensagem (ex.: só ficha da etapa 2) pode ter a conversa
+  iniciada pelo operador a qualquer momento; lead com histórico pode ser reiniciado
+  do mesmo jeito, sem perder o que já foi conversado. Opt-out bloqueia os dois casos.

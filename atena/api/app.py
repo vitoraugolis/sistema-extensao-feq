@@ -84,6 +84,10 @@ def _iniciais(nome):
     return (ps[0][:1] + (ps[1][:1] if len(ps) > 1 else "")).upper()
 
 
+def _so_digitos(s):
+    return "".join(c for c in (s or "") if c.isdigit())
+
+
 def _ha(ts):
     try:
         d = (datetime.datetime.now() - datetime.datetime.fromisoformat(ts)).total_seconds()
@@ -171,6 +175,7 @@ def conversas():
             continue   # nunca houve contato nem proposta -> não é uma "conversa" ainda
         ult = hist[-1] if hist else None
         out.append({"id": l["card_id"], "lead": l["nome"], "iniciais": _iniciais(l["nome"]),
+                    "telefone": l.get("telefone") or "",   # fallback de exibição sem nome
                     "curso": l["curso"], "estado": l["estado_conversa"], "ha": _ha(l["atualizado"]),
                     "optout": bool(l.get("optout")), "modo": l.get("modo") or "auto",
                     "preview": _preview(ult)[:80],
@@ -200,7 +205,23 @@ def conversa_detalhe(card_id):
                     "utm": EST.utm_de(lead), "criado": lead.get("criado"),
                     "modo": lead.get("modo") or "auto",
                     "thread": EST.historico(card_id),
+                    # Ficha da etapa 2 junto do card: era o dado que o agente mais
+                    # precisava ter à mão durante a conversa (e antes só existia numa
+                    # aba separada, obrigando a sair do atendimento para consultar).
+                    # Chave `inscricao` e não `ficha`: a UI já chama de "ficha" a faixa
+                    # de contato do CRM (telefone/e-mail/notas) — dois nomes iguais para
+                    # coisas diferentes na mesma tela é confusão garantida.
+                    "inscricao": _ficha_do_card(card_id),
                     "proposta": prop["mensagem"] if prop else None})
+
+
+def _ficha_do_card(card_id):
+    i = GRW.get_inscricao(card_id)
+    if not i:
+        return None
+    return {"id": i["id"], "curso": i["curso"], "turma": i["turma"],
+            "status": i["status"], "criado": i["criado"],
+            "grupos": _ficha_para_humano(i["dados_json"])}
 
 
 @app.route("/api/leads/<card_id>/notas", methods=["POST"])
@@ -257,7 +278,10 @@ def kanban():
         ult = hist[-1] if hist else None
         fase = l["fase"] if l["fase"] in cols else "Lead"
         cols[fase].append({
-            "id": l["card_id"], "nome": l["nome"] or l["card_id"],
+            # Sem nome, o card_id ("wa-554199515077") NÃO entra aqui — é chave interna,
+            # não é para o operador ler. O front cai para o telefone formatado; se nem
+            # telefone houver, mostra "(sem nome)". Ver perfil do WhatsApp em receber().
+            "id": l["card_id"], "nome": l["nome"] or "",
             "telefone": l.get("telefone") or "",     # busca do funil aceita número
             "email": l.get("email") or "",
             "utm": EST.utm_de(l), "tem_notas": bool((l.get("notas") or "").strip()),
@@ -271,6 +295,46 @@ def kanban():
             "curso_encerrado": not ONTO.ont.captavel(l["curso"]).get("captavel"),
         })
     return jsonify({"colunas": [{"fase": f, "leads": cols[f]} for f in FASES]})
+
+
+@app.route("/api/kanban/criar", methods=["POST"])
+def kanban_criar():
+    """Cria um card manualmente no Funil (lead que não veio por ingestão automática
+    — indicação, contato feito fora do WhatsApp, prospecção do operador).
+
+    IDEMPOTENTE por telefone, mesma regra de sempre (CLAUDE.md §7 — dedupe de lead é
+    SEMPRE por telefone): número que já tem card não cria um segundo. Em vez disso
+    atualiza o existente — preenche o nome só se estava vazio (nunca sobrescreve o
+    que já foi corrigido) e soma o curso ao interesse (não troca o ativo à força) —
+    e devolve `criado:false` com o card_id de verdade, para a tela nunca duplicar."""
+    b = request.get_json(silent=True) or {}
+    tel = (b.get("telefone") or "").strip()
+    nome = (b.get("nome") or "").strip()
+    curso = (b.get("curso") or "").strip().upper()
+    if not tel:
+        return jsonify({"erro": "telefone é obrigatório"}), 400
+    if len(_so_digitos(tel)) < 10:
+        return jsonify({"erro": "telefone inválido (informe DDD + número)"}), 400
+    if curso and not ONTO.ont.curso(curso):
+        return jsonify({"erro": f"curso '{curso}' não está no catálogo"}), 400
+    usuario = session.get("usuario", "operador")
+    existente = EST.lead_por_telefone(tel)
+    if existente:
+        lead = EST.get_lead(existente) or {}
+        if nome and not (lead.get("nome") or "").strip():
+            EST.upsert_lead(existente, nome=nome)
+        if curso and curso not in EST.cursos_interesse(lead):
+            EST.add_curso_interesse(existente, curso)
+        EST.log_acao(usuario, "tentativa de criar card novo — telefone já cadastrado, "
+                              "card existente atualizado em vez de duplicado", existente)
+        return jsonify({"ok": True, "card_id": existente, "criado": False,
+                        "nome": (EST.get_lead(existente) or {}).get("nome")})
+    card_id = f"op-{_so_digitos(tel)}"
+    EST.upsert_lead(card_id, nome=nome, telefone=tel, curso=curso,
+                    cursos_interesse=curso, fase="Lead", estado_conversa="qualificacao")
+    EST.log_acao(usuario, f"card criado manualmente no Funil{f' ({curso})' if curso else ''}",
+                 card_id)
+    return jsonify({"ok": True, "card_id": card_id, "criado": True})
 
 
 def _mover_fase(lead, card_id, fase):
@@ -422,6 +486,165 @@ def lead_verificar(card_id):
     return jsonify({"ok": True, "fase": lead["fase"], "ativacao": r})
 
 
+# ------------------------------------------------- Inscrições (fichas da etapa 2)
+# Substituiu a aba Verificação. A pergunta mudou: não é mais "ele se inscreveu na
+# Extecamp?" (que exigia o operador ir conferir lá), é "já transcrevi a ficha que ele
+# entregou aqui?". O dado que antes faltava agora está no sistema.
+_ROTULO_FICHA = {
+    "cpf": "CPF", "nascimento": "Nascimento", "doc_tipo": "Documento",
+    "doc_numero": "Nº do documento", "doc_emissor": "Emissor", "sexo": "Sexo",
+    "estado_civil": "Estado civil", "cidade_nascimento": "Cidade natal",
+    "cep": "CEP", "rua": "Rua", "numero": "Número", "complemento": "Complemento",
+    "bairro": "Bairro", "cidade": "Cidade", "estado": "UF",
+    "escolaridade": "Escolaridade", "instituicao": "Instituição",
+    "curso_concluido": "Curso concluído", "ano_conclusao": "Ano de conclusão",
+    "situacao": "Situação", "empresa": "Empresa", "cargo": "Cargo",
+    "experiencia_anos": "Experiência (anos)",
+    "forma_pagamento": "Forma de pagamento", "comprovante_em": "Comprovante em nome de",
+}
+# Ordem de leitura para quem vai TRANSCREVER: a mesma do formulário da Extecamp.
+# Um dict solto obrigaria o agente a caçar campo por campo na tela.
+_GRUPOS_FICHA = (
+    ("Dados pessoais", ("cpf", "nascimento", "doc_tipo", "doc_numero", "doc_emissor",
+                        "sexo", "estado_civil", "cidade_nascimento")),
+    ("Endereço", ("cep", "rua", "numero", "complemento", "bairro", "cidade", "estado")),
+    ("Formação e atuação", ("escolaridade", "instituicao", "curso_concluido",
+                            "ano_conclusao", "situacao", "empresa", "cargo",
+                            "experiencia_anos")),
+    ("Pagamento", ("forma_pagamento", "comprovante_em")),
+)
+
+
+def _ficha_para_humano(dados_json):
+    """A ficha em grupos rotulados, pronta para leitura/transcrição."""
+    try:
+        d = json.loads(dados_json or "{}")
+    except ValueError:
+        d = {}
+    grupos = []
+    for titulo, campos in _GRUPOS_FICHA:
+        itens = [{"campo": c, "rotulo": _ROTULO_FICHA.get(c, c), "valor": d[c]}
+                 for c in campos if d.get(c)]
+        if itens:
+            grupos.append({"titulo": titulo, "itens": itens})
+    # campo novo no formulário que ainda não tem rótulo aqui não pode sumir da tela
+    conhecidos = {c for _, campos in _GRUPOS_FICHA for c in campos}
+    extras = [{"campo": k, "rotulo": _ROTULO_FICHA.get(k, k), "valor": v}
+              for k, v in d.items() if k not in conhecidos and v]
+    if extras:
+        grupos.append({"titulo": "Outros", "itens": extras})
+    return grupos
+
+
+@app.route("/api/inscricoes")
+def inscricoes_lista():
+    """Fila de fichas da etapa 2: o que o agente comercial precisa transcrever."""
+    status = (request.args.get("status") or "").strip() or None
+    out = []
+    for i in GRW.inscricoes(status=status):
+        lead = EST.get_lead(i["card_id"]) or {}
+        out.append({
+            "id": i["id"], "card_id": i["card_id"], "curso": i["curso"],
+            "turma": i["turma"], "status": i["status"], "criado": i["criado"],
+            "nome": lead.get("nome"), "telefone": lead.get("telefone"),
+            "email": lead.get("email"), "fase": lead.get("fase"),
+            "grupos": _ficha_para_humano(i["dados_json"]),
+        })
+    pendentes = sum(1 for i in out if i["status"] == "recebida")
+    return jsonify({"inscricoes": out, "pendentes": pendentes})
+
+
+@app.route("/api/inscricoes/<card_id>/transcrita", methods=["POST"])
+def inscricao_transcrita(card_id):
+    """O agente lançou a ficha na Extecamp. É ESTE gesto que confirma a conversão:
+    marca a ficha e reporta `inscricao_confirmada` (CAPI offline), do mesmo jeito que
+    mover o card para Inscrito no kanban — sem duplicar se já foi reportado."""
+    lead = EST.get_lead(card_id)
+    ficha = GRW.get_inscricao(card_id)
+    if not lead or not ficha:
+        return jsonify({"erro": "ficha ou lead inexistente"}), 404
+    usuario = session.get("usuario", "operador")
+    GRW.set_inscricao_status(ficha["id"], "transcrita")
+    capi = _mover_fase(lead, card_id, "Inscrito")
+    EST.log_acao(usuario, f"ficha transcrita na Extecamp ({ficha['curso']})", card_id)
+    return jsonify({"ok": True, "status": "transcrita", "conversao_offline": capi})
+
+
+# ------------------------------------------------------ Central de Notificações
+@app.route("/api/notificacoes")
+def notificacoes():
+    """Uma caixa de entrada só, em vez de o agente varrer 5 abas atrás de trabalho.
+
+    O feed é COMPOSTO na leitura a partir das filas que já existem — não há um
+    segundo caminho de escrita para desincronizar. `alertas` entra porque é a única
+    fila com estado próprio de leitura."""
+    itens = []
+    for a in EST.alertas_nao_lidos():
+        # Alerta de tipo 'inscricao' fica FORA: a fila de fichas logo abaixo já
+        # representa o mesmo fato, e com estado melhor (some quando o trabalho é
+        # feito, em vez de depender de alguém marcar como lido). O alerta continua
+        # existindo para o disparo externo ao operador (`alertas_nao_notificados`) —
+        # o que não pode é a mesma ficha ocupar duas linhas da caixa de entrada.
+        if a["tipo"] == "inscricao":
+            continue
+        itens.append({"fonte": "alerta", "id": a["id"], "tipo": a["tipo"],
+                      "texto": a["texto"], "card_id": a.get("card_id"),
+                      "ts": a["criado"], "lido": False})
+    for i in GRW.inscricoes(status="recebida"):
+        lead = EST.get_lead(i["card_id"]) or {}
+        itens.append({"fonte": "inscricao", "id": i["id"], "tipo": "ficha_nova",
+                      "texto": f"Ficha completa de {lead.get('nome') or i['card_id']} "
+                               f"({i['curso']}) aguardando transcrição na Extecamp",
+                      "card_id": i["card_id"], "ts": i["criado"], "lido": False,
+                      "acao": "inscricoes"})
+    agora = datetime.datetime.now()
+    # A fila de aprovações mede idade em HORAS; alertas e fichas têm timestamp. Para
+    # ordenar tudo junto, converto horas -> ts (não o contrário): timestamp é o dado
+    # mais preciso e o único que sobrevive a um reload da página.
+    ABAS = {"abrir": "conversas", "duvidas": "duvidas", "injetor": "injetor"}
+    try:
+        # só o que EXIGE decisão humana (prioridade <=3); captabilidade e afins são
+        # informativos e já têm lugar próprio — repetir aqui vira ruído na caixa.
+        for p in _aprovacoes_payload()["itens"]:
+            if p.get("prioridade", 9) > 3:
+                continue
+            h = p.get("horas")
+            ts = ((agora - datetime.timedelta(hours=h)).isoformat()
+                  if isinstance(h, (int, float)) else agora.isoformat())
+            itens.append({"fonte": "aprovacao", "id": p.get("card_id") or p.get("pid"),
+                          "tipo": p.get("tipo") or "aprovacao",
+                          "texto": f"{p.get('nome') or p.get('curso') or ''}: {p.get('motivo') or ''}".strip(": "),
+                          "card_id": p.get("card_id"), "ts": ts, "lido": False,
+                          "acao": ABAS.get(p.get("acao"), "aprovacoes")})
+    except Exception as e:      # a caixa de entrada nunca pode cair por causa de uma fonte
+        print(f"[notificacoes] aprovações indisponíveis: {e}", flush=True)
+    itens.sort(key=lambda x: x.get("ts") or "", reverse=True)
+    por_tipo = {}
+    for i in itens:
+        por_tipo[i["fonte"]] = por_tipo.get(i["fonte"], 0) + 1
+    return jsonify({"itens": itens, "total": len(itens), "por_fonte": por_tipo})
+
+
+@app.route("/api/notificacoes/ler", methods=["POST"])
+def notificacoes_ler():
+    """Marca alertas como lidos. As outras fontes somem sozinhas quando o trabalho
+    é feito (ficha transcrita, aprovação decidida) — marcar 'lido' nelas seria criar
+    um estado que mente sobre a fila real."""
+    b = request.get_json(silent=True) or {}
+    usuario = session.get("usuario", "operador")
+    if b.get("id"):
+        return jsonify({"ok": EST.marcar_alerta_lido(int(b["id"]), usuario)})
+    return jsonify({"ok": True, "lidos": EST.marcar_alertas_lidos(usuario, b.get("tipo"))})
+
+
+# ------------------------------------------------------------ Otimização (spec 18)
+@app.route("/api/otimizacao")
+def otimizacao():
+    """Objetivo de controle, bandit e o gate — em modo sombra até haver evidência."""
+    from atena.avaliacao import otimizacao as otim
+    return jsonify(otim.painel(GRW, _ont()))
+
+
 @app.route("/api/leads/<card_id>/reativar", methods=["POST"])
 def lead_reativar(card_id):
     """Reativação manual: dispara feq_reengajamento (opt-out/captabilidade travam)."""
@@ -515,10 +738,28 @@ def conversa_iniciar():
     cap = ONTO.ont.captavel(curso)
     if not cap.get("captavel"):
         return jsonify({"erro": f"curso {curso} não captável ({cap.get('status')})"}), 409
-    card_id = EST.lead_por_telefone(tel) or f"op-{''.join(c for c in tel if c.isdigit())}"
+    card_id = EST.lead_por_telefone(tel) or f"op-{_so_digitos(tel)}"
     EST.upsert_lead(card_id, nome=nome, telefone=tel, curso=curso,
                     fase="Lead", estado_conversa="aguardando_resposta")
     return jsonify({"card_id": card_id, "envio": _primeiro_contato(card_id)})
+
+
+@app.route("/api/conversas/<card_id>/nova", methods=["POST"])
+def conversa_nova(card_id):
+    """Inicia (ou reinicia) a conversa de um card que JÁ existe — mesmo template de
+    abertura do 1º contato automático (feq_lead/feq_abertura_curso). Cobre os dois
+    casos pedidos: (1) o lead que nunca recebeu mensagem nenhuma — ex.: só entregou
+    a ficha da etapa 2 pela LP e nunca passou pelo WhatsApp (spec 17 §7b) — e (2) o
+    pedido explícito do operador de recomeçar o atendimento a qualquer momento,
+    mesmo havendo histórico. Não exige histórico prévio nem checa captabilidade do
+    curso (ato deliberado do operador — mesmo raciocínio de conversa_enviar_template);
+    opt-out continua bloqueando, checado dentro de enviar_template."""
+    if not EST.get_lead(card_id):
+        return jsonify({"erro": "lead inexistente"}), 404
+    r = _primeiro_contato(card_id)
+    if r.get("ok"):
+        EST.log_acao(session.get("usuario", "operador"), "iniciar/nova conversa", card_id)
+    return jsonify({"envio": r})
 
 
 # Limiar da verificação automática. 0 = IMEDIATO: decide assim que o lead chega da LP
@@ -1107,6 +1348,10 @@ def conversa_recusar(card_id):
 
 @app.route("/api/aprovacoes")
 def aprovacoes():
+    return jsonify(_aprovacoes_payload())
+
+
+def _aprovacoes_payload():
     """Fila de intervenção humana — ACIONÁVEL (spec 18).
 
     Antes isto era uma lista de texto sem botão: quando o agente desistia e pedia
@@ -1179,7 +1424,7 @@ def aprovacoes():
     agir = [i for i in itens if i["prioridade"] <= 3]
     alertas = [{"tipo": "alerta", "motivo": f"[{a['tipo']}] {a['texto']}",
                 "horas": _ha_h(a.get("criado"))} for a in EST.listar_alertas(8)]
-    return jsonify({"itens": itens, "alertas": alertas, "agir": len(agir)})
+    return {"itens": itens, "alertas": alertas, "agir": len(agir)}
 
 
 @app.route("/api/leads/<card_id>/resolver", methods=["POST"])
@@ -1235,6 +1480,13 @@ def injetor_aprovar(pid):
     else:
         r = ONTO.aprovar(pid)
         ORQ.ont = ING.ont = CUR.ont = ONTO.ont   # todos passam a usar o grafo recarregado
+    # Prorrogação: turma e URL continuam as mesmas, então não há set_oferecimento —
+    # mas a LP no ar ficou com as datas velhas e precisa ser republicada igual.
+    if r.get("ok") and p and p.get("tipo") == "prorrogacao":
+        from atena.growth import lp_auto
+        r["lp"] = lp_auto.republicar_um(GRW, ONTO.ont, EST, p["alvo"])
+        EST.log_acao(session.get("usuario", "operador"),
+                     f"prorrogação de datas em {p['alvo']}")
     if r.get("ok") and oferecimento:
         extra = json.loads(p["texto"])
         if not GRW.set_oferecimento(p["alvo"], extra["turma"], extra["url_extecamp"]):

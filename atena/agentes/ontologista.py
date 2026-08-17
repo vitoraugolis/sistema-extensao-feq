@@ -193,6 +193,52 @@ class Ontologista:
         self.est.set_proposta_status(pid, "rejeitada")
         return {"ok": True}
 
+    # ------------------------------------------------------ prorrogação de datas
+    def propor_datas(self, curso, insc_fim=None, of_inicio=None, of_fim=None,
+                     boleto=None, autor="operador"):
+        """Prorrogar/corrigir as datas da turma ATUAL — sem trocar turma nem URL.
+
+        `propor_oferecimento` cobre turma NOVA (5 campos + URL pública, que muda o slug
+        da LP). Prorrogação é outra coisa: a Extecamp esticou o prazo e empurrou o
+        oferecimento da MESMA turma, então a URL e o slug não podem mudar — e exigir
+        `insc_inicio` só para preencher formulário faria inventar uma data que o
+        catálogo não tem (vários cursos só declaram o fim).
+
+        Passa pelo mesmo caminho de todo mundo: diff explícito, SHACL e aprovação.
+        """
+        pid = f"prop-{int(time.time() * 1000)}"
+        code = (curso or "").strip().upper()
+        raw = [("janelaInscricao.fim", insc_fim), ("janelaOferecimento.inicio", of_inicio),
+               ("janelaOferecimento.fim", of_fim), ("dataBoleto", boleto)]
+        raw = [(p, v) for p, v in raw if v]
+        if not code or not raw:
+            self.est.add_proposta(pid, autor, "", code or "?", "prorrogacao", [],
+                                  ["Informe ao menos uma data (inscrição, oferecimento ou boleto)."],
+                                  {"ok": False, "mensagem": "sem datas"}, status="esclarecer")
+            return self.est.get_proposta(pid)
+        cat = self._carregar()
+        course = self._find(cat, code)
+        if not course:
+            self.est.add_proposta(pid, autor, "", code, "prorrogacao", [],
+                                  [f"Curso {code} não está no catálogo."],
+                                  {"ok": False, "mensagem": "curso inexistente"}, status="invalida")
+            return self.est.get_proposta(pid)
+        cat2 = copy.deepcopy(cat)
+        course2 = self._find(cat2, code)
+        diff = []
+        for path, para in raw:
+            diff.append({"campo": path, "de": _get(course, path), "para": para})
+            _set(course2, path, para)
+        data_graph = validacao.grafo_de_catalogo(cat2, self.vocab_path)
+        ok, txt = validacao.validar(data_graph, shapes_path=ONT_DIR / "shapes.ttl")
+        impacto = self._impacto(code, "prorrogacao", cat2)
+        impacto.append("Turma e URL da Extecamp NÃO mudam — o slug da LP continua o mesmo.")
+        impacto.append("Ao aprovar, a LP é republicada com as datas novas.")
+        self.est.add_proposta(pid, autor, "", code, "prorrogacao", diff, impacto,
+                              {"ok": bool(ok), "mensagem": "SHACL conforme" if ok else txt[:300]},
+                              status="proposta" if ok else "invalida")
+        return self.est.get_proposta(pid)
+
     # ------------------------------------------------------ novo oferecimento
     def propor_oferecimento(self, curso, turma, url_extecamp, insc_inicio, insc_fim,
                             of_inicio, of_fim, autor="operador"):

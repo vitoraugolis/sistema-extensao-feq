@@ -197,6 +197,13 @@ def recuperar(g, est, ont, wa, agora=None):
         espera = RECUPERAR_APOS_H.get(p.get("tipo_checkout"), 24)
         if h is None or h < espera or p["toques"] >= MAX_TOQUES:
             continue
+        # Ficha da etapa 2 entregue e ainda não transcrita: a bola está com a GENTE.
+        # Mandar "precisa de ajuda para concluir?" para quem acabou de nos dar CPF,
+        # endereço e forma de pagamento é constrangedor — e é o mesmo motivo pelo qual
+        # a verificação automática já pula esse lead (app.py::_verif_elegiveis).
+        insc = g.get_inscricao(p["card_id"])
+        if insc and insc["status"] == "recebida":
+            continue
         # Cadência DORMENTE não é retomada. O corte é sobre a última atividade (último
         # toque, ou o checkout se nunca houve toque), não sobre a idade do checkout:
         #   • nunca tocado e checkout velho  -> backlog frio, não acordar

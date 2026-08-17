@@ -302,6 +302,13 @@ class WhatsApp:
         for entry in payload.get("entry", []):
             for ch in entry.get("changes", []):
                 v = ch.get("value", {})
+                # Nome que a PESSOA colocou no próprio perfil do WhatsApp — a Meta manda
+                # isto junto do lote de mensagens (array `contacts`, paralelo a `messages`,
+                # casado por wa_id). É a única fonte de nome para quem chega sozinho pelo
+                # WhatsApp, sem passar por formulário nenhum — sem isso o card nasce como
+                # "wa-554199515077" e fica assim para sempre.
+                perfis = {c.get("wa_id"): ((c.get("profile") or {}).get("name") or "").strip()
+                         for c in (v.get("contacts") or [])}
                 for m in v.get("messages", []):
                     if self.est.msg_ja_vista(m.get("id")):
                         continue   # reentrega da Meta — já processada, não duplicar resposta
@@ -316,6 +323,7 @@ class WhatsApp:
                             out.append({"card_id": cid, "acao": "reacao", "emoji": r.get("emoji")})
                         continue
                     tel = m.get("from", "")
+                    nome_perfil = perfis.get(tel, "")
                     tipo, texto, media_id, mime = extrair_mensagem(m)
                     transcricao = None
                     if media_id:
@@ -331,13 +339,27 @@ class WhatsApp:
                         card_id = f"wa-{tel}"
                         curso = curso_de_texto(texto)
                         self.est.upsert_lead(
-                            card_id, nome="", telefone=tel, curso=curso,
+                            card_id, nome=nome_perfil, telefone=tel, curso=curso,
                             cursos_interesse=curso, fase="Lead",
                             estado_conversa="qualificacao",
                             # o lead nos escreveu primeiro: é opt-in e abre a janela de 24h
                             optin_ts=_agora_iso(), optin_fonte="whatsapp_lp")
                         self.est.log_acao("whatsapp", f"lead novo pelo WhatsApp (curso: {curso or 'a descobrir'})",
                                           card_id)
+                    elif nome_perfil:
+                        # Card JÁ existia (veio de "op-..." criado na mão, de outra
+                        # integração, ou de uma mensagem anterior sem o array `contacts`).
+                        # Preenche o nome só se AINDA estiver vazio: nunca sobrescreve um
+                        # nome que o operador já leu na conversa e corrigiu. Essa guarda —
+                        # "só quando vazio" — é o que torna a operação idempotente: a
+                        # segunda mensagem da mesma pessoa não faz nada, porque a primeira
+                        # já preencheu.
+                        lead = self.est.get_lead(card_id) or {}
+                        if not (lead.get("nome") or "").strip():
+                            self.est.upsert_lead(card_id, nome=nome_perfil)
+                            self.est.log_acao("whatsapp",
+                                              f"nome preenchido pelo perfil do WhatsApp: {nome_perfil}",
+                                              card_id)
                     out.append({"card_id": card_id,
                                 **self.orq.processar_mensagem(card_id, texto, tipo=tipo,
                                                               media_id=media_id,

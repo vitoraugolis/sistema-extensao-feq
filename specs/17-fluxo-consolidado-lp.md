@@ -35,23 +35,39 @@ inscricao/<SIGLA>/<OFERECIMENTO>`. Fonte da URL: `url_extecamp` da ontologia
 `inscricao` (`ponte.url_inscricao`). Turmas-alvo: FEQ-0480/009 · FEQ-0580/001 ·
 FEQ-0333/001 · FEQ-1000/018.
 
-## 3. A LP (inspiração: PUC Online, 100% ancorada)
+## 3. A LP (sequência das páginas antigas da FEQ, 100% ancorada)
 
-Seções, na ordem (todas com `data-secao` para a telemetria):
+Seções, na ordem (todas com `data-secao` para a telemetria) — a mesma sequência de
+blocos das páginas antigas de `cursos-extensao.feq.unicamp.br`:
 
-1. **Hero** — tipo+modalidade, título, objetivo (ontologia), urgência legítima
-   ("inscrições até <prazo>"), CTA primário.
-2. **Cards de valor** — carga horária, horário ("pensado para quem trabalha"),
-   parcelamento/desconto (plano da ontologia).
-3. **Conteúdo programático** — expansível (`<details>`), direto de
-   `conteudoProgramatico` da ontologia (o equivalente às "disciplinas" da PUC).
-4. **Para quem é** — requisito acadêmico + público-alvo.
-5. **Professor responsável** — nome + vínculo FEQ/Unicamp.
-6. **Investimento** — parcelas, à vista, taxa de inscrição, descontos (ex.: 10%
-   alunos/ex-alunos Unicamp), com urgência do prazo real e CTA.
-7. **FAQ** — respostas ancoradas (requisito, formato, valores, prazo, jornada
-   Extecamp).
-8. **CTA final** + rodapé institucional.
+0. **Cabeçalho codado** — UMA faixa sticky: logo + menu real do site + busca + CTA
+   (no mobile, logo + sanduíche). Não vem mais do tema do WP.
+1. **Hero** (invertido) — tipo+modalidade, título, objetivo, selos, **preço**,
+   urgência legítima ("inscrições até <prazo>"), CTA primário.
+2. **Logos de empresas** onde os formados atuam (`empresasJson`).
+3. **Seu currículo no futuro** — desenhado como uma **folha de currículo**: foto
+   (imagem de engenharia que a FEQ já publica), formação complementar (o curso),
+   competências (`habilidadesJson`) e referência de mercado (`salarioRef`), ao lado
+   do certificado. Curso **sem modelo publicado** (FEQ-0331, FEQ-0499, FEQ-0580):
+   mostramos o **teor da declaração** (nome do curso + carga horária), nunca uma
+   imagem fabricada de documento oficial da Unicamp.
+4. **Depoimentos** reais (`depoimentosJson`).
+5. **Por que a Extensão FEQ** — 4 cards: certificado, formato de aulas, corpo
+   docente, carga horária.
+6. **Professores** — responsável + docentes em destaque (foto, bio, Lattes).
+7. **Conteúdo programático** — accordion `<details>` módulo→subtópicos.
+8. **FAQ** — requisito, inscrição, formato, **objetivos**, **período de
+   oferecimento**, valores, prazo, avaliação, certificação/MEC.
+9. **Investimento** (invertido) — parcelas, à vista, taxa, descontos, campanha,
+   passo a passo da Extecamp e CTA de fechamento.
+10. **Cursos relacionados** + rodapé institucional.
+
+**Repetições eliminadas (11/08/2026):** a seção "O que você vai dominar" (mesmas
+habilidades do currículo), a faixa de chips de empresas (mesmos nomes dos logos),
+os 3 "cards de valor" (repetiam benefícios e investimento), "Para quem é" (já é
+item do FAQ e campo da etapa 2) e o CTA final solto (o bloco de investimento já
+fecha com CTA). Objetivos e período viraram itens do FAQ — mantendo o `data-secao`
+no `<details>`, então a telemetria de interesse não se perde.
 
 "Fricção positiva": a LP entrega as informações essenciais sem esconder nada —
 quem clica no CTA já se autoqualificou. O modal (Nome + WhatsApp + LGPD) é a única
@@ -103,6 +119,97 @@ certificação/MEC. Regras: seção sem dado oficial SOME (nunca inventa; a nav-
 de Depoimentos idem); dado DESATUALIZADO da página antiga (planos de pagamento
 antigos do 0480, datas passadas do 0333) NÃO é importado — pagamento/datas/carga
 vêm sempre da Extecamp via ontologia, que é quem o Revisor ancora.
+
+### 3c. Redesign monochrome com a IDV da FEQ (11/08/2026)
+
+A LP era escura com acento âmbar (paleta genérica de LP). Passou a usar a identidade
+visual do manual da marca (v2, pág. 14), na disciplina monochrome — uma tinta só,
+ênfase por inversão:
+
+| Papel | Cor | Uso |
+|---|---|---|
+| Tinta institucional | `#065BAA` | títulos, réguas, bordas, CTA — faz o papel do "preto" |
+| Leitura / inversão | `#094567` | corpo de texto e **fundo** das seções invertidas |
+| Acento gráfico | `#19ABB5` | filetes, marcadores, sinais do accordion — **nunca** texto pequeno sobre branco (2,6:1) |
+| Dinheiro e relógio | `#FBBF24` | preço, desconto, selo de campanha e contagem regressiva — só sobre fundo azul (5,6:1) |
+| Apoio | `#A2DADB` · Erro `#DC4E41` · Papel `#FFFFFF`/`#F5F7F9` | |
+
+- **Tipografia**: Montserrat (substituto livre da Gotham do manual), display com
+  tracking negativo e escala grande. O `<link>` da fonte é criado pelo
+  `bridge-logic.js` — em `@import` no CSS o `convert_chars()` do WordPress
+  transformaria o `&` de `&display=swap` em `&#038;` e quebraria a URL. **Por isso
+  `&` é proibido em `bridge.css`.**
+- **Disciplina**: raio 0, zero sombra, régua de 4px entre seções, negativo generoso,
+  transições ≤100ms. Duas exceções deliberadas: retratos (professores e depoentes)
+  são **circulares, coloridos, com anel na tinta** — quem ensina é argumento de
+  venda; e o botão do WhatsApp é redondo no **verde oficial** (`#25D366`), marca de
+  terceiro que precisa ser reconhecível.
+- **Logos de empresas**: coloridos e grandes — a seção existe para o lead
+  *reconhecer* as marcas.
+- **Cabeçalho codado** (`.lp-head`): **uma faixa só** — logo + menu real do site
+  (Home · Projetos · Legislações · Cursos · Comissão · Equipe · Contato + busca),
+  conferido no HTML de `cursos-extensao.feq.unicamp.br`, + CTA. Havia duas faixas
+  (institucional e atalhos da LP) e, empilhadas, liam como cabeçalho duplicado. A LP
+  deixa de depender do header do tema e funciona em qualquer URL.
+  **Mobile**: só logo + sanduíche (~50px); menu, busca e CTA vão para o painel. O
+  toggle é **CSS puro** (checkbox + label, checkbox invisível mas focável) — o
+  bootstrap da página vai em base64 e já foi bloqueado por plugin do WP uma vez, o
+  menu não pode depender de JS.
+- **Auditoria**: `test_growth.py` varre todo `class="…"` do template + das LPs
+  renderizadas e exige definição no `bridge.css` — classe órfã não passa.
+
+### 3d. Bloco de cursos da HOME (11/08/2026)
+
+`ponte.home_cursos_html()` gera, da ontologia, os cards de TODO o catálogo — um por
+curso do `cursos_metas`, com o estado real de captação (`ont.captavel`):
+
+| Estado | Selo | O que o card promete |
+|---|---|---|
+| aberto | verde-água | preço vigente + "Inscrições até DD/MM" → LP |
+| `recuperavel` | amarelo | "prazo encerrado, a turma não começou — peça vaga remanescente" → LP (etapa 1 escala para humano) |
+| fechado | apoio | "entre na lista de espera" → LP em modo espera |
+
+Curso sem turma aberta **não anuncia preço** (valor de turma encerrada não é oferta).
+O link sai de `ponte.slug_lp()` — a MESMA função que o deploy usa para publicar, e que
+o cross-sell da LP também passou a usar (eram duas implementações, e o cross-sell
+apontava para um slug que o deploy não publicava).
+
+**Publicação** (`wp_deploy_bridge --home` ou `--so-home`): a home é uma página
+Elementor (id 8157). O bloco de cursos ocupa VÁRIAS seções — dois títulos e duas
+grades de imagens ligando às páginas antigas — e vira UMA seção com um widget HTML.
+Guardas: só recorta entre a seção com a âncora `#cursos` e a seção de diferenciais
+("Saia na frente"), e aborta se houver no meio qualquer seção que não seja grade,
+título de curso ou espaçador. O `_elementor_data` original é salvo em
+`atena/data/bridge_pages/home_elementor_antes.json` antes da primeira escrita.
+
+Cada card leva a **imagem que a FEQ já usava** para aquele curso na grade antiga
+(extraída do backup do Elementor). Duas exceções: FEQ-0299 e FEQ-0670 apontavam para
+servidores de TERCEIROS (`agencia.fapesp.br`, `ictq.com.br`) — hotlink que quebra
+quando o outro site mexe no arquivo; foram trocadas por equivalentes da própria
+biblioteca de mídia (microscópio eletrônico e modelo molecular). Teste trava as duas
+coisas: todo curso tem imagem, e nenhuma vem de fora do domínio da FEQ.
+
+**Gotcha do Elementor**: ele serve o HTML renderizado de um cache que a escrita pela
+API não invalida — o bloco novo leva alguns minutos para aparecer, e às vezes a
+página no ar ainda mostra a versão ANTERIOR do bloco. Por isso o marcador carrega um
+carimbo de versão (`<!-- FEQ-CARDS-CURSOS v=<hash8> -->`): o deploy só responde
+`publicado` quando **aquele** hash está no ar; senão devolve
+`gravado_aguardando_cache` dizendo o que está na tela agora. Para não esperar: abrir
+a home no Elementor e clicar em *Update* (ou Elementor › Ferramentas › Regenerar
+arquivos e dados). Mexer no `post_content` não adianta — quem renderiza é o Elementor.
+
+### 3e. Datas: prorrogação × turma nova
+
+`Ontologista.propor_datas()` cobre o caso "a Extecamp esticou o prazo e empurrou o
+oferecimento da MESMA turma": muda `janelaInscricao.fim`, `janelaOferecimento.*` e a
+`dataBoleto`, **sem tocar em turma nem URL** — o slug da LP não pode mudar. Turma
+NOVA continua em `propor_oferecimento()` (que exige URL e move a LP para o slug
+perene). Os dois passam pelo mesmo caminho: diff explícito, SHACL e aprovação; ao
+aprovar, a LP é republicada.
+
+`dataBoleto` (novo campo, `feq:dataBoleto`) é a data do boleto da inscrição daquela
+turma; aparece no passo 3 do "Como se inscrever" e **some** em curso que não a
+declara — nunca é derivada do prazo de inscrição.
 
 ## 4. Publicação como página órfã no WordPress FEQ
 
@@ -166,8 +273,33 @@ CRM: ajuda → lembrete → valor → urgência → última chamada):
 
 Param de prazo ausente → "breve" (nunca parâmetro vazio, a Meta rejeita). Saem da
 régua: convertido (Inscrito/Matriculado), opt-out, curso não captável, lead que
-respondeu após o checkout (a conversa passa ao cérebro). Boleto continua esperando
-24 h para o 1º toque. Teto de 25 envios/passada.
+respondeu após o checkout (a conversa passa ao cérebro) e — desde 11/08/2026 —
+**quem entregou a ficha da etapa 2 e ainda não foi transcrito** (`inscricoes.status
+= 'recebida'`): a bola está com a gente, não com ele. Boleto continua esperando 24 h
+para o 1º toque. Teto de 25 envios/passada.
+
+### 7b. O que cada etapa faz com o lead (11/08/2026)
+
+| | Etapa 1 (contato) | Etapa 2 (ficha completa) |
+|---|---|---|
+| Guarda | card no CRM: nome, e-mail, telefone, opt-in, UTMs, sessão | tudo da etapa 1 **+ `inscricoes.dados_json`** (CPF, endereço, formação, pagamento) |
+| Evento de funil | `etapa1` (sem CAPI) | `inicio_inscricao` → CAPI InitiateCheckout, mesmo `event_id` do Pixel |
+| Fase no kanban | Lead | **Inscrito** (move só a fase; não grava `inscricao_confirmada`) |
+| Aba Verificação | fora (não há o que transcrever) | **entra** — é a fila de transcrição na Extecamp |
+| Régua | 2 h → `feq_lead` ("teve dificuldade?") | fora enquanto a ficha está `recebida` |
+| Fim da jornada | abre a etapa 2 | `/thank-you-page-lp/`: "o time entra em contato para concluir a matrícula" |
+
+A distinção que sustenta isso: **fase ≠ evento de funil**. A etapa 2 move a fase para
+Inscrito (o lead pediu a vaga e entregou os dados), mas quem reporta conversão à Meta
+e tira o card da fila continua sendo o gesto humano na Verificação, depois de lançar
+a inscrição na Extecamp de verdade (§8).
+
+**Sem repasse à Extecamp**: a LP não manda mais o lead ao formulário oficial — ele
+preencheria a mesma ficha duas vezes. Por isso o `select` de pagamento lista as
+opções **já com o preço da campanha** (parceladas e à vista) e o aviso "o formulário
+da Extecamp mostra o valor cheio" (`promocao.como_aplicar`) saiu da LP — o texto
+segue na ontologia porque os agentes ainda o usam ao mandar o link oficial numa
+inscrição fora do prazo.
 
 ## 8. Conversão offline: Central → Meta
 

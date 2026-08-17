@@ -1,14 +1,28 @@
 /* Atena · Bridge Page (specs 16 §2 e 17 §5) — two-step opt-in + telemetria de sessão.
- * Lê window.BRIDGE = {curso, destino, webhook, pixel} (injetado pelo template).
- * Regras: CTA abre modal; submit valida, dispara Pixel InitiateCheckout com o
- * MESMO event_id que vai ao backend (dedup CAPI) e redireciona à Extecamp em
- * <=1,5s — sucesso, falha ou timeout: a venda nunca espera o backend.
+ * Lê window.BRIDGE = {curso, aberto, webhook, webhook_inscricao, pixel} (do template).
+ * Regras: CTA abre a etapa 1 (contato, sem Pixel); a etapa 2 é a ficha completa e é
+ * ela que dispara o Pixel InitiateCheckout com o MESMO event_id que vai ao backend
+ * (dedup CAPI) e leva à página de obrigado — sucesso, falha ou timeout, o lead nunca
+ * fica preso esperando o backend.
  * Telemetria: alcance/tempo por seção (data-secao), scroll máx., CTA, modal;
  * resumo via sendBeacon na saída. Sem PII — a sessão só se liga ao lead se o
  * modal for enviado (sessao_id acompanha o POST). */
 (function () {
   "use strict";
   var CFG = window.BRIDGE || {};
+
+  // Tipografia da marca: o manual da FEQ usa Gotham (licença comercial) — o
+  // substituto livre de mesma lógica geométrica é a Montserrat. O <link> é criado
+  // AQUI, e não com @import no bridge.css, porque o convert_chars() do WordPress
+  // troca "&" por "&#038;" em todo o post_content (inclusive dentro de <style>) e
+  // quebraria "...&display=swap". Este bloco viaja em base64, imune a isso.
+  // Sem a fonte (rede fora/CSP), o stack de fallback do CSS assume — nunca some texto.
+  (function () {
+    var l = document.createElement("link");
+    l.rel = "stylesheet";
+    l.href = "https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap";
+    document.head.appendChild(l);
+  })();
   var modal = document.getElementById("modal");
   var form = document.getElementById("bridge-form");
   var tel = document.getElementById("whatsapp");
@@ -299,10 +313,13 @@
     function concluir() {
       if (foi) return;
       foi = true;
-      // Mesmo interstício de sempre: é o path que a conversão de Lead do Google
-      // Ads/GTM observa (o gatilho exige começar com /thank-you-page).
-      window.location.href = "/thank-you-page-lp/?to=" +
-        encodeURIComponent(CFG.destino || window.location.pathname);
+      // Página de obrigado e PARA AQUI — sem repassar o lead para o formulário da
+      // Extecamp. Ele acabou de preencher a ficha completa AQUI; mandá-lo preencher
+      // tudo de novo lá seria pedir a mesma coisa duas vezes.
+      // A transcrição na Extecamp é trabalho do time (aba Verificação da Central).
+      // O path continua começando com /thank-you-page porque é o que o gatilho de
+      // conversão do Google Ads/GTM observa.
+      window.location.href = "/thank-you-page-lp/";
     }
     fetch(CFG.webhook_inscricao, {
       method: "POST",

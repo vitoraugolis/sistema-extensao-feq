@@ -6,123 +6,129 @@
 <meta name="robots" content="noindex, nofollow">
 <title>{{NOME_CURSO}} — Extensão FEQ Unicamp</title>
 </head>
-<body class="bg-slate-950 text-slate-100 antialiased">
+<body class="antialiased">
 <!-- LP-FEQ-INICIO (o deploy WP publica só o que está entre os marcadores) -->
 <!-- CSS estático (não o runtime CDN do Tailwind): sites com plugins que
      interceptam cdn.tailwindcss.com (ex.: WindPress) reescrevem o DOM ao
      redor dele e isso impede os <script> vizinhos de executar. -->
 <style>{{BRIDGE_CSS}}</style>
 
-<!-- Publicado no WP como FRAGMENTO — a tag <body> (com bg-slate-950/text-slate-100
-     acima) nunca vai junto, só o miolo entre os marcadores. Sem um wrapper próprio,
-     as seções ficavam sem fundo (herdavam o body BRANCO do tema) com texto claro
-     por cima -> quase ilegível. .lp-canvas garante o fundo/cor certos sempre,
-     não importa o que a página hospedeira faça. -->
+<!-- Publicado no WP como FRAGMENTO — a tag <body> nunca vai junto, só o miolo
+     entre os marcadores. Sem um wrapper próprio, as seções herdariam a cor de
+     texto do tema. .lp-canvas garante papel/tinta sempre, não importa o que a
+     página hospedeira faça.
+     Ordem dos blocos: a mesma das páginas antigas da FEQ (hero -> empresas ->
+     currículo -> depoimentos -> por que a FEQ -> professores -> conteúdo ->
+     FAQ -> investimento -> relacionados). -->
 <div class="lp-canvas">
 {{BARRA_PROMO}}
 
-<!-- 1. Hero — imagem de fundo real do site (mesma do topo da home da FEQ) +
-     logo oficial: a página já nasce dentro do tema (nav real + breadcrumb),
-     então não repetimos cabeçalho — só reforçamos a marca aqui dentro. -->
-<section data-secao="hero" class="hero-bg text-center">
-  <div class="max-w-4xl mx-auto px-6 pt-6 pb-10">
-    <img src="{{LOGO_URL}}" alt="FEQ Unicamp" class="logo-topo">
-    <p class="mt-5 text-amber-400 text-sm font-semibold uppercase tracking-widest mb-2">{{TIPO_CURSO}} · {{MODALIDADE}}</p>
-    <h1 class="text-3xl sm:text-5xl font-bold leading-tight">{{NOME_CURSO}}</h1>
-    <p class="mt-4 text-lg text-slate-200 max-w-2xl mx-auto">{{OBJETIVO_CURTO}}</p>
+<!-- 0. Cabeçalho CODADO (não vem mais do tema do WordPress): a LP funciona em
+     qualquer URL e não depende do header do site.
+     Faixa 1 = menu institucional REAL de cursos-extensao.feq.unicamp.br (itens e
+     destinos conferidos no HTML do site em 11/08/2026; "Projetos" aponta direto
+     para o único destino que havia no submenu, e "Cursos" para a âncora que o
+     próprio site usa). Faixa 2 = atalhos da LP + CTA, essa sim grudada no topo. -->
+<header class="lp-head">
+  <input type="checkbox" id="menu-tgl" class="menu-tgl" aria-label="Abrir menu">
+  <div class="lp-head-in">
+    <a href="https://cursos-extensao.feq.unicamp.br/" class="lp-head-marca">
+      <img src="{{LOGO_URL}}" alt="Extensão FEQ Unicamp"></a>
+    <nav class="lp-site-nav">
+      <a href="https://cursos-extensao.feq.unicamp.br/">Home</a>
+      <a href="https://cursos-extensao.feq.unicamp.br/projetos_gerais/">Projetos</a>
+      <a href="https://cursos-extensao.feq.unicamp.br/legislacoes/">Legislações</a>
+      <a href="https://cursos-extensao.feq.unicamp.br/#cursos">Cursos</a>
+      <a href="https://cursos-extensao.feq.unicamp.br/pesquisa-extensao/">Comissão</a>
+      <a href="https://cursos-extensao.feq.unicamp.br/equipe/">Equipe</a>
+      <a href="https://cursos-extensao.feq.unicamp.br/contato-2/">Contato</a>
+    </nav>
+    <form class="lp-busca" action="https://cursos-extensao.feq.unicamp.br/" method="get" role="search">
+      <input type="search" name="s" placeholder="Buscar" aria-label="Buscar no site da Extensão FEQ">
+      <button type="submit" aria-label="Buscar">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="2.5" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle>
+          <path d="M20 20l-4.2-4.2"></path></svg>
+      </button>
+    </form>
+    <button data-cta class="btn-mini">{{CTA_LABEL}}</button>
+    <!-- sanduíche: só aparece no mobile, e é CSS puro (label do checkbox acima) -->
+    <label for="menu-tgl" class="menu-btn">
+      <svg width="24" height="24" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"
+           aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18"></path></svg>
+    </label>
+  </div>
+</header>
+
+<!-- 1. Hero invertido: foto real do site institucional em duotone (a paleta não
+     ganha uma segunda família de cores por causa de uma imagem). -->
+<section id="topo" data-secao="hero" class="hero inv">
+  <div class="hero-in">
+    <p class="kicker kicker-marca">{{TIPO_CURSO}} · {{MODALIDADE}}</p>
+    <h1 class="display">{{NOME_CURSO}}</h1>
+    <p class="hero-objetivo">{{OBJETIVO_CURTO}}</p>
     <div class="hero-selos">{{HERO_SELOS}}</div>
     {{HERO_PRECO}}
-    <p class="mt-3 text-sm text-slate-300">{{PRAZO_LINHA}}</p>
-  <div class="hero-ctas">
-    <button data-cta class="bg-amber-400 hover:bg-amber-300 text-slate-900 text-lg font-bold px-8 py-4 rounded-xl shadow-lg shadow-amber-400/20">
-      {{CTA_LABEL}}
-    </button>
-    <a href="{{WA_LINK}}" target="_blank" rel="noopener" class="hero-cta-2">Tirar dúvidas no WhatsApp</a>
-  </div>
-  <p class="hero-reforco">{{HERO_REFORCO}}</p>
+    <p class="hero-prazo">{{PRAZO_LINHA}}</p>
+    <div class="hero-ctas">
+      <button data-cta class="btn">{{CTA_LABEL}}</button>
+      <a href="{{WA_LINK}}" target="_blank" rel="noopener" class="btn-2">Tirar dúvidas no WhatsApp</a>
+    </div>
+    <p class="hero-reforco">{{HERO_REFORCO}}</p>
   </div>
 </section>
 
-<!-- Prova social IMEDIATA: os logos estavam na metade da página. Quem decide em
-     30s precisa ver antes do programa que o mercado reconhece a formação. -->
-{{EMPRESAS_TOPO_HTML}}
-
-<!-- Nav-âncora: sumário fixo (padrão de LP de curso premium — MBA USP/Esalq e
-     PUCRS Online usam a mesma barra de atalhos). Sticky logo abaixo do topo
-     já que removemos o cabeçalho do site (spec 17). -->
-<nav class="nav-ancora">
-  <div class="max-w-4xl mx-auto px-6 flex gap-6 overflow-x-auto text-sm font-medium">
-    <a href="#beneficios">Diferenciais</a>
-    <a href="#programa">Programa</a>
-    <a href="#professor">Professores</a>
-    {{NAV_DEPOIMENTOS}}
-    <a href="#investimento">Investimento</a>
-    {{NAV_INSCRICAO}}
-    <a href="#faq">Dúvidas</a>
-  </div>
-</nav>
-
-<!-- 2. Por que estudar na Extensão FEQ -->
-<section id="beneficios" data-secao="beneficios" class="secao-divisor max-w-4xl mx-auto px-6 py-16">
-  <h2 class="text-2xl font-bold mb-6 text-center">Por que estudar na Extensão FEQ Unicamp</h2>
-  <div class="grid sm:grid-cols-3 gap-4">
-    <div class="bg-white/5 border border-white/10 rounded-2xl p-6">
-      <p class="icone-beneficio">🎓</p>
-      <p class="mt-2 font-semibold">Certificado Unicamp</p>
-      <p class="mt-1 text-sm text-slate-300">Emitido pela Universidade Estadual de Campinas através
-        da Extecamp (Escola de Extensão), com o peso acadêmico que o mercado reconhece.</p>
-    </div>
-    <div class="bg-white/5 border border-white/10 rounded-2xl p-6">
-      <p class="icone-beneficio">💻</p>
-      <p class="mt-2 font-semibold">{{MODALIDADE}}</p>
-      <p class="mt-1 text-sm text-slate-300">{{HORARIO}} — pensado para conciliar com quem trabalha,
-        sem abrir mão da qualidade do ensino Unicamp.</p>
-    </div>
-    <div class="bg-white/5 border border-white/10 rounded-2xl p-6">
-      <p class="icone-beneficio">🧑‍🏫</p>
-      <p class="mt-2 font-semibold">Corpo docente FEQ</p>
-      <p class="mt-1 text-sm text-slate-300">Aulas com professores da própria Faculdade de Engenharia
-        Química da Unicamp, com atuação acadêmica ativa na área.</p>
-    </div>
-  </div>
-</section>
-
-<!-- 2b. Empresas onde os formados trabalham (prova social; some sem dado) -->
+<!-- 2. Logos das empresas onde os formados trabalham (some sem dado oficial) -->
 {{SECAO_EMPRESAS}}
 
-<!-- 2c. Objetivos do curso (texto oficial; some se o curso não tiver) -->
-{{SECAO_OBJETIVOS}}
-
-<!-- 2d. Seu Currículo no Futuro: salário de referência + habilidades + certificado -->
+<!-- 3. Seu currículo no futuro: salário de referência + habilidades + certificado.
+     Absorveu a antiga seção "O que você vai dominar", que repetia as habilidades. -->
 {{SECAO_CURRICULO}}
 
-<!-- 3. Cards de valor -->
-<section data-secao="valor" class="secao-divisor max-w-4xl mx-auto px-6 py-16 grid sm:grid-cols-3 gap-4">
-  <div class="bg-white/5 border border-white/10 rounded-2xl p-6">
-    <p class="text-2xl font-bold text-amber-400">{{CARGA}}h</p>
-    <p class="mt-1 text-sm text-slate-300">de carga horária, com certificado da Unicamp ao concluir.</p>
-  </div>
-  <div class="bg-white/5 border border-white/10 rounded-2xl p-6">
-    <p class="text-2xl font-bold text-amber-400">{{FORMATO_AULAS_RESUMO}}</p>
-    <p class="mt-1 text-sm text-slate-300">{{FORMATO_AULAS_DETALHE}}</p>
-  </div>
-  <div class="bg-white/5 border border-white/10 rounded-2xl p-6">
-    <p class="text-2xl font-bold text-amber-400">{{PLANO}}</p>
-    <p class="mt-1 text-sm text-slate-300">{{PLANO_DETALHE}}</p>
+<!-- 4. Depoimentos reais (transcritos das páginas oficiais; some se não houver) -->
+{{SECAO_DEPOIMENTOS}}
+
+<!-- 5. Por que escolher a FEQ -->
+<section id="beneficios" data-secao="beneficios" class="faixa regua-topo">
+  <p class="kicker kicker-marca">Por que a Extensão FEQ</p>
+  <!-- sem número de anos nem superlativo: cada card abaixo é um fato da ontologia -->
+  <h2 class="titulo mt-2">Uma formação com a assinatura da Unicamp</h2>
+  <div class="grid-4 mt-4">
+    <div class="card">
+      <p class="kicker">Certificação</p>
+      <p class="titulo-3 mt-1">Certificado Unicamp</p>
+      <p class="fraco mt-1">Emitido pela Universidade Estadual de Campinas através da Extecamp
+        (Escola de Extensão), com o peso acadêmico que o mercado reconhece.</p>
+    </div>
+    <div class="card">
+      <p class="kicker">Formato</p>
+      <p class="titulo-3 mt-1">{{FORMATO_AULAS_RESUMO}}</p>
+      <p class="fraco mt-1">{{FORMATO_AULAS_DETALHE}}</p>
+    </div>
+    <div class="card">
+      <p class="kicker">Corpo docente</p>
+      <p class="titulo-3 mt-1">Professores da FEQ</p>
+      <p class="fraco mt-1">Aulas com docentes da própria Faculdade de Engenharia Química
+        da Unicamp, com atuação acadêmica ativa na área.</p>
+    </div>
+    <div class="card">
+      <p class="kicker">Carga horária</p>
+      <p class="titulo-3 numero mt-1">{{CARGA}} horas</p>
+      <p class="fraco mt-1">Carga horária oficial da turma {{CURSO}}/{{TURMA}}, registrada
+        no certificado ao concluir.</p>
+    </div>
   </div>
 </section>
 
-<!-- 3a. Período de oferecimento (datas de início e fim das aulas — Extecamp) -->
-{{PERIODO_OFERECIMENTO}}
-
-<!-- 3c. Professor — prova social vem cedo, antes do conteúdo longo -->
-<section id="professor" data-secao="professor" class="secao-divisor max-w-4xl mx-auto px-6 py-16">
-  <div class="bg-white/5 border border-white/10 rounded-2xl p-8 flex items-center gap-4">
+<!-- 6. Professores — prova social antes do conteúdo longo -->
+<section id="professor" data-secao="professor" class="faixa regua-topo">
+  <p class="kicker kicker-marca">Quem ensina</p>
+  <h2 class="titulo mt-2">Professor responsável</h2>
+  <div class="card-nu prof-topo mt-4">
     {{FOTO_PROFESSOR_HTML}}
     <div>
-      <p class="text-sm uppercase tracking-widest text-slate-400 mb-1">Professor responsável</p>
-      <h2 class="text-xl font-semibold">{{PROFESSOR}}</h2>
-      <p class="mt-2 text-slate-300 text-sm">{{PROFESSOR_DESC}}</p>
+      <h3 class="titulo-3">{{PROFESSOR}}</h3>
+      <p class="fraco mt-1">{{PROFESSOR_DESC}}</p>
       {{PROFESSOR_CREDENCIAL_HTML}}
     </div>
   </div>
@@ -130,160 +136,133 @@
   {{OUTROS_PROFESSORES_HTML}}
 </section>
 
-<!-- 3d. Depoimentos reais (transcritos das páginas oficiais; some se não houver) -->
-{{SECAO_DEPOIMENTOS}}
-
-<!-- 3b. Habilidades desenvolvidas (texto oficial; some se o curso não tiver) -->
-{{SECAO_HABILIDADES}}
-
-<!-- 4. Conteúdo programático (accordion módulo→subtópicos quando há detalhe oficial) -->
-<section id="programa" data-secao="conteudo" class="secao-divisor max-w-4xl mx-auto px-6 py-16">
-  <h2 class="text-2xl font-bold mb-2">O que você vai estudar</h2>
-  <p class="text-sm text-slate-400 mb-6">Programa oficial da turma {{CURSO}}/{{TURMA}} —
-    toque em um módulo para ver o conteúdo.</p>
-  <div class="space-y-2">
+<!-- 7. Conteúdo programático (accordion módulo->subtópicos quando há detalhe oficial) -->
+<section id="programa" data-secao="conteudo" class="faixa regua-topo">
+  <p class="kicker kicker-marca">Programa oficial</p>
+  <h2 class="titulo mt-2">O que você vai estudar</h2>
+  <p class="fraco mt-2">Turma {{CURSO}}/{{TURMA}} — toque em um módulo para ver o conteúdo.</p>
+  <div class="mt-4">
     {{CONTEUDO_HTML}}
   </div>
 </section>
 
-<!-- 5. Para quem é -->
-<section data-secao="quem" class="secao-divisor max-w-4xl mx-auto px-6 py-16">
-  <div class="bg-white/5 border border-white/10 rounded-2xl p-8">
-    <h2 class="text-2xl font-bold mb-3">Para quem é este curso</h2>
-    <p class="text-slate-300 text-sm">{{REQUISITO}}</p>
-  </div>
-</section>
-
-<!-- 7. Investimento -->
-<section id="investimento" data-secao="investimento" class="secao-divisor max-w-4xl mx-auto px-6 py-16">
-  <div class="bg-gradient-to-br from-amber-400/15 to-white/5 border border-amber-400/30 rounded-2xl p-8 text-center">
-    <p class="text-xs uppercase tracking-widest text-amber-400 mb-2">{{INVEST_TARJA}}</p>
-    <h2 class="text-2xl font-bold">Investimento</h2>
-    {{INVEST_DESTAQUE}}
-    <ul class="mt-4 space-y-2 text-slate-200 checklist">
-      {{INVESTIMENTO_ITENS}}
-    </ul>
-    <p class="mt-4 text-sm text-slate-400">{{INVEST_RODAPE}}</p>
-    {{GARANTIA_HTML}}
-    {{SALARIO_HTML}}
-    <button data-cta class="mt-6 bg-amber-400 hover:bg-amber-300 text-slate-900 text-lg font-bold px-8 py-4 rounded-xl">
-      {{CTA_LABEL}}
-    </button>
-  </div>
-</section>
-
-<!-- 7b. Como se inscrever (5 passos oficiais da Extecamp) — some sem turma aberta -->
-{{SECAO_INSCRICAO}}
-
-<!-- 8. Cursos relacionados (cross-sell — só os outros 3 cursos-alvo reais) -->
-<section data-secao="relacionados" class="secao-divisor max-w-4xl mx-auto px-6 py-16">
-  <h2 class="text-2xl font-bold mb-6 text-center">Outros cursos da Extensão FEQ</h2>
-  <div class="grid sm:grid-cols-3 gap-4">
-    {{CURSOS_RELACIONADOS_HTML}}
-  </div>
-</section>
-
-<!-- 9. FAQ -->
-<section id="faq" data-secao="faq" class="secao-divisor max-w-4xl mx-auto px-6 py-16">
-  <h2 class="text-2xl font-bold mb-6">Perguntas frequentes</h2>
-  <div class="space-y-3">
-    <details class="bg-white/5 border border-white/10 rounded-xl p-5">
-      <summary class="cursor-pointer font-semibold">Quem pode se inscrever?</summary>
-      <p class="mt-2 text-sm text-slate-300">{{REQUISITO}}</p>
+<!-- 8. FAQ — absorveu "objetivos" e "período de oferecimento", que eram seções
+     próprias e repetiam o que a dobra e o programa já diziam. -->
+<section id="faq" data-secao="faq" class="faixa regua-topo">
+  <p class="kicker kicker-marca">Dúvidas</p>
+  <h2 class="titulo mt-2">Perguntas frequentes</h2>
+  <div class="mt-4">
+    {{SECAO_OBJETIVOS}}
+    <details class="qa">
+      <summary>Quem pode se inscrever?</summary>
+      <p>{{REQUISITO}}</p>
     </details>
     {{FAQ_COMO_INSCREVER}}
-    <details class="bg-white/5 border border-white/10 rounded-xl p-5">
-      <summary class="cursor-pointer font-semibold">Qual é o formato das aulas?</summary>
-      <p class="mt-2 text-sm text-slate-300">{{MODALIDADE}}. Aulas: {{HORARIO}}.</p>
+    <details class="qa">
+      <summary>Qual é o formato das aulas?</summary>
+      <p>{{MODALIDADE}}. Aulas: {{HORARIO}}.</p>
     </details>
-    <details class="bg-white/5 border border-white/10 rounded-xl p-5">
-      <summary class="cursor-pointer font-semibold">Quanto custa e como pago?</summary>
-      <p class="mt-2 text-sm text-slate-300">{{PLANO_DETALHE}} Os valores oficiais e as formas de
-        pagamento aparecem na página da Extecamp, para onde você será direcionado.</p>
+    {{PERIODO_OFERECIMENTO}}
+    <details class="qa">
+      <summary>Quanto custa e como pago?</summary>
+      <p>{{PLANO_DETALHE}} Os valores oficiais e as formas de pagamento aparecem na
+        página da Extecamp, para onde você será direcionado.</p>
     </details>
-    <details class="bg-white/5 border border-white/10 rounded-xl p-5">
-      <summary class="cursor-pointer font-semibold">Até quando posso me inscrever?</summary>
-      <p class="mt-2 text-sm text-slate-300">{{FAQ_PRAZO}}</p>
+    <details class="qa">
+      <summary>Até quando posso me inscrever?</summary>
+      <p>{{FAQ_PRAZO}}</p>
     </details>
     {{FAQ_EXTRA_HTML}}
-    <details class="bg-white/5 border border-white/10 rounded-xl p-5">
-      <summary class="cursor-pointer font-semibold">Ficou com alguma dúvida?</summary>
-      <p class="mt-2 text-sm text-slate-300">Fale com a gente no WhatsApp pelo botão no canto da tela —
-        respondemos sobre conteúdo, requisitos, valores e o passo a passo da inscrição.</p>
+    <details class="qa">
+      <summary>Ficou com alguma dúvida?</summary>
+      <p>Fale com a gente no WhatsApp pelo botão no canto da tela — respondemos sobre
+        conteúdo, requisitos, valores e o passo a passo da inscrição.</p>
     </details>
   </div>
 </section>
 
-<!-- 10. CTA final -->
-<section data-secao="cta" class="secao-divisor max-w-4xl mx-auto px-6 py-16 text-center">
-  <h2 class="text-2xl sm:text-3xl font-bold">{{CTA_FINAL_TITULO}}</h2>
-  <p class="mt-2 text-slate-300">{{CTA_FINAL_SUB}}</p>
-  <button data-cta class="mt-6 bg-amber-400 hover:bg-amber-300 text-slate-900 text-lg font-bold px-8 py-4 rounded-xl">
-    {{CTA_LABEL}}
-  </button>
+<!-- 9. Investimento — bloco INVERTIDO: o fechamento ganha ênfase por inversão,
+     não por uma cor nova. Traz junto o passo a passo e o CTA final. -->
+<section id="investimento" data-secao="investimento" class="inv">
+  <div class="faixa">
+    <p class="kicker kicker-marca">{{INVEST_TARJA}}</p>
+    <h2 class="titulo mt-2">Investimento</h2>
+    {{INVEST_DESTAQUE}}
+    <ul class="invest-tabela checklist">
+      {{INVESTIMENTO_ITENS}}
+    </ul>
+    <p class="fraco mt-3">{{INVEST_RODAPE}}</p>
+    {{GARANTIA_HTML}}
+    {{SALARIO_HTML}}
+    {{SECAO_INSCRICAO}}
+    <div class="mt-4">
+      <button data-cta class="btn">{{CTA_LABEL}}</button>
+    </div>
+  </div>
 </section>
 
-<footer class="border-t border-white/10 py-6 pb-24 text-center text-xs text-slate-500">
+<!-- 10. Cursos relacionados (cross-sell — prioriza turmas com inscrição aberta) -->
+<section data-secao="relacionados" class="banda">
+  <div class="faixa">
+    <p class="kicker kicker-marca">Continue estudando</p>
+    <h2 class="titulo mt-2">Outros cursos da Extensão FEQ</h2>
+    <div class="grid-3 mt-4">
+      {{CURSOS_RELACIONADOS_HTML}}
+    </div>
+  </div>
+</section>
+
+<footer class="lp-rodape">
   Extensão FEQ · Unicamp — página informativa; a inscrição oficial acontece no site da Extecamp.
 </footer>
 
-<!-- Barra de CTA fixa: some no hero (já tem o botão grande ali), aparece ao
-     rolar — padrão presente nas duas referências (MBA USP/Esalq e PUCRS
-     Online repetem o CTA em barra fixa/cards ao longo de toda a página). -->
+<!-- Barra de CTA fixa: some no hero (já tem o botão grande ali), aparece ao rolar. -->
 <div id="cta-fixo" class="cta-fixo hidden">
-  <div class="max-w-4xl mx-auto px-4 flex items-center justify-between gap-4">
-    <span class="text-sm font-medium truncate">{{NOME_CURSO}}</span>
-    <button data-cta class="bg-amber-400 hover:bg-amber-300 text-slate-900 font-bold px-5 py-2.5 rounded-lg whitespace-nowrap">
-      {{CTA_LABEL}}
-    </button>
+  <div class="cta-fixo-in">
+    <span class="cta-fixo-nome">{{NOME_CURSO}}</span>
+    <button data-cta class="btn-mini">{{CTA_LABEL}}</button>
   </div>
 </div>
 
 <!-- WhatsApp flutuante: conversa livre com os agentes (spec 17 §6) -->
 <a id="wa-flutuante" href="{{WA_LINK}}" target="_blank" rel="noopener"
-   aria-label="Falar no WhatsApp"
-   class="fixed bottom-5 right-5 z-40 bg-green-500 hover:bg-green-400 rounded-full shadow-xl wa-botao">
+   aria-label="Falar no WhatsApp" class="wa-botao">
   <svg width="26" height="26" viewBox="0 0 24 24" fill="#fff" aria-hidden="true"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5.1-1.3A10 10 0 1 0 12 2zm0 18.2c-1.6 0-3.1-.4-4.4-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2zm4.6-6.1c-.3-.1-1.5-.7-1.7-.8-.2-.1-.4-.1-.6.1l-.8 1c-.1.2-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.3-.4 0-.5.1-.7l.5-.6c.1-.2.1-.3 0-.5l-.8-1.9c-.2-.5-.4-.4-.6-.4h-.5c-.2 0-.5.1-.7.3-.9.9-1.2 2.2-.2 3.9a12 12 0 0 0 4.6 4.3c1.7.8 2.4.9 3.2.7.5-.1 1.5-.6 1.7-1.2.2-.6.2-1.1.1-1.2l-.5-.2z"/></svg>
 </a>
 
-<!-- Modal (two-step opt-in) -->
-<div id="modal" class="fixed inset-0 z-50 hidden items-center justify-center p-4">
-  <div id="overlay" class="absolute inset-0 bg-black/70"></div>
-  <div class="modal-caixa relative bg-slate-900 border border-white/15 rounded-2xl p-7 w-full max-w-md shadow-2xl">
-    <button id="fechar" type="button" aria-label="Fechar"
-            class="absolute top-3 right-4 text-slate-400 hover:text-white text-2xl leading-none">&times;</button>
-    <h3 class="text-lg font-semibold">{{MODAL_TITULO}}</h3>
-    <p class="mt-1 text-xs text-slate-400">Etapa 1 de 2 — leva 30 segundos.</p>
-    <form id="bridge-form" class="mt-5 space-y-4" novalidate>
-      <div>
-        <label for="nome" class="block text-sm text-slate-300 mb-1">Nome completo</label>
-        <input id="nome" type="text" required autocomplete="name"
-               class="w-full rounded-lg bg-white/10 border border-white/20 px-4 py-3 text-slate-100 focus:outline-none focus:border-amber-400">
+<!-- Modal — ETAPA 1 (contato). Sem Pixel aqui: quem só deixou o telefone ainda
+     não é conversão (spec 17 §7). -->
+<div id="modal" class="hidden">
+  <div id="overlay" class="modal-fundo"></div>
+  <div class="modal-caixa">
+    <button id="fechar" type="button" aria-label="Fechar" class="modal-fechar">&times;</button>
+    <p class="kicker">Etapa 1 de 2 — 30 segundos</p>
+    <h3 class="titulo-3 mt-2">{{MODAL_TITULO}}</h3>
+    <form id="bridge-form" novalidate>
+      <div class="campo">
+        <label for="nome" class="lbl">Nome completo</label>
+        <input id="nome" type="text" required autocomplete="name" class="inp">
       </div>
-      <div>
-        <label for="email" class="block text-sm text-slate-300 mb-1">E-mail</label>
-        <input id="email" type="email" required autocomplete="email"
-               placeholder="seu@email.com"
-               class="w-full rounded-lg bg-white/10 border border-white/20 px-4 py-3 text-slate-100 focus:outline-none focus:border-amber-400">
-        <p id="erro-email" class="hidden mt-1 text-xs text-red-400">Informe um e-mail válido.</p>
+      <div class="campo">
+        <label for="email" class="lbl">E-mail</label>
+        <input id="email" type="email" required autocomplete="email" placeholder="seu@email.com" class="inp">
+        <p id="erro-email" class="erro hidden mt-1">Informe um e-mail válido.</p>
       </div>
-      <div>
-        <label for="whatsapp" class="block text-sm text-slate-300 mb-1">WhatsApp (com DDD)</label>
+      <div class="campo">
+        <label for="whatsapp" class="lbl">WhatsApp (com DDD)</label>
         <input id="whatsapp" type="tel" required autocomplete="tel" inputmode="numeric"
-               placeholder="(19) 99999-9999" maxlength="16"
-               class="w-full rounded-lg bg-white/10 border border-white/20 px-4 py-3 text-slate-100 focus:outline-none focus:border-amber-400">
-        <p id="erro-tel" class="hidden mt-1 text-xs text-red-400">Informe o WhatsApp com DDD (10–11 dígitos).</p>
+               placeholder="(19) 99999-9999" maxlength="16" class="inp">
+        <p id="erro-tel" class="erro hidden mt-1">Informe o WhatsApp com DDD (10–11 dígitos).</p>
       </div>
-      <label class="flex items-start gap-2 text-xs text-slate-400">
-        <input id="optin" type="checkbox" required class="mt-0.5">
+      <label class="optin">
+        <input id="optin" type="checkbox" required>
         <span>Autorizo o contato da Extensão FEQ Unicamp pelo WhatsApp sobre este curso
           (LGPD — você pode sair da lista a qualquer momento).</span>
       </label>
-      <p id="erro-optin" class="hidden text-xs text-red-400">Para continuar, autorize o contato (LGPD).</p>
-      <button id="continuar" type="submit"
-              class="w-full bg-amber-400 hover:bg-amber-300 disabled:opacity-60 text-slate-900 font-bold py-4 rounded-xl">
-        {{MODAL_BOTAO}}
-      </button>
+      <p id="erro-optin" class="erro hidden mt-1">Para continuar, autorize o contato (LGPD).</p>
+      <div class="mt-3">
+        <button id="continuar" type="submit" class="btn btn-bloco">{{MODAL_BOTAO}}</button>
+      </div>
     </form>
   </div>
 </div>
@@ -291,18 +270,17 @@
 <!-- ETAPA 2 — ficha completa. Só aqui a conversão conta: o Pixel dispara no submit
      deste formulário, não no da etapa 1 (spec 17 §7). Nome/e-mail/telefone não se
      repetem: vieram da etapa 1 e já estão guardados. -->
-<div id="etapa2" class="fixed inset-0 z-50 hidden overflow-y-auto p-4 sm:p-8">
-  <div class="absolute inset-0 bg-slate-950/95"></div>
-  <div class="relative mx-auto w-full max-w-3xl bg-slate-900 border border-white/15 rounded-2xl p-6 sm:p-9 shadow-2xl">
-    <p class="text-xs uppercase tracking-widest text-amber-400 font-bold">Etapa 2 de 2</p>
-    <h3 class="mt-1 text-2xl font-bold">Complete sua inscrição</h3>
-    <p class="mt-2 text-sm text-slate-300">Olá, <span id="e2-nome" class="font-semibold text-white"></span>!
-      Estes são os dados que a Extecamp pede para efetivar a matrícula. Leva cerca de 3 minutos.</p>
+<div id="etapa2" class="e2-overlay hidden">
+  <div class="e2-caixa">
+    <p class="kicker">Etapa 2 de 2</p>
+    <h3 class="titulo mt-2">Complete sua inscrição</h3>
+    <p class="sub mt-2">Olá, <span id="e2-nome" class="destaque"></span>! Estes são os dados que a
+      Extecamp pede para efetivar a matrícula. Leva cerca de 3 minutos.</p>
 
-    <form id="etapa2-form" class="mt-7 space-y-7" novalidate>
-      <fieldset class="space-y-4">
-        <legend class="text-sm font-bold text-amber-400 uppercase tracking-wide">Dados pessoais</legend>
-        <div class="grid sm:grid-cols-2 gap-4">
+    <form id="etapa2-form" novalidate>
+      <fieldset>
+        <legend class="e2-legenda">Dados pessoais</legend>
+        <div class="e2-grid">
           <div><label class="lbl" for="cpf">CPF *</label>
             <input id="cpf" name="cpf" required inputmode="numeric" placeholder="000.000.000-00" maxlength="14" class="inp"></div>
           <div><label class="lbl" for="nascimento">Data de nascimento *</label>
@@ -326,9 +304,9 @@
         </div>
       </fieldset>
 
-      <fieldset class="space-y-4">
-        <legend class="text-sm font-bold text-amber-400 uppercase tracking-wide">Endereço</legend>
-        <div class="grid sm:grid-cols-2 gap-4">
+      <fieldset>
+        <legend class="e2-legenda">Endereço</legend>
+        <div class="e2-grid">
           <div><label class="lbl" for="cep">CEP</label>
             <input id="cep" name="cep" inputmode="numeric" placeholder="00000-000" maxlength="9" class="inp"></div>
           <div><label class="lbl" for="rua">Rua</label><input id="rua" name="rua" class="inp"></div>
@@ -341,15 +319,15 @@
         </div>
       </fieldset>
 
-      <fieldset class="space-y-4">
-        <legend class="text-sm font-bold text-amber-400 uppercase tracking-wide">Formação e atuação</legend>
-        <div class="grid sm:grid-cols-2 gap-4">
-          <div class="sm:col-span-2"><label class="lbl" for="escolaridade">Escolaridade *</label>
+      <fieldset>
+        <legend class="e2-legenda">Formação e atuação</legend>
+        <div class="e2-grid">
+          <div class="e2-largo"><label class="lbl" for="escolaridade">Escolaridade *</label>
             <select id="escolaridade" name="escolaridade" required class="inp"><option value="">Selecione…</option>
               <option>Ensino Médio Completo</option><option>Superior Incompleto</option>
               <option>Superior Completo</option><option>Pós-graduação</option>
               <option>Mestrado</option><option>Doutorado</option></select>
-            <p class="mt-1 text-xs text-slate-400">{{REQUISITO_AVISO}}</p></div>
+            <p class="fraco mt-1">{{REQUISITO_AVISO}}</p></div>
           <div><label class="lbl" for="instituicao">Instituição de ensino</label>
             <input id="instituicao" name="instituicao" class="inp"></div>
           <div><label class="lbl" for="curso_concluido">Curso concluído</label>
@@ -367,42 +345,33 @@
         </div>
       </fieldset>
 
-      <fieldset class="space-y-4">
-        <legend class="text-sm font-bold text-amber-400 uppercase tracking-wide">Pagamento</legend>
-        <div><label class="lbl" for="forma_pagamento">Forma de pagamento *</label>
-          <select id="forma_pagamento" name="forma_pagamento" required class="inp">
-            <option value="">Selecione…</option>
-            {{OPCOES_PAGAMENTO}}
-          </select></div>
-        {{PROMO_AVISO}}
-        <div><label class="lbl" for="comprovante_em">Comprovante de pagamento em nome de</label>
-          <select id="comprovante_em" name="comprovante_em" class="inp">
-            <option>Aluno</option><option>Empresa</option></select></div>
+      <fieldset>
+        <legend class="e2-legenda">Pagamento</legend>
+        <div class="e2-grid">
+          <!-- as opções JÁ vêm com o preço com desconto da campanha: este formulário é
+               nosso, então não há mais o aviso "o formulário da Extecamp mostra o
+               valor cheio" — o valor escolhido aqui é o que vale. -->
+          <div class="e2-largo"><label class="lbl" for="forma_pagamento">Forma de pagamento *</label>
+            <select id="forma_pagamento" name="forma_pagamento" required class="inp">
+              <option value="">Selecione…</option>
+              {{OPCOES_PAGAMENTO}}
+            </select></div>
+          <div class="e2-largo"><label class="lbl" for="comprovante_em">Comprovante de pagamento em nome de</label>
+            <select id="comprovante_em" name="comprovante_em" class="inp">
+              <option>Aluno</option><option>Empresa</option></select></div>
+        </div>
       </fieldset>
 
-      <fieldset class="space-y-4">
-        <legend class="text-sm font-bold text-amber-400 uppercase tracking-wide">Para finalizar</legend>
-        <div><label class="lbl" for="como_soube">Como ficou sabendo do curso?</label>
-          <select id="como_soube" name="como_soube" class="inp"><option value="">Selecione…</option>
-            <option>Instagram</option><option>Facebook</option><option>Google</option>
-            <option>Site da Extecamp</option><option>Indicação de amigo/colega</option>
-            <option>Já fiz outro curso da FEQ</option><option>Outros</option></select></div>
-        <div><label class="lbl" for="contato_pref">Como prefere que entremos em contato?</label>
-          <select id="contato_pref" name="contato_pref" class="inp"><option value="">Selecione…</option>
-            <option>WhatsApp</option><option>E-mail</option><option>Telefone</option></select></div>
-      </fieldset>
-
-      <p class="text-xs text-slate-400 border-l-2 border-amber-400/60 pl-3">
+      <p class="e2-privacidade">
         Estes dados são usados exclusivamente para efetivar sua inscrição junto à Escola de
         Extensão da Unicamp (Extecamp) e para o contato sobre este curso. Você pode pedir a
         correção ou a exclusão a qualquer momento pelos nossos canais oficiais.
       </p>
-      <p id="erro-e2" class="hidden text-sm text-red-400"></p>
-      <button id="e2-enviar" type="submit"
-              class="w-full bg-amber-400 hover:bg-amber-300 disabled:opacity-60 text-slate-900 font-bold py-4 rounded-xl text-lg">
-        Concluir inscrição
-      </button>
-      <p class="text-center text-xs text-slate-500">* campos obrigatórios</p>
+      <p id="erro-e2" class="erro hidden mt-2"></p>
+      <div class="mt-3">
+        <button id="e2-enviar" type="submit" class="btn btn-bloco">Concluir inscrição</button>
+      </div>
+      <p class="e2-obrig">* campos obrigatórios</p>
     </form>
   </div>
 </div>

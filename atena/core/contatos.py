@@ -13,8 +13,8 @@ Dados retirados literalmente da página de contato do "Guia do Curso" de referê
 CONTATOS_OFICIAIS = {
     "secretaria": {
         "rotulo": "Secretaria da Extensão FEQ",
-        "telefone": "+551935214132",
-        "telefone_exibicao": "(19) 3521-4132",
+        "telefone": "+551935213911",
+        "telefone_exibicao": "(19) 3521-3911",
         "email": "sextfeq@unicamp.br",
         "whatsapp": False,   # fixo institucional — não tem conta de WhatsApp
     },

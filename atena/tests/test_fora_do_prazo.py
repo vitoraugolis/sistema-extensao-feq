@@ -51,9 +51,13 @@ check(ONT.captavel("FEQ-1000", D(2026, 9, 5))["status"] == "encerrada",
 check(ONT.captavel("FEQ-1000", D(2026, 12, 1))["recuperavel"] is False,
       "curso em andamento não é recuperável")
 
-# curso que já começou há meses continua simplesmente encerrado
-check(ONT.captavel("FEQ-0499", D(2026, 8, 7))["status"] == "encerrada",
-      "FEQ-0499 (aulas desde maio) segue encerrado")
+# curso que já começou há meses continua simplesmente encerrado. O código sai do
+# catálogo, não fixo: o FEQ-0499 era o exemplo até reabrir (11/08/2026) — teste de
+# janela temporal não pode depender de qual curso está fechado hoje.
+_ENCERRADO = next(c for c in sorted(ONT.cursos())
+                  if ONT.captavel(c, D(2026, 8, 7))["status"] == "encerrada")
+check(ONT.captavel(_ENCERRADO, D(2026, 8, 7))["status"] == "encerrada",
+      f"{_ENCERRADO} (aulas no passado) segue encerrado")
 
 # ------------------------------------------------------- 2) política ancorada
 pol = ONT.politica("politicaForaDoPrazo")
@@ -77,7 +81,7 @@ check("QUEM GERA O LINK É UMA PESSOA" in b and "não invente URL" in b,
       "proíbe o agente de fingir que gerou o link")
 check("NÃO ofereça lista de espera" in b, "proíbe a oferta errada (esperar) neste caso")
 
-b_enc = _bloco_janela(bib.contexto("FEQ-0499", "Superior completo"))
+b_enc = _bloco_janela(bib.contexto(_ENCERRADO, "Superior completo"))
 check("lista de espera" in b_enc and "vagas remanescentes" not in b_enc,
       "curso realmente encerrado mantém a lista de espera")
 check(_bloco_janela(bib.contexto("FEQ-0480", "Superior completo")) == "",

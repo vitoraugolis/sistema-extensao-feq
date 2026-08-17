@@ -73,6 +73,10 @@ METAS = [
     ("FEQ-0670", "001", 15, 20, "https://ins.extecamp.unicamp.br/curso/inscricao/FEQ-0670/001"),
     # FEQ-0499 sem turma aberta: url vazia — a LP coleta lead (lista de espera).
     ("FEQ-0499", "001", 15, 20, ""),
+    # FEQ-0295 (12/08/2026): curso novo (proposta Extecamp), inscrições só abrem em
+    # 01/09/2026 — sem URL ainda (Extecamp não publicou o link de inscrição desta
+    # turma); meta_real = vagasMin da proposta (20). Mesmo modo lista de espera do 0499.
+    ("FEQ-0295", "001", 20, 26, ""),
 ]
 
 
@@ -253,6 +257,24 @@ class Growth:
                 "SELECT * FROM inscricoes WHERE card_id=? ORDER BY id DESC LIMIT 1",
                 (card_id,)).fetchone()
         return dict(r) if r else None
+
+    def inscricoes(self, status=None, limite=200):
+        """Fila de fichas da etapa 2 — o trabalho real do agente comercial: ler os
+        dados e transcrever na Extecamp. Substituiu a antiga fila de Verificação,
+        que perguntava 'ele se inscreveu?' quando a resposta agora está aqui dentro.
+        Uma linha por lead (a mais recente), não uma por envio."""
+        q = ("SELECT i.* FROM inscricoes i"
+             " JOIN (SELECT card_id, MAX(id) mid FROM inscricoes GROUP BY card_id) u"
+             "   ON u.mid = i.id")
+        p = []
+        if status:
+            q += " WHERE i.status=?"
+            p.append(status)
+        q += " ORDER BY i.criado DESC LIMIT ?"
+        p.append(limite)
+        with self._lock:
+            rows = self.conn.execute(q, p).fetchall()
+        return [dict(r) for r in rows]
 
     def set_inscricao_status(self, insc_id, status):
         with self._lock:
