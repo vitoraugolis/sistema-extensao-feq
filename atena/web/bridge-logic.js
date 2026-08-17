@@ -285,7 +285,7 @@
     ev.preventDefault();
     var erro = document.getElementById("erro-e2");
     var faltando = [];
-    ["cpf", "nascimento", "escolaridade", "forma_pagamento"].forEach(function (id) {
+    ["cpf", "nascimento", "forma_pagamento"].forEach(function (id) {
       var el = document.getElementById(id);
       if (el && !String(el.value).trim()) faltando.push(id);
     });

@@ -1414,7 +1414,7 @@ CAMPOS_ETAPA2 = (
 # "Para finalizar" (como ficou sabendo / preferência de contato) saiu do formulário:
 # a origem já vem dos UTMs e do fbclid, e o canal de contato é o WhatsApp que ele
 # acabou de informar — eram dois campos a mais numa ficha que já é longa.
-OBRIGATORIOS_ETAPA2 = ("cpf", "nascimento", "escolaridade", "forma_pagamento")
+OBRIGATORIOS_ETAPA2 = ("cpf", "nascimento", "forma_pagamento")
 
 
 def processar_etapa2(dados, est, g, ads, ing, ont=None):

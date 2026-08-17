@@ -282,7 +282,7 @@ para o 1º toque. Teto de 25 envios/passada.
 
 | | Etapa 1 (contato) | Etapa 2 (ficha completa) |
 |---|---|---|
-| Guarda | card no CRM: nome, e-mail, telefone, opt-in, UTMs, sessão | tudo da etapa 1 **+ `inscricoes.dados_json`** (CPF, endereço, formação, pagamento) |
+| Guarda | card no CRM: nome, e-mail, telefone, opt-in, UTMs, sessão | tudo da etapa 1 **+ `inscricoes.dados_json`** (CPF, endereço, pagamento) |
 | Evento de funil | `etapa1` (sem CAPI) | `inicio_inscricao` → CAPI InitiateCheckout, mesmo `event_id` do Pixel |
 | Fase no kanban | Lead | **Inscrito** (move só a fase; não grava `inscricao_confirmada`) |
 | Aba Verificação | fora (não há o que transcrever) | **entra** — é a fila de transcrição na Extecamp |
@@ -300,6 +300,15 @@ opções **já com o preço da campanha** (parceladas e à vista) e o aviso "o f
 da Extecamp mostra o valor cheio" (`promocao.como_aplicar`) saiu da LP — o texto
 segue na ontologia porque os agentes ainda o usam ao mandar o link oficial numa
 inscrição fora do prazo.
+
+**Formulário simplificado (16/08/2026)**: a ficha da etapa 2 é mais curta que a da
+Extecamp — **Dados pessoais, Endereço e Pagamento** apenas. A seção "Formação e
+atuação" (escolaridade, instituição, cargo, empresa etc.) foi retirada: eram campos
+informativos que só enfeitavam a ficha de quem vai transcrever; o *gate* acadêmico
+(ensino superior completo, spec 11) não depende dela — ele é feito na conversa pelo
+orquestrador (`coletando escolaridade`), que já cobre leads que chegam sem a
+declaração. `CAMPOS_ETAPA2`/`_GRUPOS_FICHA` seguem aceitando e exibindo esses campos
+para **fichas históricas** (whitelist + Central não descartam dado já capturado).
 
 ## 8. Conversão offline: Central → Meta
 
