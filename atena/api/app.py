@@ -1824,6 +1824,21 @@ def _operacoes():
                 EST.anonimizar_antigos(dias=180)
             if h == 11 and not _rodou_hoje("op_canario"):     # 11h BRT
                 _canario()
+            # Pacing do Growth Engine (spec 15 §8): insights + ritmo + CPL + realocação.
+            # Documentado como cron externo (30 7 * * * pacing) mas o VPS nunca teve
+            # crontab nem timer — a régua de recuperação tinha o mesmo problema até
+            # entrar neste loop (ver comentário no bloco op_recuperar); pacing ficou
+            # para trás e nunca rodou em produção. 7h BRT ~= 07:30 documentado.
+            if h == 7 and not _rodou_hoje("op_pacing"):
+                try:
+                    from atena.growth import pacing as _pacing
+                    rp = _pacing.passada(GRW, ADS, ont=ONTO.ont, est=EST)
+                    realoc = rp.get("realocacao")
+                    print(f"[operacoes] pacing: {len(rp.get('ritmos', {}))} curso(s)"
+                          + (f", realocação {realoc['doador']}->{realoc['receptor']}" if realoc else ""),
+                          flush=True)
+                except Exception as e:
+                    print(f"[operacoes] pacing falhou: {e}", flush=True)
             # aprendizado contínuo (spec 18): ingere o novo e destila as resoluções
             # humanas do dia em lições. 05h BRT — fora do horário de atendimento.
             if h == 5 and not _rodou_hoje("op_curador"):

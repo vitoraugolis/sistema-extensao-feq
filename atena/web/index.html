@@ -1351,7 +1351,7 @@ function kbCard(c){
   if(origem) b.push(`<span class="chip" style="margin:0;background:var(--sky);" title="${escapeHtml(campanha||origem)}"><i class="ti ti-target-arrow"></i> ${escapeHtml(origem)}</span>`);
   if(c.tem_notas) b.push('<span class="chip" style="margin:0;background:var(--sun);" title="tem notas"><i class="ti ti-notes"></i></span>');
   return `<div class="kb-card" data-id="${escapeHtml(c.id)}" onclick="kbClique('${c.id}')">
-    <div class="kb-nome"><span class="conv-ava" style="width:22px;height:22px;font-size:9.5px;">${c.iniciais}</span>${escapeHtml(c.nome || (c.telefone?fmtTel(c.telefone):'') || '(sem nome)')}</div>
+    <div class="kb-nome"><span class="conv-ava" style="width:22px;height:22px;font-size:9.5px;">${escapeHtml(c.iniciais)}</span>${escapeHtml(c.nome || (c.telefone?fmtTel(c.telefone):'') || '(sem nome)')}</div>
     <div class="kb-sub">${cursoTxt} · ${c.ha}</div>
     ${contato}
     ${b.length?`<div class="kb-badges">${b.join('')}</div>`:''}
@@ -1534,7 +1534,7 @@ function renderListaConv(){
     (qNum && _digitos(c.id).includes(qNum)));
   $('#convLista').innerHTML = lst.length ? lst.map(c=>`
     <div class="conv-item ${c.id===CONV_ABERTA?'on':''} ${c.nao_lidas?'nao-lida':''}" onclick="abrirConversa('${c.id}')">
-      <div class="conv-ava">${c.iniciais}</div>
+      <div class="conv-ava">${escapeHtml(c.iniciais)}</div>
       <div class="conv-meta">
         <div class="conv-nome"><span>${escapeHtml(c.lead || (c.telefone?fmtTel(c.telefone):'') || c.id)}</span><span class="muted" style="font-size:10.5px;">${c.ha}</span></div>
         <div class="conv-prev">${c.pendente?'<i class="ti ti-robot" style="color:var(--guara);"></i> proposta pronta para aprovação':(escapeHtml(c.preview)||'(sem mensagens)')}</div>
@@ -1763,7 +1763,7 @@ function renderChrome(d){
     <div class="conv-head">
       <div style="display:flex;align-items:center;gap:10px;">
         <button class="conv-back" onclick="fecharConversa()" title="Voltar"><i class="ti ti-arrow-left"></i></button>
-        <div class="conv-ava">${d.iniciais}</div>
+        <div class="conv-ava">${escapeHtml(d.iniciais)}</div>
         <div><div style="font-weight:500;font-size:13.5px;">${escapeHtml(d.lead || (d.telefone?fmtTel(d.telefone):'') || d.id)}</div>
         <div class="muted"><span id="convCurso">${d.curso}</span> · <span id="convEstado">${d.estado}</span>${d.optout?' · <span style="color:var(--bad);">opt-out</span>':''}</div></div>
         <div style="margin-left:auto;display:flex;gap:6px;align-items:center;">

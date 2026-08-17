@@ -19,7 +19,21 @@ from atena.growth.funil import valor_curso
 from atena.growth.ponte import _investimento_itens
 from atena.agentes.cerebro import _bloco_promo
 
-ONT = Ontologia()
+# As campanhas de agosto/2026 (FEQ-0480 e FEQ-0331) morrem sozinhas no fim da janela
+# — de propósito (spec: "a promoção MORRE sozinha"). Sem fixar "hoje", este arquivo
+# vira um teste de calendário: passava rodando em agosto e falharia sozinho a partir
+# de 16-17/08, mesmo sem nenhuma mudança de código (achado real da revisão de
+# 16/08/2026 — FEQ-0331 encerrou 15/08 e já quebrava aqui). HOJE_REF cai dentro da
+# janela das duas campanhas (06/08–16/08 e 06/08–15/08).
+HOJE_REF = datetime.date(2026, 8, 10)
+
+
+class _OntFixaHoje(Ontologia):
+    def promocao(self, codigo, hoje=None):
+        return super().promocao(codigo, hoje or HOJE_REF)
+
+
+ONT = _OntFixaHoje()
 ok = 0
 
 
