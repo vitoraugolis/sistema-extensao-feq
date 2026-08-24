@@ -463,7 +463,22 @@ check(ponte._outros_professores_html([]) == "" and ponte._outros_professores_htm
 
 # --- catálogo real (não FakeOnt): campos novos do redesign dos cards chegam até a LP
 from atena.ontologia.servico import Ontologia as _OntReal
-_ont_real = _OntReal()
+
+
+# A campanha de agosto/2026 do FEQ-0480 morre sozinha no fim da janela (por design).
+# Sem fixar "hoje", as checagens de preço promocional abaixo passariam só enquanto a
+# campanha estivesse no ar e falhariam sozinhas depois, sem nenhum bug real — foi o
+# que aconteceu em 24/08. Mesma correção já feita em test_promocao.py. Só `promocao`
+# é fixada: captabilidade segue no dia real, que é o que as checagens de status querem.
+_HOJE_CAMPANHA = datetime.date(2026, 8, 10)
+
+
+class _OntRealFixa(_OntReal):
+    def promocao(self, codigo, hoje=None):
+        return super().promocao(codigo, hoje or _HOJE_CAMPANHA)
+
+
+_ont_real = _OntRealFixa()
 _c0480 = _ont_real.curso("FEQ-0480")
 check(_c0480["formato_aulas_resumo"] == "Aulas online ao vivo + gravadas"
       and "gravadas liberadas às segundas" in _c0480["formato_aulas_detalhe"],

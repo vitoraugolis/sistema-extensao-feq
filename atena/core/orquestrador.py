@@ -149,13 +149,20 @@ def _brain_deterministico(ont, lead, mensagem_lead, historico=None, hoje=None):
     # FOI PERGUNTADO (varia por curso — não assumir superior).
     ultima_agente = next((h["texto"] for h in reversed(historico or []) if h.get("papel") == "agente"), "")
     nivel_curso = ((ont.curso(cod) or {}).get("requisito")) or "superiorCompleto"
+    # Curso declarado pela Extecamp SEM escolaridade mínima (feq:nenhum — ex.: o
+    # FEQ-1150, difusão de oferecimento contínuo): não existe gate a passar. Perguntar
+    # "você concluiu o ensino superior?" a quem já é elegível é o convite à
+    # autoexclusão que fez a pergunta virar por-curso (ver _NIVEL_PERGUNTA). Segue
+    # direto para preço/link, que é o que o lead veio buscar.
+    sem_gate = nivel_curso == "nenhum"
     if not esc and AFIRMA_RE.search(mensagem_lead or "") and (
             "ensino superior" in ultima_agente.lower() or "ensino médio" in ultima_agente.lower()
             or "pós-graduação" in ultima_agente.lower()):
+        # .get(): nível fora do mapa (nenhum) cairia em KeyError e derrubaria a conversa
         esc = {"medio": "Ensino Médio Completo", "superiorIncompleto": "Superior Incompleto",
-               "superiorCompleto": "Superior Completo", "pos": "Pós-graduação"}[nivel_curso]
-    if esc:
-        eleg = ont.elegivel(esc, cod)
+               "superiorCompleto": "Superior Completo", "pos": "Pós-graduação"}.get(nivel_curso)
+    if esc or sem_gate:
+        eleg = True if sem_gate else ont.elegivel(esc, cod)
         if eleg is False:
             exigido = _NIVEL_PERGUNTA.get(nivel_curso, "o ensino superior")
             return C.DecisaoAgente(C.DESCARTAR, "inelegível (gate acadêmico)",

@@ -30,7 +30,7 @@ feq:RequisitoShape a sh:NodeShape ;
     sh:targetClass feq:RequisitoAcademico ;
     sh:property [
         sh:path feq:nivelMinimo ; sh:minCount 1 ; sh:maxCount 1 ;
-        sh:in ( feq:medio feq:superiorIncompleto feq:superiorCompleto feq:pos ) ;
+        sh:in ( feq:nenhum feq:medio feq:superiorIncompleto feq:superiorCompleto feq:pos ) ;
         sh:message "nivelMinimo deve ser um NivelEscolaridade conhecido (ordinal)." ] .
 
 # ------------------------------------------------------------------ Janela temporal

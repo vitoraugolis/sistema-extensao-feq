@@ -161,6 +161,15 @@ input:focus,select:focus,textarea:focus{outline:none;box-shadow:3px 3px 0 var(--
 .conv-ts{font-size:10px;color:var(--ink3);margin-top:3px;}
 .conv-composer{padding:11px;border-top:2px solid var(--b);display:flex;gap:8px;align-items:flex-end;flex-shrink:0;background:var(--paper);}
 .conv-composer textarea{resize:none;max-height:110px;}
+.conv-mais-wrap{position:relative;flex-shrink:0;}
+.conv-mais-menu{position:absolute;bottom:calc(100% + 9px);left:0;z-index:40;min-width:236px;
+ background:#fff;border:2px solid var(--b);border-radius:10px;box-shadow:4px 4px 0 var(--b);
+ padding:5px;display:flex;flex-direction:column;}
+.conv-mais-menu button{display:flex;align-items:center;gap:9px;width:100%;background:none;border:0;
+ border-radius:7px;padding:8px 10px;font:inherit;font-size:12.5px;font-weight:600;color:var(--ink);
+ cursor:pointer;text-align:left;white-space:nowrap;}
+.conv-mais-menu button:hover{background:var(--laranjinha);}
+.conv-mais-menu button i{font-size:16px;color:var(--ink3);flex-shrink:0;}
 .conv-blocked{font-size:12px;font-weight:500;color:var(--ink);background:var(--rosa);border:2px solid var(--b);
  border-radius:9px;padding:7px 10px;margin:0 11px 9px;}
 .conv-ficha{padding:8px 14px;border-bottom:2px solid var(--b);background:#fff;font-size:12px;
@@ -1788,11 +1797,16 @@ function renderChrome(d){
          <div id="convEmoji" class="conv-tpl hidden"></div>
          <div class="conv-composer">
            <input type="file" id="convArquivo" class="hidden" onchange="convEnviarMidia('${d.id}')">
-           <button class="btn btn-g" id="convClipe" onclick="$('#convArquivo').click()" title="Enviar arquivo, áudio ou foto (o texto digitado vai como legenda)"><i class="ti ti-paperclip"></i></button>
-           <button class="btn btn-g" onclick="toggleTpl('${d.id}')" title="Enviar template aprovado (reabre fora da janela de 24h)"><i class="ti ti-mail-fast"></i></button>
-           <button class="btn btn-g" onclick="toggleContato('${d.id}')" title="Compartilhar contato oficial"><i class="ti ti-id-badge-2"></i></button>
-           <button class="btn btn-g" id="convGuia" onclick="enviarGuia('${d.id}')" title="Enviar guia do curso em PDF"><i class="ti ti-file-type-pdf"></i></button>
-           <button class="btn btn-g" onclick="toggleEmoji()" title="Inserir emoji"><i class="ti ti-mood-smile"></i></button>
+           <div class="conv-mais-wrap">
+             <button class="btn btn-g" id="convMais" onclick="toggleMais(event)" title="Anexos e atalhos" aria-haspopup="menu" aria-expanded="false"><i class="ti ti-plus"></i></button>
+             <div id="convMaisMenu" class="conv-mais-menu hidden" role="menu">
+               <button role="menuitem" onclick="maisAcao('arquivo','${d.id}')"><i class="ti ti-paperclip"></i><span>Arquivo, áudio ou foto</span></button>
+               <button role="menuitem" onclick="maisAcao('template','${d.id}')"><i class="ti ti-mail-fast"></i><span>Template aprovado</span></button>
+               <button role="menuitem" onclick="maisAcao('contato','${d.id}')"><i class="ti ti-id-badge-2"></i><span>Contato oficial</span></button>
+               <button role="menuitem" onclick="maisAcao('guia','${d.id}')"><i class="ti ti-file-type-pdf"></i><span>Guia do curso em PDF</span></button>
+               <button role="menuitem" onclick="maisAcao('emoji','${d.id}')"><i class="ti ti-mood-smile"></i><span>Emoji</span></button>
+             </div>
+           </div>
            <textarea id="convInput" rows="1" placeholder="Digite uma mensagem…" onkeydown="convKeydown(event)"></textarea>
            <button class="btn btn-p" onclick="convEnviar()" title="Enviar (Enter)"><i class="ti ti-send"></i></button>
          </div>`}`;
@@ -1987,6 +2001,40 @@ function convKeydown(e){
   if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); convEnviar(); }
 }
 
+// Composer no padrão WhatsApp: um "+" só, e as ações com NOME dentro do menu.
+// Antes eram 5 ícones lado a lado espremendo o campo de texto — e ícone solto
+// obriga o operador a passar o mouse em cada um para descobrir o que faz. O que
+// se escreve é o trabalho principal desta tela; anexo é exceção, e exceção mora
+// atrás de um clique.
+function toggleMais(ev){
+  if(ev) ev.stopPropagation();        // senão o listener de clique-fora fecha no mesmo clique
+  const m = $('#convMaisMenu'); if(!m) return;
+  const abrir = m.classList.contains('hidden');
+  m.classList.toggle('hidden', !abrir);
+  const b = $('#convMais'); if(b) b.setAttribute('aria-expanded', abrir ? 'true' : 'false');
+}
+function fecharMais(){
+  const m = $('#convMaisMenu'); if(m) m.classList.add('hidden');
+  const b = $('#convMais'); if(b) b.setAttribute('aria-expanded','false');
+}
+// O "+" acumula o estado de carregando das DUAS ações lentas (mídia e guia em PDF),
+// que antes tinham cada uma o seu próprio botão para mostrar o loader.
+function convMaisOcupado(on){
+  const b = $('#convMais'); if(!b) return;
+  b.disabled = on;
+  b.innerHTML = on ? '<i class="ti ti-loader"></i>' : '<i class="ti ti-plus"></i>';
+}
+function maisAcao(qual, id){
+  fecharMais();                        // escolheu: o menu sai da frente do texto
+  if(qual === 'arquivo')       $('#convArquivo').click();
+  else if(qual === 'template') toggleTpl(id);
+  else if(qual === 'contato')  toggleContato(id);
+  else if(qual === 'guia')     enviarGuia(id);
+  else if(qual === 'emoji')    toggleEmoji();
+}
+document.addEventListener('click', e=>{ if(!e.target.closest('.conv-mais-wrap')) fecharMais(); });
+document.addEventListener('keydown', e=>{ if(e.key === 'Escape') fecharMais(); });
+
 // Grade fixa, sem CDN (mesmo padrão zero-dependência-externa das bridge pages) — não é
 // o conjunto completo de emoji Unicode, é uma curadoria do que cabe numa conversa
 // comercial (nada de emoji fora de contexto). Fácil de ajustar o tom depois.
@@ -2050,11 +2098,10 @@ async function convEnviarMidia(id){
   const inp = $('#convArquivo'); const f = inp && inp.files && inp.files[0];
   if(!f) return;
   const cap = $('#convInput'); const legenda = cap ? cap.value.trim() : '';
-  const clipe = $('#convClipe');
-  if(clipe){ clipe.disabled = true; clipe.innerHTML = '<i class="ti ti-loader"></i>'; }
+  convMaisOcupado(true);
   const fd = new FormData(); fd.append('arquivo', f); if(legenda) fd.append('legenda', legenda);
   const r = await api('/api/conversas/'+id+'/midia',{method:'POST', body:fd});  // sem Content-Type: o browser põe o boundary
-  if(clipe){ clipe.disabled = false; clipe.innerHTML = '<i class="ti ti-paperclip"></i>'; }
+  convMaisOcupado(false);
   inp.value = '';                                   // permite reenviar o mesmo arquivo
   if(r.erro){ marcarErro(id, r); return; }
   if(r.envio && !r.envio.ok){ marcarErro(id, {}, r.envio.motivo || ('não enviado — '+r.envio.status)); return; }
@@ -2123,10 +2170,9 @@ async function enviarContato(id, chave){
 }
 
 async function enviarGuia(id){
-  const btn = $('#convGuia');   // gerar o PDF (1ª vez por curso) leva alguns segundos
-  if(btn){ btn.disabled = true; btn.innerHTML = '<i class="ti ti-loader"></i>'; }
+  convMaisOcupado(true);        // gerar o PDF (1ª vez por curso) leva alguns segundos
   const r = await api('/api/conversas/'+id+'/guia',{method:'POST'});
-  if(btn){ btn.disabled = false; btn.innerHTML = '<i class="ti ti-file-type-pdf"></i>'; }
+  convMaisOcupado(false);
   if(r.erro){ marcarErro(id, r); return; }
   if(!r.ok){ marcarErro(id, {}, r.motivo || 'guia não enviado'); return; }
   await aposAcao();

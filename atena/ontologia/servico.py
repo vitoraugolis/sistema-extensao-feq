@@ -152,7 +152,9 @@ class Ontologia:
         return {
             "codigo": str(self.g.value(u, FEQ.codigo)),
             "nome": str(self.g.value(u, FEQ.nome)),
-            "tipo": "Formação de Especialistas" if FEQ.Especializacao in tipos else "Curso de Extensão",
+            "tipo": ("Formação de Especialistas" if FEQ.Especializacao in tipos
+                     else "Curso de Difusão" if FEQ.Difusao in tipos
+                     else "Curso de Extensão"),
             "modalidade": str(self.g.value(u, FEQ.modalidade) or ""),
             "horario": str(self.g.value(u, FEQ.horarioAula) or ""),
             "formato_aulas_resumo": str(self.g.value(u, FEQ.formatoAulasResumo) or "") or None,

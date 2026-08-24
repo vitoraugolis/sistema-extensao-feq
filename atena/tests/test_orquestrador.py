@@ -268,6 +268,83 @@ def test_sem_pedido_de_guia_decisao_fica_sem_anexo():
     assert est.decisao_pendente("c1")["anexo"] is None
 
 
+
+# ---------------------------------------- curso SEM exigência de escolaridade (feq:nenhum)
+# Tipo DIFUSÃO da Extecamp (FEQ-1150) declara "Grau de Escolaridade mínimo: NENHUM".
+# Um curso aberto a todos não tem gate — e o gate aqui não é inofensivo: ele PERGUNTA
+# ao lead se ele concluiu o ensino superior. Quem responde "não" a essa pergunta num
+# curso que aceita todo mundo se autoexclui de uma inscrição que era possível.
+class _OntSemExigencia:
+    """Espelha a Ontologia real, mas com o curso declarando requisito 'nenhum'."""
+    def __init__(self, cod="FEQ-0480"):
+        self.cod = cod
+
+    def curso(self, c):
+        info = dict(ONT.curso(c) or {})
+        if info and c and c.upper() == self.cod:
+            info["requisito"] = "nenhum"
+        return info or None
+
+    def captavel(self, c, hoje=None):
+        return ONT.captavel(c, hoje)
+
+    def elegivel(self, nivel, c):
+        return True if (c or "").upper() == self.cod else ONT.elegivel(nivel, c)
+
+    def portfolio(self, hoje=None):
+        return ONT.portfolio(hoje)
+
+    def promocao(self, c, hoje=None):
+        return ONT.promocao(c, hoje)
+
+    def ancoras(self, c):
+        return ONT.ancoras(c)
+
+
+def _sem_exigencia():
+    est = Estado(":memory:")
+    est.upsert_lead("c1", nome="Teste", telefone="+55 19 99999", curso="FEQ-0480",
+                    fase="Lead", estado_conversa="qualificacao")
+    ont = _OntSemExigencia()
+    return est, Orquestrador(estado=est, ont=ont), ont
+
+
+def test_curso_sem_exigencia_nao_pergunta_escolaridade():
+    """O lead chega interessado e recebe a informação do curso, não um interrogatório
+    sobre um diploma que o curso não pede."""
+    est, orq, ont = _sem_exigencia()
+    d = brain_deterministico(ont, est.get_lead("c1"), "quero saber sobre o curso")
+    msg = (d.mensagem_ao_lead or "").lower()
+    assert "já concluiu" not in msg, msg
+    assert "pré-requisito" not in msg, msg
+    assert d.proxima_acao != C.CONTINUAR or "escolaridade" not in (d.motivo or "")
+
+
+def test_curso_sem_exigencia_segue_para_preco_ou_link():
+    """Sem gate, o lead entra direto no fluxo comercial (preço / link de inscrição)."""
+    est, orq, ont = _sem_exigencia()
+    d = brain_deterministico(ont, est.get_lead("c1"), "quanto custa?")
+    assert d.proxima_acao == C.QUALIFICAR, (d.proxima_acao, d.motivo)
+
+
+def test_curso_sem_exigencia_nunca_descarta_por_escolaridade():
+    """Nem o lead que declara só o ensino fundamental: ordem 0 aceita todo mundo."""
+    est, orq, ont = _sem_exigencia()
+    orq.processar_mensagem("c1", "tenho só o ensino médio, posso fazer?")
+    assert est.get_lead("c1")["fase"] != "Perdido"
+
+
+def test_afirmacao_apos_pergunta_de_gate_nao_quebra_sem_exigencia():
+    """Regressão: o mapa de nível era indexado direto ([nivel_curso]) e 'nenhum' não
+    está nele — um 'sim' do lead logo após uma pergunta de gate herdada do histórico
+    levantava KeyError e derrubava a conversa inteira."""
+    est, orq, ont = _sem_exigencia()
+    est.add_conversa("c1", "agente", "Você já concluiu o ensino superior?")
+    d = brain_deterministico(ont, est.get_lead("c1"), "sim, concluí",
+                             historico=est.historico("c1"))
+    assert d is not None and d.proxima_acao in (C.QUALIFICAR, C.CONTINUAR)
+
+
 if __name__ == "__main__":
     casos = [v for k, v in sorted(globals().items()) if k.startswith("test_") and callable(v)]
     falhas = 0

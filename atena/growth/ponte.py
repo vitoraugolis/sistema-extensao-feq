@@ -37,6 +37,9 @@ WA_NUMERO_DEFAULT = "551931672313"   # WABA da Extensão FEQ (+55 19 3167-2313)
 # "ensino superior completo" para todo curso com requisito — falso nos cursos que
 # pedem só ensino médio (FEQ-0299, FEQ-0670).
 _REQUISITO_TEXTO = {
+    # Sem exigência é ARGUMENTO DE VENDA, não ausência de informação — o texto
+    # afirma a abertura em vez de deixar a linha vazia e parecer omissão.
+    "nenhum": "Não há pré-requisito de escolaridade: o curso é aberto a todos.",
     "medio": "É necessário ensino médio completo.",
     "superiorIncompleto": "É necessário ensino superior em andamento (ou concluído).",
     "superiorCompleto": "É necessário ensino superior completo (graduação concluída em qualquer área).",
@@ -874,11 +877,15 @@ def _faq_extra_html(c):
         plat = c.get("plataforma")
         extra = (f' As aulas ficam disponíveis na plataforma {_esc(plat)}.' if plat else "")
         itens.append(("Como funcionam as avaliações e entregas?", _esc(aval) + extra))
+    # "é um curso de " + tipo.lower() dava "é um curso de CURSO DE extensão" (o rótulo
+    # já começa com "Curso de"). O substantivo da frase é outro do rótulo do card.
+    _NOME_TIPO = {"Formação de Especialistas": "formação de especialistas",
+                  "Curso de Extensão": "extensão", "Curso de Difusão": "difusão"}
     itens.append((
         "Esse curso é lato-sensu? É reconhecido pelo MEC?",
         "A certificação é reconhecida pelo MEC e aclamada pelo mercado, mas o curso não se "
         "enquadra como pós-graduação lato-sensu: é um curso de "
-        + _esc((c.get("tipo") or "formação").lower())
+        + _esc(_NOME_TIPO.get(c.get("tipo"), "formação"))
         + " e a Unicamp certifica diretamente todos os formados no tema abordado. Na prática, "
         "a ementa é constantemente atualizada com as tendências do mercado e o corpo docente "
         "inclui profissionais com ampla experiência na indústria."))

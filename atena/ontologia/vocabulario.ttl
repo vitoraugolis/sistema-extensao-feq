@@ -32,6 +32,9 @@ feq:externa_irreversivel a feq:NivelDeRisco ; feq:ordemRisco 3 .
 feq:Curso              a rdfs:Class .
 feq:Especializacao     a rdfs:Class ; rdfs:subClassOf feq:Curso .
 feq:Extensao           a rdfs:Class ; rdfs:subClassOf feq:Curso .
+# DIFUSÃO: 3º tipo do catálogo Extecamp (FEQ-1150, 17/08/2026). Difere de Extensão
+# na prática comercial — costuma ser oferecimento CONTÍNUO e sem gate acadêmico.
+feq:Difusao            a rdfs:Class ; rdfs:subClassOf feq:Curso .
 feq:RequisitoAcademico a rdfs:Class .
 feq:JanelaTemporal     a rdfs:Class ; rdfs:comment "Intervalo [inicio, fim]; status derivado vs. hoje." .
 feq:PlanoPagamento     a rdfs:Class .
@@ -48,6 +51,7 @@ feq:Lead               a rdfs:Class ; rdfs:subClassOf feq:Entidade .
 
 # ---------------------------------------------------------------- Escolaridade ORDINAL
 #  Elegibilidade = comparação >= sobre feq:ordem (não igualdade de string).
+feq:nenhum             a feq:NivelEscolaridade ; feq:ordem 0 ; rdfs:label "Sem escolaridade mínima" .
 feq:medio              a feq:NivelEscolaridade ; feq:ordem 1 ; rdfs:label "Ensino médio completo" .
 feq:superiorIncompleto a feq:NivelEscolaridade ; feq:ordem 2 ; rdfs:label "Superior incompleto" .
 feq:superiorCompleto   a feq:NivelEscolaridade ; feq:ordem 3 ; rdfs:label "Superior completo" .
