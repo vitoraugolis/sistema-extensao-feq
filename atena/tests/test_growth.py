@@ -730,6 +730,33 @@ check(wpd._fatia_de_cursos(_home_secoes[:-1]) == (None, None, None),
       "home: sem a seção-limite de diferenciais, não publica")
 check(wpd.publicar_home_cursos(g5, _ont_real)["status"] == "dry_run",
       "sem credenciais WP, o bloco da home também é dry-run")
+
+
+# --- invalidação do cache de render do Elementor ---------------------------------
+# A home é Elementor: escrever `_elementor_data` pela REST não passa pelo save do
+# Elementor, que é quem invalida o HTML já renderizado. Sem este DELETE a home servia
+# a versão anterior para sempre e só um Update manual no editor resolvia (24/08/2026:
+# builder em v=260bea04 e página no ar em v=2a8ca31d ao mesmo tempo).
+class _SessaoFake:
+    def __init__(self, code=200, erro=None):
+        self.code, self.erro, self.chamadas = code, erro, []
+
+    def delete(self, url, timeout=None):
+        self.chamadas.append(url)
+        if self.erro:
+            raise self.erro
+        return type("R", (), {"status_code": self.code})()
+
+
+_ses = _SessaoFake()
+check(wpd._limpar_cache_elementor(_ses, "https://x.br") is True,
+      "limpeza de cache: 2xx -> True")
+check(_ses.chamadas == ["https://x.br/wp-json/elementor/v1/cache"],
+      f"chama a rota do Elementor, não a do WP core (chamou: {_ses.chamadas})")
+check(wpd._limpar_cache_elementor(_SessaoFake(code=403), "https://x.br") is False,
+      "HTTP de erro -> False (o deploy avisa em vez de mentir 'publicado')")
+check(wpd._limpar_cache_elementor(_SessaoFake(erro=OSError("rede caiu")), "https://x.br") is False,
+      "rede caindo não derruba a publicação: o dado já foi gravado")
 # imagens dos cards: uma por curso, todas na biblioteca de mídia da PRÓPRIA FEQ
 # (a grade antiga hotlinkava agencia.fapesp.br e ictq.com.br — servidor de terceiro
 # muda o arquivo e o card fica quebrado sem ninguém perceber). FEQ-0295 (12/08/2026)

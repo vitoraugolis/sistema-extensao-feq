@@ -85,6 +85,27 @@ def _wp(sessao, base, metodo, rota, **kw):
         return None
 
 
+def _limpar_cache_elementor(sessao, base):
+    """Invalida o cache de RENDER do Elementor (DELETE /elementor/v1/cache).
+
+    A home é uma página Elementor e quem manda nela é o `_elementor_data`. Só que
+    escrever essa meta pela REST do WordPress não passa pelo Document::save() do
+    Elementor — que é quem invalida o HTML já renderizado. Resultado: o builder ficava
+    com o bloco novo e a página servia o antigo indefinidamente, e a única saída era
+    alguém abrir o editor e clicar em Update na mão a cada publicação (era o que a
+    mensagem de 'gravado_aguardando_cache' pedia). Diagnóstico de 24/08/2026: builder
+    em v=260bea04, `content.rendered` em v=2a8ca31d e a home no ar idem — três verdades
+    diferentes ao mesmo tempo. Não era cache de página (nginx sem CDN, e a REST, que
+    nem passa por cache de página, servia o velho igual).
+    Falha aqui não derruba a publicação: o dado já está gravado e o retorno avisa."""
+    try:
+        r = sessao.delete(f"{base}/wp-json/elementor/v1/cache", timeout=60)
+        return r.status_code < 400
+    except Exception as e:
+        print(f"[wp-deploy] cache do Elementor: {e}", flush=True)
+        return False
+
+
 def publicar(paginas):
     """Publica/atualiza cada LP como página órfã (spec 17 §4): FRAGMENTO dentro de
     bloco wp:html (sem wpautop mastigando o JS) e validação pós-publicação — se o
@@ -281,17 +302,23 @@ def publicar_home_cursos(g, ont, backup_dir=None):
     # invalidado por um save do próprio Elementor — ver retorno abaixo)
     depois = _wp(s, base, "GET", f"pages/{HOME_PAGE_ID}?context=edit&_fields=meta") or {}
     gravado = (depois.get("meta") or {}).get("_elementor_data") or ""
-    if ponte.HOME_MARCA not in gravado:
-        return {"status": "falhou", "motivo": "o POST voltou 200 mas o bloco não ficou gravado"}
+    # carimbo de VERSÃO, não só a presença do bloco: o bloco ANTIGO também casa com
+    # HOME_MARCA, então procurar só o marcador dava "gravado" para uma escrita que
+    # não mudou nada.
+    versao = html.split(" -->")[0].split("v=")[-1]
+    if versao not in gravado:
+        return {"status": "falhou",
+                "motivo": f"o POST voltou 200 mas a versão {versao} não ficou gravada"}
+    # sem isto a home serve o render antigo até alguém salvar no editor na mão
+    cache_limpo = _limpar_cache_elementor(s, base)
     resto = json.dumps(dados[fim - trocadas + 1:], ensure_ascii=False)
     vivo = _paginapublicada(s, pg.get("link") or base + "/")
-    # carimbo de VERSÃO, não só a presença do bloco: o Elementor serve a versão
-    # anterior do cache, e "existe um bloco nosso" respondia publicado do mesmo jeito.
-    versao = html.split(" -->")[0].split("v=")[-1]
     if versao in vivo:
         return {"status": "publicado", "link": pg.get("link"), "versao": versao,
-                "cards": vivo.count('class="feq-card"'), "secoes_trocadas": trocadas}
+                "cards": vivo.count('class="feq-card"'), "secoes_trocadas": trocadas,
+                "cache_elementor_limpo": cache_limpo}
     return {"status": "gravado_aguardando_cache", "link": pg.get("link"), "versao": versao,
+            "cache_elementor_limpo": cache_limpo,
             "no_ar_agora": ("versão anterior do bloco" if ponte.HOME_MARCA in vivo
                             else "grade antiga"),
             # sem as aspas: dentro do JSON do Elementor elas vêm escapadas
@@ -300,10 +327,11 @@ def publicar_home_cursos(g, ont, backup_dir=None):
             "resto_da_home_intacto": {"diferenciais": HOME_FIM in resto,
                                       "logos": "braskem-1" in resto,
                                       "cta_final": "Pronto para iniciar" in resto},
-            "acao": "o bloco está no builder; o Elementor serve HTML em cache e só o "
-                    "invalida no save dele — abrir a home no Elementor e clicar em "
-                    "Update (ou Elementor > Ferramentas > Regenerar arquivos e dados) "
-                    "publica o bloco na tela"}
+            "acao": ("o bloco está no builder e o cache do Elementor foi limpo, mas a "
+                     "home ainda serve o render antigo — procure outra camada de cache "
+                     "(WP Super Cache, CDN)" if cache_limpo else
+                     "não consegui limpar o cache do Elementor (DELETE /elementor/v1/cache "
+                     "falhou) — abra a home no Elementor e clique em Update")}
 
 
 def _paginapublicada(sessao, link):
