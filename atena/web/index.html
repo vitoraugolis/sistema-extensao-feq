@@ -170,6 +170,10 @@ input:focus,select:focus,textarea:focus{outline:none;box-shadow:3px 3px 0 var(--
  cursor:pointer;text-align:left;white-space:nowrap;}
 .conv-mais-menu button:hover{background:var(--laranjinha);}
 .conv-mais-menu button i{font-size:16px;color:var(--ink3);flex-shrink:0;}
+/* .hidden é uma classe só, igual a .conv-mais-menu: sem este par a regra de baixo
+   (display:flex) vencia por ordem e o menu ficava aberto para sempre. Mesmo
+   remédio já usado em .pf-modal.hidden. */
+.conv-mais-menu.hidden{display:none;}
 .conv-blocked{font-size:12px;font-weight:500;color:var(--ink);background:var(--rosa);border:2px solid var(--b);
  border-radius:9px;padding:7px 10px;margin:0 11px 9px;}
 .conv-ficha{padding:8px 14px;border-bottom:2px solid var(--b);background:#fff;font-size:12px;
@@ -2032,8 +2036,22 @@ function maisAcao(qual, id){
   else if(qual === 'guia')     enviarGuia(id);
   else if(qual === 'emoji')    toggleEmoji();
 }
-document.addEventListener('click', e=>{ if(!e.target.closest('.conv-mais-wrap')) fecharMais(); });
-document.addEventListener('keydown', e=>{ if(e.key === 'Escape') fecharMais(); });
+// Painéis do composer (template, contato, emoji) e o menu "+": todos são popovers
+// e todos somem ao clicar fora ou no Esc. Antes cada painel só fechava no seu ✕ —
+// o operador abria o de template, mudava de ideia e ele ficava tampando a conversa.
+function fecharPopovers(){
+  fecharMais();
+  ['#convTpl', '#convContato', '#convEmoji'].forEach(id=>{
+    const box = $(id);
+    if(box && !box.classList.contains('hidden')){ box.classList.add('hidden'); box.innerHTML = ''; }
+  });
+}
+document.addEventListener('click', e=>{
+  // dentro do "+" ou dentro de um painel aberto: é interação, não desistência
+  if(e.target.closest('.conv-mais-wrap') || e.target.closest('.conv-tpl')) return;
+  fecharPopovers();
+});
+document.addEventListener('keydown', e=>{ if(e.key === 'Escape') fecharPopovers(); });
 
 // Grade fixa, sem CDN (mesmo padrão zero-dependência-externa das bridge pages) — não é
 // o conjunto completo de emoji Unicode, é uma curadoria do que cabe numa conversa
