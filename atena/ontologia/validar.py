@@ -7,7 +7,7 @@ Atena · Validação da fundação ontológica (offline, sem FARO/WhatsApp).
 3) Teste NEGATIVO: injeta um plano de pagamento alucinado (30x R$ 866,09)
    e prova que a trava de coerência o REPROVA.
 4) Demonstra as inferências de RUNTIME:
-   - captabilidade: status da janela de inscrição vs. hoje (SPARQL temporal);
+   - captabilidade: status da janela de inscrição vs. hoje (via Ontologia.captavel);
    - elegibilidade: nível do lead >= nível mínimo do curso (ordinal).
 
 Uso:  python3 atena/ontologia/validar.py
@@ -53,22 +53,19 @@ def teste_negativo(vocab):
 
 
 def captabilidade(g, hoje):
-    q = """
-    SELECT ?codigo ?inicio ?fim WHERE {
-        ?c feq:codigo ?codigo ; feq:janelaInscricao ?j .
-        ?j feq:fim ?fim . OPTIONAL { ?j feq:inicio ?inicio }
-    } ORDER BY ?codigo """
+    """Status pelo MOTOR de verdade (Ontologia.captavel), não por uma segunda
+    implementação. Esta função reimplementava a regra em SPARQL e já vinha divergindo:
+    não conhecia 'fora_do_prazo' (chamava de ENCERRADA) nem 'antecipada' (chamava de
+    futura) — ou seja, o diagnóstico que existe para conferir o catálogo mostrava um
+    estado diferente do que a operação usava."""
+    from atena.ontologia.servico import Ontologia
+    ont = Ontologia()
     linhas = []
-    for cod, inicio, fim in g.query(q, initNs={"feq": FEQ}):
-        ini = inicio.toPython() if inicio else None
-        f = fim.toPython()
-        if ini and hoje < ini:
-            status = "futura"
-        elif hoje > f:
-            status = "ENCERRADA"
-        else:
-            status = "aberta"
-        linhas.append((str(cod), status, f.strftime("%d/%m/%Y")))
+    for cod in ont.cursos():
+        cap = ont.captavel(cod, hoje)
+        status = "ENCERRADA" if cap["status"] == "encerrada" else cap["status"]
+        fim = cap.get("fim") or ""
+        linhas.append((cod, status, "/".join(reversed(fim.split("-"))) if fim else "—"))
     return linhas
 
 

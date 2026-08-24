@@ -40,5 +40,12 @@
     "autor": "vitor",
     "motivo": "FEQ-0295: seção 'Profissionais de empresas que você conhece' (mesma lista do portfólio)",
     "pre_imagem": "catalogo_pre_v0006_1786644325.jsonld"
+  },
+  {
+    "versao": "v0007",
+    "ts": "2026-08-24T11:48:05",
+    "autor": "vitor",
+    "motivo": "FEQ-0295: ficha BÁSICA (proposta Extecamp) + captação antecipada no site próprio",
+    "pre_imagem": "catalogo_pre_v0007_1787582885.jsonld"
   }
 ]

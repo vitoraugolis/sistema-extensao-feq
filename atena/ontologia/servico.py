@@ -7,7 +7,7 @@ grounding dos agentes e do Revisor — ninguém consulta o grafo direto.
 
 Expõe, com proveniência implícita no próprio grafo:
   • curso(codigo)            -> fatos do curso (dict)
-  • captavel(codigo, hoje)   -> {status: futura|aberta|encerrada, captavel: bool}
+  • captavel(codigo, hoje)   -> {status: futura|antecipada|aberta|fora_do_prazo|encerrada, captavel: bool}
   • elegivel(nivel, codigo)  -> bool (comparação ORDINAL, não string)
   • ancoras(codigo)          -> conjunto de âncoras factuais para o Revisor
 
@@ -204,6 +204,11 @@ class Ontologia:
             "avaliacao": str(self.g.value(u, FEQ.avaliacaoTexto) or "") or None,
             "salario_ref": str(self.g.value(u, FEQ.salarioRef) or "") or None,
             "garantia_7d": str(self.g.value(u, FEQ.garantia7dias) or "") == "true",
+            # "basica" | "completa" — qual ficha a Extecamp usa neste curso (vem da
+            # proposta de oferecimento). Define quantos campos a etapa 2 pede: pedir
+            # dado que a Extecamp não vai receber custa conversão e não serve a ninguém.
+            "ficha_inscricao": str(self.g.value(u, FEQ.fichaInscricao) or "") or "completa",
+            "captacao_antecipada": str(self.g.value(u, FEQ.captacaoAntecipada) or "") == "true",
             "plataforma": str(self.g.value(u, FEQ.plataformaAula) or "") or None,
             "promocao": self.promocao(codigo),
         }
@@ -237,7 +242,13 @@ class Ontologia:
         ini, fim = self._janela(u, FEQ.janelaInscricao)
         aulas_ini, _ = self._janela(u, FEQ.janelaOferecimento)
         if ini and hoje < ini:
-            status = "futura"
+            # A janela da Extecamp ainda não abriu, MAS a coordenação autorizou captar
+            # no nosso site (feq:captacaoAntecipada). Estado PRÓPRIO pelo mesmo motivo
+            # de 'fora_do_prazo': tratar como 'futura' manda o lead para a lista de
+            # espera e perde um inscrito que já era possível hoje. A janela no grafo
+            # continua sendo a da Extecamp — é dela que sai o prazo citado ao lead.
+            antecip = str(self.g.value(u, FEQ.captacaoAntecipada) or "") == "true"
+            status = "antecipada" if antecip else "futura"
         elif fim and hoje > fim:
             # Prazo vencido mas a turma ainda não começou: sobram vagas remanescentes e a
             # coordenação consegue gerar link de inscrição fora do prazo. Estado PRÓPRIO —
@@ -250,8 +261,12 @@ class Ontologia:
             "curso": codigo, "existe": True, "status": status,
             # segue False: inscrição pública fechada. Quem decide o que fazer com o
             # 'fora_do_prazo' é quem lê o status, não quem lê este booleano.
-            "captavel": status == "aberta",
+            "captavel": status in ("aberta", "antecipada"),
             "recuperavel": status == "fora_do_prazo",
+            # captamos hoje, mas a Extecamp só abre em `inicio`: quem for MANDAR o link
+            # da Extecamp tem de olhar isto, senão manda o lead para uma página que
+            # ainda não aceita inscrição.
+            "antecipada": status == "antecipada",
             "inicio": ini.isoformat() if ini else None,
             "fim": fim.isoformat() if fim else None,
             "aulas_inicio": aulas_ini.isoformat() if aulas_ini else None,

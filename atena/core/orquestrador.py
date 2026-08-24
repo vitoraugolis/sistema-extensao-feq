@@ -175,7 +175,22 @@ def _brain_deterministico(ont, lead, mensagem_lead, historico=None, hoje=None):
             quer_link = (re.search(r"\blink\b|inscri", mensagem_lead or "", re.I) or
                          ("link de inscrição" in ultima_agente.lower()
                           and AFIRMA_RE.search(mensagem_lead or "")))
-            if quer_link and c.get("url_extecamp"):
+            # CAPTAÇÃO ANTECIPADA: captamos hoje, mas a Extecamp só recebe esta turma a
+            # partir de cap["inicio"]. Mandar a URL agora joga o lead numa página que
+            # não aceita a inscrição dele — ele conclui que o link está quebrado (ou
+            # que a vaga acabou) e some. Aqui o agente assume o passo: registra e avisa.
+            if cap.get("antecipada"):
+                abre = "/".join(reversed((cap.get("inicio") or "").split("-")))
+                if quer_link:
+                    msg = (f"Sua vaga no {cod} já pode ser garantida agora — eu mesmo registro "
+                           "a sua inscrição por aqui. "
+                           + (f"O sistema oficial da Unicamp (Extecamp) abre para esta turma em "
+                              f"{abre}, e a Extensão FEQ conclui o seu cadastro lá nesse dia, "
+                              "te avisando por e-mail. " if abre else "")
+                           + "Posso seguir com o seu registro?")
+                    return C.DecisaoAgente(C.QUALIFICAR, "elegível — captação antecipada (sem link Extecamp)",
+                                           mensagem_ao_lead=msg, dados={"escolaridade": esc})
+            elif quer_link and c.get("url_extecamp"):
                 prazo = "/".join(reversed((c.get("inscricoes_fim") or "").split("-")))
                 msg = (f"Aqui está o link de inscrição do {cod}: "
                        f"{c['url_extecamp']} — as inscrições vão até {prazo}. "
@@ -183,8 +198,10 @@ def _brain_deterministico(ont, lead, mensagem_lead, historico=None, hoje=None):
                 return C.DecisaoAgente(C.QUALIFICAR, "elegível — link de inscrição enviado",
                                        mensagem_ao_lead=msg, dados={"escolaridade": esc})
             p = c["plano"]
+            oferta = ("Quer que eu registre a sua inscrição?" if cap.get("antecipada")
+                      else "Posso te enviar o link de inscrição?")
             msg = (f"O {cod} são {p['n']}x de R$ {_fmt_ptbr(p['valor_parcela'])}, "
-                   f"ou R$ {_fmt_ptbr(p['a_vista'])} à vista. Posso te enviar o link de inscrição?")
+                   f"ou R$ {_fmt_ptbr(p['a_vista'])} à vista. {oferta}")
             return C.DecisaoAgente(C.QUALIFICAR, "elegível + interesse",
                                    mensagem_ao_lead=msg, dados={"escolaridade": esc})
     # anti-repetição: se a última mensagem do agente já foi o gate, varia a frase

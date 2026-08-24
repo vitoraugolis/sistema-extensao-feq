@@ -431,6 +431,63 @@ def _secao_curriculo(c):
         '</section>')
 
 
+# Blocos da etapa 2 que existem SÓ na ficha completa. A Extecamp usa duas fichas de
+# inscrição e cada proposta de oferecimento declara qual ("Ficha de Inscrição a ser
+# utilizada: BÁSICA/COMPLETA"). Pedir ao lead um dado que a ficha da Extecamp nem
+# recebe cobra o preço mais caro da LP — abandono no meio do formulário — e não
+# entrega nada a ninguém: o operador transcreve campo a campo o que a Extecamp pede.
+# O que sobra na básica é o mínimo para existir uma inscrição: quem é (CPF +
+# nascimento) e como paga.
+_E2_PESSOAIS_EXTRA = """          <div><label class="lbl" for="doc_tipo">Tipo de documento</label>
+            <select id="doc_tipo" name="doc_tipo" class="inp"><option value="">Selecione…</option>
+              <option>RG</option><option>CNH</option><option>Passaporte</option><option>RNE</option></select></div>
+          <div><label class="lbl" for="doc_numero">Número do documento</label>
+            <input id="doc_numero" name="doc_numero" class="inp"></div>
+          <div><label class="lbl" for="doc_emissor">Estado emissor</label>
+            <input id="doc_emissor" name="doc_emissor" maxlength="2" placeholder="SP" class="inp"></div>
+          <div><label class="lbl" for="sexo">Sexo</label>
+            <select id="sexo" name="sexo" class="inp"><option value="">Selecione…</option>
+              <option>Feminino</option><option>Masculino</option><option>Prefiro não informar</option></select></div>
+          <div><label class="lbl" for="estado_civil">Estado civil</label>
+            <select id="estado_civil" name="estado_civil" class="inp"><option value="">Selecione…</option>
+              <option>Solteiro(a)</option><option>Casado(a)</option><option>Divorciado(a)</option>
+              <option>Viúvo(a)</option><option>União estável</option></select></div>
+          <div><label class="lbl" for="cidade_nascimento">Cidade onde nasceu</label>
+            <input id="cidade_nascimento" name="cidade_nascimento" class="inp"></div>
+"""
+
+_E2_ENDERECO = """      <fieldset>
+        <legend class="e2-legenda">Endereço</legend>
+        <div class="e2-grid">
+          <div><label class="lbl" for="cep">CEP</label>
+            <input id="cep" name="cep" inputmode="numeric" placeholder="00000-000" maxlength="9" class="inp"></div>
+          <div><label class="lbl" for="rua">Rua</label><input id="rua" name="rua" class="inp"></div>
+          <div><label class="lbl" for="numero">Número</label><input id="numero" name="numero" class="inp"></div>
+          <div><label class="lbl" for="complemento">Complemento</label><input id="complemento" name="complemento" class="inp"></div>
+          <div><label class="lbl" for="bairro">Bairro</label><input id="bairro" name="bairro" class="inp"></div>
+          <div><label class="lbl" for="cidade">Cidade</label><input id="cidade" name="cidade" class="inp"></div>
+          <div><label class="lbl" for="estado">Estado</label>
+            <input id="estado" name="estado" maxlength="2" placeholder="SP" class="inp"></div>
+        </div>
+      </fieldset>
+"""
+
+_E2_PAGAMENTO_EXTRA = """          <div class="e2-largo"><label class="lbl" for="comprovante_em">Comprovante de pagamento em nome de</label>
+            <select id="comprovante_em" name="comprovante_em" class="inp">
+              <option>Aluno</option><option>Empresa</option></select></div>
+"""
+
+
+def _etapa2_blocos(c):
+    """Campos da etapa 2 conforme a ficha declarada pelo curso. Default: completa —
+    curso sem o campo declarado mantém exatamente o formulário que já estava no ar."""
+    if ((c or {}).get("ficha_inscricao") or "completa") == "basica":
+        return {"E2_TEMPO": "Leva menos de 1 minuto.", "E2_PESSOAIS_EXTRA": "",
+                "E2_ENDERECO": "", "E2_PAGAMENTO_EXTRA": ""}
+    return {"E2_TEMPO": "Leva cerca de 3 minutos.", "E2_PESSOAIS_EXTRA": _E2_PESSOAIS_EXTRA,
+            "E2_ENDERECO": _E2_ENDERECO, "E2_PAGAMENTO_EXTRA": _E2_PAGAMENTO_EXTRA}
+
+
 def _opcoes_pagamento(c):
     """<option> da etapa 2, no formato que a Extecamp usa no próprio formulário:
     sempre o parcelamento MÁXIMO e a opção à vista, ambos boleto. Vem do plano da
@@ -831,11 +888,31 @@ def _periodo_html(c, aberto=True):
         f'a <strong>{fim}</strong>.</p>\n  </details>')
 
 
-def _passos_html(c):
-    """Como se inscrever — 5 passos publicados nas páginas oficiais (Extecamp)."""
+def _passos_html(c, antecipada=False, abre_em=""):
+    """Como se inscrever — 5 passos publicados nas páginas oficiais (Extecamp).
+
+    `antecipada`: captamos aqui ANTES de a Extecamp abrir. O passo 1 original manda o
+    lead preencher no sistema da Extecamp — que ainda não aceita inscrição nesta turma.
+    Repetir esse texto mandaria o lead bater numa porta fechada e culpar a página."""
     taxa = _moeda((c.get("plano") or {}).get("taxa")) or "o valor publicado na Extecamp"
     # data do boleto desta turma, quando a coordenação a declarou (spec 17 §3e)
     quando = f" O boleto desta turma é de {_ddmm(c.get('boleto_data'))}." if c.get("boleto_data") else ""
+    if antecipada:
+        passos = [
+            "Preencha a ficha de inscrição aqui mesmo nesta página — leva menos de um minuto "
+            "e garante o seu lugar na turma.",
+            "A Extensão FEQ registra a sua inscrição no sistema oficial da Unicamp (Extecamp) "
+            + (f"assim que ele abrir para esta turma, em {abre_em}. " if abre_em
+               else "assim que ele abrir para esta turma. ")
+            + "Você não precisa fazer nada neste passo.",
+            "Você recebe por e-mail as instruções de acesso ao portal do aluno e o termo de "
+            "compromisso, e envia os documentos na aba “Documentos”.",
+            f"Pague o boleto da taxa de inscrição ({taxa}).{quando}",
+            "Com a turma confirmada, a secretaria entra em contato por e-mail para o pagamento "
+            "e a efetivação da matrícula. Pronto — você é aluno da Extensão Unicamp!"]
+        return "\n    ".join(
+            f'<li class="passo"><span class="passo-n">{i + 1}</span><span>{p}</span></li>'
+            for i, p in enumerate(passos))
     passos = [
         "Preencha o formulário de inscrição no sistema oficial da Unicamp (Extecamp) e aguarde "
         "o e-mail com as instruções de acesso ao portal do aluno e o termo de compromisso.",
@@ -852,7 +929,7 @@ def _passos_html(c):
     return itens
 
 
-def _secao_inscricao_html(c, aberto):
+def _secao_inscricao_html(c, aberto, antecipada=False, abre_em=""):
     """'Como se inscrever' (5 passos oficiais da Extecamp) — só com turma aberta.
     Sem turma, prometer um passo a passo de inscrição seria falso; a captação
     acontece pelo modal de lista de espera.
@@ -861,12 +938,16 @@ def _secao_inscricao_html(c, aberto):
     degrau a mais por causa disso."""
     if not aberto:
         return ""
+    intro = ("Sua inscrição começa aqui mesmo: a Extensão FEQ conclui o registro no sistema "
+             "oficial da Unicamp (Extecamp) " + (f"quando ele abrir, em {abre_em}." if abre_em
+                                                 else "assim que ele abrir.")
+             if antecipada else
+             "O processo acontece no sistema oficial da Unicamp (Extecamp) — leva poucos minutos.")
     return (
         '<div id="inscricao" data-secao="inscricao" class="passos-bloco">\n'
         '  <p class="kicker">Como se inscrever</p>\n'
-        '  <p class="fraco mt-1">O processo acontece no sistema oficial da '
-        'Unicamp (Extecamp) — leva poucos minutos.</p>\n'
-        f'  <ol class="mt-2">\n    {_passos_html(c)}\n  </ol>\n</div>')
+        f'  <p class="fraco mt-1">{intro}</p>\n'
+        f'  <ol class="mt-2">\n    {_passos_html(c, antecipada, abre_em)}\n  </ol>\n</div>')
 
 
 def _faq_extra_html(c):
@@ -929,7 +1010,8 @@ def _cursos_relacionados_html(g, ont, curso_atual, limite=3, hoje=None):
     return "\n    ".join(itens)
 
 
-def render_tokens(meta_row, c, aberto=True, recuperavel=False):
+def render_tokens(meta_row, c, aberto=True, recuperavel=False,
+                  antecipada=False, abre_em=""):
     """Tokens da LP a partir do cursos_metas + ontologia (c = ont.curso(...) ou {}).
     Regra anti-alucinação: todo fato vem da ontologia; sem âncora -> texto neutro
     apontando para a página oficial da Extecamp.
@@ -1015,7 +1097,7 @@ def render_tokens(meta_row, c, aberto=True, recuperavel=False):
         "PROFESSORES_BIO_HTML": _professores_bio_html(c),
         "GARANTIA_HTML": _garantia_html(c),
         "SALARIO_HTML": _salario_html(c),
-        "PASSOS_HTML": _passos_html(c),
+        "PASSOS_HTML": _passos_html(c, antecipada, abre_em),
         "PERIODO_OFERECIMENTO": _periodo_html(c, aberto),
         "FAQ_EXTRA_HTML": _faq_extra_html(c),
         # --- inscrição aberta × lista de espera (spec 17 §2b) ---------------------
@@ -1046,7 +1128,7 @@ def render_tokens(meta_row, c, aberto=True, recuperavel=False):
                         ("Quero meu link fora do prazo" if recuperavel else "Entrar na lista de espera")),
         # O passo a passo da Extecamp só faz sentido com turma aberta (vai dentro do
         # bloco de Investimento; o CTA final é o do próprio bloco, não uma seção extra).
-        "SECAO_INSCRICAO": _secao_inscricao_html(c, aberto),
+        "SECAO_INSCRICAO": _secao_inscricao_html(c, aberto, antecipada, abre_em),
         "INVEST_DESTAQUE": _invest_destaque(c, aberto),
         "INVEST_TARJA": (f"Inscrições abertas até {_ddmm(c.get('inscricoes_fim'))}" if aberto
                          else ("Prazo encerrado · vagas remanescentes" if recuperavel
@@ -1060,6 +1142,15 @@ def render_tokens(meta_row, c, aberto=True, recuperavel=False):
              "Valores praticados na última turma, para você se planejar — podem ser reajustados "
              "quando a próxima abrir. Entre na lista de espera para receber as condições oficiais.")),
         "FAQ_COMO_INSCREVER": (
+            '<details class="qa">'
+            '<summary>Como funciona a inscrição?</summary>'
+            '<p>Ao clicar em Inscreva-se, você preenche a ficha desta página (nome e contato, '
+            'depois os dados da matrícula) e a sua vaga fica registrada conosco. O sistema '
+            f'oficial da Unicamp (Extecamp) abre para a turma {meta_row["curso"]}/'
+            f'{meta_row["turma"]} em {abre_em}'
+            ' — a Extensão FEQ conclui o seu registro lá e te avisa por e-mail, com o termo de '
+            'compromisso, o envio de documentos e o boleto da taxa de inscrição.</p></details>'
+            if (aberto and antecipada) else
             '<details class="qa">'
             '<summary>Como funciona a inscrição?</summary>'
             '<p>Ao clicar em Inscreva-se, você preenche a ficha desta página (nome e contato, '
@@ -1126,14 +1217,20 @@ def render(g, ont, curso, webhook_url="/webhook/ponte", hoje=None):
         c = ont.curso(curso)
     except Exception:
         c = None
-    recuperavel = False
+    recuperavel = antecipada = False
+    abre_em = ""
     try:
         cap = ont.captavel(curso, hoje)
         aberto = bool(cap.get("captavel"))
         recuperavel = bool(cap.get("recuperavel"))
+        # captação antecipada: a página abre, mas a Extecamp só recebe a inscrição a
+        # partir de `inicio` — a data entra no texto para o lead saber o que esperar.
+        antecipada = bool(cap.get("antecipada"))
+        abre_em = _ddmm(cap.get("inicio")) if antecipada else ""
     except Exception:
         aberto = True    # sem ontologia (ex.: FakeOnt nos testes): comporta como aberto
-    tokens = render_tokens(alvo, c, aberto=aberto, recuperavel=recuperavel)
+    tokens = render_tokens(alvo, c, aberto=aberto, recuperavel=recuperavel,
+                           antecipada=antecipada, abre_em=abre_em)
     pagina = (_WEB / "bridge-template.html").read_text()
     for k, v in tokens.items():
         pagina = pagina.replace("{{%s}}" % k, str(v) if k in _RAW_TOKENS else _esc(v))
@@ -1143,12 +1240,15 @@ def render(g, ont, curso, webhook_url="/webhook/ponte", hoje=None):
     css = ((_WEB / "bridge.css").read_text()
            .replace("{{HERO_BG_URL}}", hero_bg)
            .replace("{{CV_FOTO_URL}}", os.environ.get("GROWTH_CV_FOTO_URL") or CV_FOTO_URL))
+    for _k, _v in _etapa2_blocos(c).items():        # ficha básica x completa
+        pagina = pagina.replace("{{%s}}" % _k, _v)
     return (pagina
             .replace("{{CURSOS_RELACIONADOS_HTML}}", _cursos_relacionados_html(g, ont, curso))
             .replace("{{WEBHOOK_URL}}", webhook_url)
             .replace("{{SECAO_EMPRESAS}}", _secao_empresas(c))
             .replace("{{SECAO_CURRICULO}}", _secao_curriculo(c))
             .replace("{{OPCOES_PAGAMENTO}}", _opcoes_pagamento(c))
+            .replace("{{E2_TEMPO}}", _etapa2_blocos(c)["E2_TEMPO"])
             .replace("{{REQUISITO_AVISO}}",
                      _esc(_REQUISITO_TEXTO.get((c or {}).get("requisito"), "")))
             .replace("{{LOGO_URL}}", logo)

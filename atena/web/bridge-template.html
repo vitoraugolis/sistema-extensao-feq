@@ -275,7 +275,7 @@
     <p class="kicker">Etapa 2 de 2</p>
     <h3 class="titulo mt-2">Complete sua inscrição</h3>
     <p class="sub mt-2">Olá, <span id="e2-nome" class="destaque"></span>! Estes são os dados que a
-      Extecamp pede para efetivar a matrícula. Leva cerca de 3 minutos.</p>
+      Extecamp pede para efetivar a matrícula. {{E2_TEMPO}}</p>
 
     <form id="etapa2-form" novalidate>
       <fieldset>
@@ -285,39 +285,11 @@
             <input id="cpf" name="cpf" required inputmode="numeric" placeholder="000.000.000-00" maxlength="14" class="inp"></div>
           <div><label class="lbl" for="nascimento">Data de nascimento *</label>
             <input id="nascimento" name="nascimento" type="date" required class="inp"></div>
-          <div><label class="lbl" for="doc_tipo">Tipo de documento</label>
-            <select id="doc_tipo" name="doc_tipo" class="inp"><option value="">Selecione…</option>
-              <option>RG</option><option>CNH</option><option>Passaporte</option><option>RNE</option></select></div>
-          <div><label class="lbl" for="doc_numero">Número do documento</label>
-            <input id="doc_numero" name="doc_numero" class="inp"></div>
-          <div><label class="lbl" for="doc_emissor">Estado emissor</label>
-            <input id="doc_emissor" name="doc_emissor" maxlength="2" placeholder="SP" class="inp"></div>
-          <div><label class="lbl" for="sexo">Sexo</label>
-            <select id="sexo" name="sexo" class="inp"><option value="">Selecione…</option>
-              <option>Feminino</option><option>Masculino</option><option>Prefiro não informar</option></select></div>
-          <div><label class="lbl" for="estado_civil">Estado civil</label>
-            <select id="estado_civil" name="estado_civil" class="inp"><option value="">Selecione…</option>
-              <option>Solteiro(a)</option><option>Casado(a)</option><option>Divorciado(a)</option>
-              <option>Viúvo(a)</option><option>União estável</option></select></div>
-          <div><label class="lbl" for="cidade_nascimento">Cidade onde nasceu</label>
-            <input id="cidade_nascimento" name="cidade_nascimento" class="inp"></div>
+{{E2_PESSOAIS_EXTRA}}
         </div>
       </fieldset>
 
-      <fieldset>
-        <legend class="e2-legenda">Endereço</legend>
-        <div class="e2-grid">
-          <div><label class="lbl" for="cep">CEP</label>
-            <input id="cep" name="cep" inputmode="numeric" placeholder="00000-000" maxlength="9" class="inp"></div>
-          <div><label class="lbl" for="rua">Rua</label><input id="rua" name="rua" class="inp"></div>
-          <div><label class="lbl" for="numero">Número</label><input id="numero" name="numero" class="inp"></div>
-          <div><label class="lbl" for="complemento">Complemento</label><input id="complemento" name="complemento" class="inp"></div>
-          <div><label class="lbl" for="bairro">Bairro</label><input id="bairro" name="bairro" class="inp"></div>
-          <div><label class="lbl" for="cidade">Cidade</label><input id="cidade" name="cidade" class="inp"></div>
-          <div><label class="lbl" for="estado">Estado</label>
-            <input id="estado" name="estado" maxlength="2" placeholder="SP" class="inp"></div>
-        </div>
-      </fieldset>
+{{E2_ENDERECO}}
 
       <fieldset>
         <legend class="e2-legenda">Pagamento</legend>
@@ -330,9 +302,7 @@
               <option value="">Selecione…</option>
               {{OPCOES_PAGAMENTO}}
             </select></div>
-          <div class="e2-largo"><label class="lbl" for="comprovante_em">Comprovante de pagamento em nome de</label>
-            <select id="comprovante_em" name="comprovante_em" class="inp">
-              <option>Aluno</option><option>Empresa</option></select></div>
+{{E2_PAGAMENTO_EXTRA}}
         </div>
       </fieldset>
 

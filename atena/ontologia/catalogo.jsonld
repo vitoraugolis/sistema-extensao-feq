@@ -99,7 +99,9 @@
     "dataBoleto": {
       "@id": "feq:dataBoleto",
       "@type": "xsd:date"
-    }
+    },
+    "fichaInscricao": "feq:fichaInscricao",
+    "captacaoAntecipada": "feq:captacaoAntecipada"
   },
   "@graph": [
     {
@@ -730,7 +732,9 @@
       "conteudoProgramatico": "(1) FEQ-0296 - Introdução à Modelagem Termodinâmica de Fluidos de Reservatório (40h, obrigatória); (2) FEQ-0297 - Gradação Composicional (40h, obrigatória).",
       "avaliacaoTexto": "Nota mínima de 7 (sete) e frequência mínima de 75%.",
       "urlExtecamp": "https://ins.extecamp.unicamp.br/curso/inscricao/FEQ-0295/001",
-      "empresasJson": "[\"EMS\", \"Solvay\", \"3M\", \"Petrobras\", \"Eaton\", \"Buckman\", \"Boehringer\", \"Braskem\"]"
+      "empresasJson": "[\"EMS\", \"Solvay\", \"3M\", \"Petrobras\", \"Eaton\", \"Buckman\", \"Boehringer\", \"Braskem\"]",
+      "fichaInscricao": "basica",
+      "captacaoAntecipada": "true"
     }
   ]
 }
