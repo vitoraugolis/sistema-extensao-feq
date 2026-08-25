@@ -317,6 +317,7 @@ input:focus,select:focus,textarea:focus{outline:none;box-shadow:3px 3px 0 var(--
            tinha trabalho. Fica no topo porque é por onde o dia começa. -->
       <button class="navi" data-sec="notificacoes"><i class="ti ti-bell"></i> Notificações <span class="tag t-bad" id="ntCount" style="display:none;margin-left:auto;"></span></button>
       <button class="navi" data-sec="inscricoes"><i class="ti ti-file-text"></i> Inscrições <span class="tag t-warn" id="inCount" style="display:none;margin-left:auto;"></span></button>
+      <button class="navi" data-sec="coleta"><i class="ti ti-cloud-download"></i> Coleta de Dados</button>
       <button class="navi" data-sec="kanban"><i class="ti ti-layout-columns"></i> Funil</button>
       <button class="navi" data-sec="conversas"><i class="ti ti-messages"></i> Conversas <span class="tag t-ok" id="cvCount" style="display:none;margin-left:auto;"></span></button>
       <button class="navi" data-sec="aprovacoes"><i class="ti ti-inbox"></i> Aprovações <span class="tag t-bad" id="apCount" style="display:none;margin-left:auto;"></span></button>
@@ -464,6 +465,34 @@ input:focus,select:focus,textarea:focus{outline:none;box-shadow:3px 3px 0 var(--
         </div>
       </section>
 
+      <section id="coleta" class="hidden">
+        <div class="g sec">
+          <h2 style="margin:0 0 4px;"><i class="ti ti-cloud-download"></i> Coleta de Dados · Extecamp</h2>
+          <p class="muted" style="margin:0 0 12px;">Traz do ADM Cursos quem está inscrito, matriculado e
+            cancelado em cada oferecimento, e põe cada um na coluna certa do Funil.</p>
+
+          <div class="row" style="align-items:flex-start;gap:14px;flex-wrap:wrap;">
+            <div style="flex:1;min-width:260px;">
+              <p style="font-weight:800;margin:0 0 6px;">1. Entre no sistema</p>
+              <p class="muted" style="margin:0 0 8px;">O login e a verificação de humano são seus — a
+                Atena não guarda a sua senha da Extecamp.</p>
+              <button class="btn btn-g" onclick="coletaLogar()"><i class="ti ti-external-link"></i> Logar no sistema</button>
+            </div>
+            <div style="flex:1;min-width:260px;">
+              <p style="font-weight:800;margin:0 0 6px;">2. Abra a coleta</p>
+              <p class="muted" style="margin:0 0 8px;">Gera o atalho que roda a coleta dentro da aba já
+                logada. Vale por 12 horas.</p>
+              <button class="btn btn-p" onclick="coletaSessao()"><i class="ti ti-key"></i> Abrir sessão de coleta</button>
+            </div>
+          </div>
+          <div id="coletaAtalho" class="hidden" style="margin-top:12px;"></div>
+
+          <div id="coletaCursos" style="margin-top:16px;"></div>
+          <h3 style="margin:18px 0 6px;">Fila de trabalho</h3>
+          <p class="muted" id="coletaQuando" style="margin:0 0 10px;"></p>
+          <div id="coletaFila"></div>
+        </div>
+      </section>
       <section id="lps" class="hidden">
         <div class="g sec">
           <h2><i class="ti ti-browser"></i> Gestão de LPs</h2>
@@ -700,6 +729,7 @@ document.querySelectorAll('.navi').forEach(b=>b.onclick=()=>{
   if(b.dataset.sec==='lps') lpCarregar();
   if(b.dataset.sec==='medicao') mdCarregar();
   if(b.dataset.sec==='injetor') ofCursosCarregar();
+  if(b.dataset.sec==='coleta') coletaCarregar();
   setTimeout(ajustarAltura, 0);      // a seção acabou de ficar visível: agora dá p/ medir
 });
 
@@ -1624,6 +1654,70 @@ function bolhaConteudo(t){
   }
   return t.texto ? escapeHtml(t.texto) : '<i class="muted">(sem conteúdo)</i>';
 }
+// ==================== Coleta de Dados · Extecamp (spec 20) =====================
+// A sessão autenticada da Extecamp vive na ABA DELA (o login pede humano + captcha),
+// e de outra origem o navegador não deixa lê-la — com razão. Por isso a coleta roda
+// lá dentro, por um atalho que o operador dispara, e não daqui.
+const COLETA_LOGIN = "https://www.extecamp.unicamp.br/sistema.asp";
+
+function coletaLogar(){ window.open(COLETA_LOGIN, "_blank", "noopener"); }
+
+async function coletaSessao(){
+  const r = await api('/api/coleta/sessao', {method:'POST'});
+  if(!r || !r.ok){ alert('Não consegui abrir a sessão de coleta.'); return; }
+  const cx = $('#coletaAtalho');
+  cx.classList.remove('hidden');
+  // O atalho é um link para ARRASTAR até a barra de favoritos: um bookmarklet é a
+  // única forma de rodar nosso código na origem da Extecamp sem instalar extensão.
+  cx.innerHTML = `
+    <div style="border:2px solid var(--b);border-radius:9px;padding:12px;background:var(--laranjinha);">
+      <p style="font-weight:800;margin:0 0 6px;">3. Arraste este botão para a barra de favoritos</p>
+      <p class="muted" style="margin:0 0 9px;">Depois, já dentro do ADM Cursos, clique nele. A coleta
+        aparece num painel no canto da tela. Validade: ${r.validade_horas}h.</p>
+      <a href="${r.bookmarklet}" onclick="alert('Não clique aqui: ARRASTE este botão para a barra de favoritos e clique nele já dentro do ADM Cursos.');return false;"
+         style="display:inline-block;background:var(--guara);color:#fff;font-weight:800;text-decoration:none;
+                border:2px solid var(--b);border-radius:9px;padding:8px 14px;box-shadow:3px 3px 0 var(--b);cursor:grab;">
+        ⬇ Coletar Extecamp</a>
+    </div>`;
+}
+
+function coletaChip(taxa){
+  const m = {termo_pendente:'t-bad', taxa_vencida:'t-bad', taxa_a_pagar:'t-warn', taxa_paga:'t-ok'};
+  return m[taxa] || '';
+}
+
+async function coletaCarregar(){
+  const d = await api('/api/coleta');
+  if(!d) return;
+  $('#coletaQuando').textContent = d.ultima_coleta
+    ? 'Última coleta: ' + d.ultima_coleta.replace('T',' ')
+    : 'Nenhuma coleta ainda — siga os passos acima.';
+  $('#coletaCursos').innerHTML = (d.cursos||[]).length ? `
+    <table style="width:100%;border-collapse:collapse;font-size:12.5px;">
+      <tr style="text-align:left;"><th>Curso</th><th>Turma</th><th>Inscritos</th><th>Matriculados</th><th>Cancelados</th></tr>
+      ${d.cursos.map(c=>`<tr style="border-top:1px solid var(--b);">
+        <td><strong>${escapeHtml(c.curso||'')}</strong></td><td>${escapeHtml(c.turma||'')}</td>
+        <td>${c.inscritos||0}</td><td>${c.matriculados||0}</td><td>${c.cancelados||0}</td></tr>`).join('')}
+    </table>` : '';
+  $('#coletaFila').innerHTML = (d.fila||[]).length ? d.fila.map(g=>`
+    <div style="border:2px solid var(--b);border-radius:9px;margin-bottom:10px;overflow:hidden;">
+      <div style="padding:8px 11px;background:var(--paper);border-bottom:2px solid var(--b);">
+        <span class="chip ${coletaChip(g.taxa)}" style="margin:0;">${g.leads.length}</span>
+        <strong style="margin-left:6px;">${escapeHtml(g.situacao||'')}</strong>
+        <div class="muted" style="margin-top:3px;">${escapeHtml(g.acao||'')}</div>
+      </div>
+      <div style="padding:6px 11px;">
+        ${g.leads.map(l=>`<div style="display:flex;gap:8px;align-items:center;padding:4px 0;border-top:1px solid #eee;">
+          <span style="flex:1;">${escapeHtml(l.nome||'(sem nome)')}</span>
+          <span class="muted">${escapeHtml(l.curso||'')}/${escapeHtml(l.turma||'')}</span>
+          ${l.telefone ? `<button class="btn btn-g" style="padding:3px 9px;font-size:11.5px;"
+              onclick="abrirConversa('${l.card_id}');document.querySelector('.navi[data-sec=&quot;conversas&quot;]').click()">Conversa</button>`
+            : '<span class="chip t-warn" style="margin:0;" title="A Extecamp não informa telefone nesta tela">sem telefone</span>'}
+        </div>`).join('')}
+      </div>
+    </div>`).join('') : '<p class="muted">Sem fila — nada pendente na última coleta.</p>';
+}
+
 // ==================== Funil comercial de professores (módulo restrito) ==========
 // Cadastro 100% manual: não há ingestão, webhook, Revisor nem agente aqui. O contato
 // sai pelo WhatsApp PESSOAL do operador (link wa.me), não pela API do WABA — por isso

@@ -139,6 +139,11 @@ class Estado:
                     # campanha. O e-mail JÁ chegava do formulário Meta e era descartado.
                     "ALTER TABLE leads ADD COLUMN email TEXT",
                     "ALTER TABLE leads ADD COLUMN notas TEXT",
+                    # estado do aluno no ADM Cursos da Extecamp (spec 20): taxa,
+                    # documentação, situação e a data da última coleta. JSON porque o
+                    # formato é de terceiro e muda sem avisar — coluna por campo viraria
+                    # migração a cada mudança de lá.
+                    "ALTER TABLE leads ADD COLUMN extecamp_json TEXT",
                     "ALTER TABLE leads ADD COLUMN utm TEXT",      # JSON: source/medium/campaign...
                     # Retentativa de entrega: POR QUE a Meta recusou (131026 número não
                     # recebe / 131049 pacing de marketing / 130472 experimento) e PARA QUAL

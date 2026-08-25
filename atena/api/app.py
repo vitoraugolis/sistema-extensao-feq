@@ -11,12 +11,16 @@ Rodar:
 import os
 import sys
 import json
+import hmac
 import time
+import secrets
 import datetime
 import pathlib
 import tempfile
+from urllib.parse import quote
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2]))
+
 
 
 def _load_env(p=pathlib.Path(__file__).resolve().parents[2] / ".env"):
@@ -51,6 +55,8 @@ from atena.transporte.whatsapp import (WhatsApp, TEMPLATES_ROL as WhatsApp_TEMPL
 from atena.growth.db import Growth
 from atena.growth.meta_ads import MetaAds
 from atena.growth import ponte
+from atena.coleta import extecamp as coleta_extecamp
+from atena.coleta import sincronizacao as coleta_sinc
 from atena.growth import funil as growth_funil
 from atena.growth import pdf_guia
 
@@ -1497,6 +1503,143 @@ def injetor_aprovar(pid):
         EST.log_acao(session.get("usuario", "operador"),
                     f"novo oferecimento {p['alvo']}: turma {extra['turma']}")
     return jsonify(r)
+
+
+# ======================================================================= COLETA
+# Integração com o ADM Cursos da Extecamp (spec 20).
+#
+# Por que TOKEN e não a sessão da Central: o login da Extecamp exige humano +
+# verificação anti-robô, então a sessão autenticada vive no navegador do
+# operador. O coletor precisa rodar DENTRO da origem da Extecamp para enxergar
+# essa sessão — e de lá não há como mandar o cookie da Central (outra origem).
+# O token é gerado na Central pelo operador logado e viaja no corpo do POST.
+_COLETA_TTL = 12 * 3600     # a sessão da Extecamp não dura um dia de trabalho inteiro
+
+
+def _coleta_token_valido(token):
+    guardado = EST.get_config("coleta_token") or ""
+    if not token or not guardado or "|" not in guardado:
+        return False
+    valor, nascido = guardado.rsplit("|", 1)
+    if not hmac.compare_digest(valor, str(token)):
+        return False
+    try:
+        return (time.time() - float(nascido)) < _COLETA_TTL
+    except ValueError:
+        return False
+
+
+@app.route("/api/coleta/sessao", methods=["POST"])
+def coleta_sessao():
+    """Abre uma sessão de coleta e devolve o bookmarklet já com o token dentro."""
+    token = secrets.token_urlsafe(24)
+    EST.set_config("coleta_token", f"{token}|{time.time()}")
+    EST.log_acao(session.get("usuario", "operador"), "abriu sessão de coleta da Extecamp")
+    base = (os.environ.get("ATENA_PUBLIC_URL") or request.url_root).rstrip("/")
+    js = (f"(function(){{var s=document.createElement('script');"
+          f"s.src='{base}/coleta/coletor.js?t={token}&_='+Date.now();"
+          f"document.body.appendChild(s);}})()")
+    return jsonify({"ok": True, "token": token, "base": base,
+                    "bookmarklet": "javascript:" + quote(js, safe="") ,
+                    "entradas": coleta_extecamp.ENTRADAS,
+                    "validade_horas": _COLETA_TTL // 3600})
+
+
+@app.route("/coleta/coletor.js")
+def coleta_coletor_js():
+    """O coletor. Servido para ser injetado na página da Extecamp — por isso é
+    público (não há sessão nossa naquela origem); quem manda dado precisa do
+    token, que é o que realmente protege a escrita."""
+    js = (WEB / "coletor-extecamp.js").read_text(encoding="utf-8")
+    base = (os.environ.get("ATENA_PUBLIC_URL") or request.url_root).rstrip("/")
+    js = js.replace("{{BASE}}", base).replace("{{TOKEN}}", request.args.get("t", ""))
+    return js, 200, {"Content-Type": "application/javascript; charset=utf-8",
+                     "Access-Control-Allow-Origin": "*"}
+
+
+@app.route("/api/coleta/pagina", methods=["POST", "OPTIONS"])
+def coleta_pagina():
+    """Recebe UMA página do ADM Cursos e devolve as PRÓXIMAS a buscar.
+
+    O coletor é uma bomba burra de propósito: quem sabe a estrutura do ADM
+    Cursos é este backend, em Python testado contra fixtures reais. Assim a
+    lógica frágil (HTML de terceiro) não vira JavaScript sem teste no navegador
+    de ninguém."""
+    if request.method == "OPTIONS":
+        return "", 204, _CORS_LP
+    b = request.get_json(silent=True) or {}
+    if not _coleta_token_valido(b.get("token")):
+        return jsonify({"erro": "sessão de coleta expirada — reabra pela aba Coleta"}), 403, _CORS_LP
+    url, pagina = b.get("url") or "", b.get("html") or ""
+    tipo = coleta_extecamp.classificar(url)
+    resposta = {"tipo": tipo, "url": url, "proximas": [], "resumo": None}
+    try:
+        if tipo == "unidades":
+            resposta["proximas"] = coleta_extecamp.links_unidades(pagina)
+        elif tipo == "lista":
+            # Só os cursos que ESTE sistema opera. A FEQ tem 49 em inscrição e 220
+            # em andamento; varrer tudo seriam ~800 requisições ao servidor da
+            # Extecamp para trazer oferecimentos que não estão em campanha nenhuma.
+            conhecidos = {m["curso"] for m in GRW.cursos()}
+            todos = bool(b.get("todos"))
+            for c in coleta_extecamp.parse_lista_cursos(pagina):
+                if todos or c["curso"] in conhecidos:
+                    resposta["proximas"] += list(
+                        coleta_extecamp.urls_das_abas(c["chaves"]).values())
+        elif tipo in coleta_extecamp.ABAS:
+            parse = {"inscritos": coleta_extecamp.parse_inscritos,
+                     "matriculados": coleta_extecamp.parse_matriculados,
+                     "cancelados": coleta_extecamp.parse_cancelados}[tipo]
+            dados = parse(pagina)
+            r = coleta_sinc.sincronizar(EST, dados)
+            resposta["resumo"] = r
+            # a listagem pagina de 20 em 20: enfileira as páginas 2..N
+            if dados.get("paginas", 1) > 1 and "pagina_form" not in url:
+                for n in range(2, dados["paginas"] + 1):
+                    prox = coleta_extecamp.urls_das_abas(
+                        (dados.get("itens") or [{}])[0].get("chaves", {}), pagina=n)
+                    if prox.get(tipo):
+                        resposta["proximas"].append(prox[tipo])
+        else:
+            resposta["erro"] = "página fora do roteiro da coleta"
+    except Exception as e:                      # HTML de terceiro: nunca derruba a coleta
+        resposta["erro"] = f"{type(e).__name__}: {e}"
+        print(f"[coleta] {url}: {e}", flush=True)
+    return jsonify(resposta), 200, _CORS_LP
+
+
+@app.route("/api/coleta")
+def coleta_status():
+    """Fila de trabalho gerada pela última coleta, agrupada pela AÇÃO."""
+    grupos, cursos, ultima = {}, {}, None
+    for l in EST.listar_leads():
+        bruto = l.get("extecamp_json")
+        if not bruto:
+            continue
+        try:
+            e = json.loads(bruto)
+        except ValueError:
+            continue
+        ultima = max(ultima or "", e.get("coletado_em") or "")
+        ck = f"{e.get('curso')}/{e.get('turma')}"
+        cursos.setdefault(ck, {"curso": e.get("curso"), "turma": e.get("turma"),
+                               "inscritos": 0, "matriculados": 0, "cancelados": 0})
+        cursos[ck][e.get("aba", "inscritos")] = cursos[ck].get(e.get("aba"), 0) + 1
+        if e.get("aba") != "inscritos":
+            continue
+        g = grupos.setdefault(e.get("situacao") or "—",
+                              {"situacao": e.get("situacao"), "acao": e.get("acao"),
+                               "taxa": e.get("taxa"), "leads": []})
+        g["leads"].append({"card_id": l["card_id"], "nome": l.get("nome"),
+                           "telefone": l.get("telefone") or "", "curso": e.get("curso"),
+                           "turma": e.get("turma"), "documentacao": e.get("documentacao"),
+                           "desde": e.get("desde")})
+    ordem = ["termo_pendente", "taxa_vencida", "taxa_a_pagar", "taxa_paga"]
+    fila = sorted(grupos.values(),
+                  key=lambda g: (ordem.index(g["taxa"]) if g["taxa"] in ordem else 9))
+    return jsonify({"ultima_coleta": ultima, "fila": fila,
+                    "cursos": sorted(cursos.values(), key=lambda c: c["curso"] or ""),
+                    "sessao_ativa": bool(EST.get_config("coleta_token"))})
 
 
 @app.route("/api/ingestao/simulate", methods=["POST"])
