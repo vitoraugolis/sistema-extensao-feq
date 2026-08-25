@@ -187,7 +187,8 @@ def conversas():
         ult = hist[-1] if hist else None
         out.append({"id": l["card_id"], "lead": l["nome"], "iniciais": _iniciais(l["nome"]),
                     "telefone": l.get("telefone") or "",   # fallback de exibição sem nome
-                    "curso": l["curso"], "estado": l["estado_conversa"], "ha": _ha(l["atualizado"]),
+                    "curso": l["curso"], "cursos": EST.cursos_interesse(l),  # filtro por curso (aba Conversas)
+                    "estado": l["estado_conversa"], "ha": _ha(l["atualizado"]),
                     "optout": bool(l.get("optout")), "modo": l.get("modo") or "auto",
                     "preview": _preview(ult)[:80],
                     "preview_de_lead": bool(ult and ult["papel"] == "lead"),

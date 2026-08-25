@@ -366,7 +366,7 @@ input:focus,select:focus,textarea:focus{outline:none;box-shadow:3px 3px 0 var(--
       <section id="conversas" class="hidden">
         <div class="g conv-shell">
           <div class="conv-side">
-            <div class="conv-search"><input id="convBusca" placeholder="Buscar por nome, curso ou telefone…" oninput="renderListaConv()"></div>
+            <div class="conv-search" style="display:flex;gap:6px;"><input id="convBusca" placeholder="Buscar por nome, curso ou telefone…" oninput="renderListaConv()" style="flex:1;"><select id="convFiltroCurso" onchange="renderListaConv()" style="width:auto;padding:5px 7px;font-size:12px;"><option value="">Todos os cursos</option></select></div>
             <div class="conv-list" id="convLista"></div>
           </div>
           <div class="conv-main" id="convMain">
@@ -1571,11 +1571,16 @@ async function conversaNova(id){
 }
 
 function renderListaConv(){
+  const cf = $('#convFiltroCurso');
+  if(cf && cf.options.length <= 1 && window.CURSOS_ALL)
+    cf.innerHTML = '<option value="">Todos os cursos</option>'
+      + window.CURSOS_ALL.map(c=>`<option value="${c}">${c}</option>`).join('');
+  const filtro = (cf||{}).value || '';
   const q = _busca(($('#convBusca')||{}).value);
   const qNum = _digitos(q);
-  const lst = CONV_LISTA.filter(c => !q || _busca(c.lead).includes(q) ||
-    _busca(c.curso).includes(q) || _busca(c.id).includes(q) ||
-    (qNum && _digitos(c.id).includes(qNum)));
+  const lst = CONV_LISTA.filter(c => (!filtro || (c.cursos||[c.curso]).includes(filtro))
+    && (!q || _busca(c.lead).includes(q) || _busca(c.curso).includes(q) || _busca(c.id).includes(q)
+    || (qNum && _digitos(c.id).includes(qNum))));
   $('#convLista').innerHTML = lst.length ? lst.map(c=>`
     <div class="conv-item ${c.id===CONV_ABERTA?'on':''} ${c.nao_lidas?'nao-lida':''}" onclick="abrirConversa('${c.id}')">
       <div class="conv-ava">${escapeHtml(c.iniciais)}</div>
