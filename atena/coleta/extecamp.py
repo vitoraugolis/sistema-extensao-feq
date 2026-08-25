@@ -335,6 +335,8 @@ def classificar(url):
     for aba in ABAS:
         if caminho == f"{aba}.asp":
             return aba
+    if caminho in ("reltel.asp", "reltel_mat.asp", "reltel_canc.asp"):
+        return "contatos"
     return "desconhecido"
 
 
@@ -359,3 +361,97 @@ def urls_das_abas(chave, pagina=None):
         return {}
     sufixo = f"&pagina_form={pagina}" if pagina and pagina > 1 else ""
     return {aba: f"{BASE}{aba}.asp?sigla={sig}&of={of}{sufixo}" for aba in ABAS}
+
+# ------------------------------------------------- relatório de telefones e e-mails
+# Existe um por aba (o botão "Relatório de telefones e emails" nas Ações). É o que
+# devolve o TELEFONE — as listagens não têm essa coluna — e telefone é a chave de
+# identidade de todo o sistema (CLAUDE.md §7).
+RELATORIOS = {"inscritos": "reltel.asp", "matriculados": "reltel_mat.asp",
+              "cancelados": "reltel_canc.asp"}
+
+# Contatos da PRÓPRIA Extecamp, que aparecem no rodapé de toda página do sistema.
+# Sem esta trava o primeiro telefone encontrado seria o da secretaria — e todo
+# inscrito viraria o mesmo lead.
+_INSTITUCIONAIS = {"551935214646", "551935214647", "551935213911", "551935213946"}
+_DOMINIOS_INSTITUCIONAIS = ("extecamp.unicamp.br",)
+
+_RE_EMAIL = re.compile(r"[\w.+-]+@[\w-]+\.[\w.-]+")
+# Exige DDD entre parênteses OU separador antes dos 4 últimos dígitos: sem isso um
+# CPF ou uma data ("09/03/2026 14:07:54") viraria telefone.
+_RE_TEL = re.compile(r"(?:\(\d{2}\)\s*\d{4,5}[-.\s]?\d{4})|(?:\b\d{2}\s*\d{4,5}[-.\s]\d{4}\b)")
+
+
+def _so_digitos(t):
+    return re.sub(r"\D", "", t or "")
+
+
+def _telefones(texto):
+    """Telefones plausíveis de um texto, normalizados e sem os institucionais."""
+    achados = []
+    for m in _RE_TEL.finditer(texto or ""):
+        d = _so_digitos(m.group(0))
+        if len(d) in (10, 11):
+            d = "55" + d
+        if len(d) not in (12, 13) or d in _INSTITUCIONAIS or d in achados:
+            continue
+        achados.append(d)
+    return achados
+
+
+def _emails(texto):
+    out = []
+    for e in _RE_EMAIL.findall(texto or ""):
+        e = e.strip(".,;").lower()
+        if any(e.endswith(d) for d in _DOMINIOS_INSTITUCIONAIS) or e in out:
+            continue
+        out.append(e)
+    return out
+
+
+def _sem_rodape(pagina):
+    """Corta o rodapé institucional ANTES de procurar contato. É uma trava
+    estrutural (e não uma lista de números proibidos), então continua valendo se
+    a Extecamp trocar o telefone da secretaria."""
+    corte = re.search(r'<div\s+id="rodape"', pagina, re.I)
+    return pagina[:corte.start()] if corte else pagina
+
+
+def parse_relatorio_contatos(pagina):
+    """Nome -> telefones/e-mails, a partir de qualquer um dos três relatórios.
+
+    Deliberadamente CEGO ao layout: casa pelo FORMATO do dado (e-mail e telefone
+    brasileiro têm forma inequívoca) em vez de posição de coluna. Assim o mesmo
+    parser serve aos três relatórios — que são telas diferentes do mesmo sistema
+    antigo — e sobrevive a uma coluna a mais.
+    """
+    pagina = _sem_rodape(decodificar(pagina))
+    out = []
+    for ln in _linhas(pagina):
+        cels = [_txt(c["texto"]) for c in ln["celulas"]]
+        if not cels:
+            continue
+        junto = " ".join(cels)
+        tels, mails = _telefones(junto), _emails(junto)
+        if not tels and not mails:
+            continue
+        # nome = a célula com mais LETRAS que não seja e-mail nem telefone
+        def _pontua(c):
+            if "@" in c or not c:
+                return -1
+            letras = sum(ch.isalpha() for ch in c)
+            return letras if letras >= 3 and letras >= len(_so_digitos(c)) else -1
+        nome = max(cels, key=_pontua)
+        if _pontua(nome) < 0:
+            continue
+        nome = re.sub(r"^\d+\s*-\s*", "", nome).strip()   # "5 - FULANO" -> "FULANO"
+        out.append({"nome": nome, "telefones": tels, "emails": mails})
+    return out
+
+
+def urls_relatorios(chave, abas=None):
+    """URLs dos relatórios de contato deste oferecimento."""
+    sig, of = chave.get("sigla") or chave.get("id1"), chave.get("of") or chave.get("id2")
+    if not (sig and of):
+        return {}
+    return {aba: f"{BASE}{arq}?sigla={sig}&of={of}"
+            for aba, arq in RELATORIOS.items() if not abas or aba in abas}

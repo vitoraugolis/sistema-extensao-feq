@@ -6,17 +6,17 @@ A Extecamp é a fonte da verdade sobre INSCRIÇÃO/MATRÍCULA: é lá que o dinh
 entra e o aluno existe. Aqui essa verdade vira card no funil, sem nunca duplicar
 pessoa e sem apagar o que o operador já sabia.
 
-Chave de identidade — o problema central deste módulo:
-as abas do ADM Cursos mostram o NOME e mais nada. O sistema inteiro dedupe por
-telefone (CLAUDE.md §7) e telefone não aparece nessas páginas. Então:
-  1º) tenta casar com um card EXISTENTE por nome normalizado dentro do MESMO
-      curso — é o lead que veio do WhatsApp/LP e agora apareceu na Extecamp;
-  2º) só se não achar, cria card novo com id derivado de (curso, turma, nome),
-      estável entre as abas — a mesma pessoa migrando de Inscritos para
-      Matriculados cai no mesmo card em vez de virar dois.
-Nome é chave mais fraca que telefone: homônimo no mesmo curso vira o mesmo card.
-O caminho para fechar isso é o relatório de telefones/e-mails da própria
-Extecamp (reltel.asp), ainda não mapeado — ver "Pendências" na spec 20.
+Chave de identidade, em ordem de força:
+  1º) TELEFONE, vindo do "Relatório de telefones e e-mails" do próprio
+      oferecimento. É a chave de todo o sistema (CLAUDE.md §7) e a única que
+      reencontra com certeza o lead que já falava conosco pelo WhatsApp. Por
+      isso a coleta lê o relatório ANTES da listagem: sabendo o telefone na hora
+      de criar o card, não se cria duplicata para fundir depois;
+  2º) nome normalizado dentro do MESMO curso, quando o relatório não trouxe o
+      contato daquela pessoa;
+  3º) só então um card novo, com id derivado de (curso, turma, nome), estável
+      entre as abas — quem migra de Inscritos para Matriculados muda de coluna
+      em vez de virar dois cards.
 """
 import re
 import json
@@ -65,7 +65,35 @@ def _existente_por_nome(est, nome, curso):
     return None
 
 
-def sincronizar(est, dados, agora=None):
+def indexar_contatos(contatos):
+    """Lista do relatório -> {nome normalizado: {telefone, email}}."""
+    from atena.core.estado import normalizar_e164
+    idx = {}
+    for c in contatos or []:
+        chave = normalizar_nome(c.get("nome"))
+        if not chave:
+            continue
+        # CELULAR na frente do fixo: o canal do sistema é WhatsApp, e o relatório
+        # costuma trazer os dois. Celular normalizado tem 13 dígitos (55+DD+9XXXXXXXX),
+        # fixo tem 12 — guardar o fixo daria um card que nenhuma cadência alcança.
+        nums = [normalizar_e164(t) for t in (c.get("telefones") or [])]
+        tel = next((n for n in nums if len(n) == 13), nums[0] if nums else "")
+        idx[chave] = {"telefone": tel, "email": (c.get("emails") or [""])[0]}
+    return idx
+
+
+def identificar(est, curso, turma, nome, contato=None):
+    """card_id desta pessoa. Telefone primeiro — é o que reencontra o lead que já
+    conversava conosco e evita um segundo card para a mesma pessoa."""
+    tel = (contato or {}).get("telefone")
+    if tel:
+        canonico = est.lead_por_telefone(tel)
+        if canonico:
+            return canonico
+    return _existente_por_nome(est, nome, curso) or card_id_de(curso, turma, nome)
+
+
+def sincronizar(est, dados, contatos=None, agora=None):
     """Aplica UMA aba de UM oferecimento ao funil. Idempotente.
 
     Devolve o que MUDOU, não o que foi visto: rodar de novo sem novidade na
@@ -84,7 +112,8 @@ def sincronizar(est, dados, agora=None):
         nome = item.get("nome") or ""
         if not nome:
             continue
-        card_id = _existente_por_nome(est, nome, curso) or card_id_de(curso, turma, nome)
+        contato = (contatos or {}).get(normalizar_nome(nome)) or {}
+        card_id = identificar(est, curso, turma, nome, contato)
         lead = est.get_lead(card_id)
         estado_ext = {
             "aba": aba, "curso": curso, "turma": turma,
@@ -97,14 +126,21 @@ def sincronizar(est, dados, agora=None):
         }
         campos = {"extecamp_json": json.dumps(estado_ext, ensure_ascii=False)}
         if not lead:
-            # Card novo NASCE sem telefone: estas páginas não têm telefone. Fica
-            # visível no funil (o operador precisa saber que a pessoa existe),
-            # mas sem telefone nenhuma cadência o alcança — e é o correto: não
-            # temos consentimento nem canal, só o fato de ele existir lá.
-            est.upsert_lead(card_id, nome=nome, telefone="", curso=curso, fase=fase,
+            # Nasce JÁ com o contato quando o relatório do oferecimento o trouxe.
+            # Sem contato o card ainda vale (o operador precisa saber que a pessoa
+            # existe), mas nenhuma cadência o alcança — e é o correto: sem canal
+            # não há como falar, e sem opt-in não se deveria.
+            est.upsert_lead(card_id, nome=nome, telefone=contato.get("telefone") or "",
+                            email=contato.get("email") or "", curso=curso, fase=fase,
                             estado_conversa="aguardando_1o_contato", **campos)
-            criados.append({"card_id": card_id, "nome": nome, "fase": fase})
+            criados.append({"card_id": card_id, "nome": nome, "fase": fase,
+                            "com_contato": bool(contato.get("telefone"))})
             continue
+        # card que já existia e ainda não tinha contato: completa, NUNCA sobrescreve
+        # (o telefone que o operador já usou vale mais que o cadastro da Extecamp)
+        for campo in ("telefone", "email"):
+            if contato.get(campo) and not (lead.get(campo) or "").strip():
+                campos[campo] = contato[campo]
         antes_fase = lead.get("fase")
         antes_ext = lead.get("extecamp_json") or ""
         if antes_fase != fase:

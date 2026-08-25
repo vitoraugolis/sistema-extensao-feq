@@ -59,9 +59,14 @@
 
   function anota(t) { log.push(t); pinta(); }
 
-  function enfileira(u) {
+  /* A fila guarda {url, ctx}: algumas páginas (os relatórios de contato) não
+   * dizem a que oferecimento pertencem, então o backend manda o contexto junto e
+   * o coletor devolve intacto. Assim o backend segue sem estado entre requisições. */
+  function enfileira(item) {
+    var u = typeof item === "string" ? item : (item && item.url);
     if (!u || vistos[u] || fila.length + soma.paginas > TETO) return;
-    vistos[u] = 1; fila.push(u);
+    vistos[u] = 1;
+    fila.push({url: u, ctx: (typeof item === "object" && item.ctx) || null});
   }
 
   /* O ADM Cursos serve iso-8859-1. Deixar o navegador adivinhar o charset
@@ -72,10 +77,10 @@
       .then(function (buf) { return new TextDecoder("iso-8859-1").decode(buf); });
   }
 
-  function entregar(url, corpo) {
+  function entregar(item, corpo) {
     return fetch(BASE + "/api/coleta/pagina", {
       method: "POST", headers: {"Content-Type": "application/json"},
-      body: JSON.stringify({token: TOKEN, url: url, html: corpo})
+      body: JSON.stringify({token: TOKEN, url: item.url, ctx: item.ctx, html: corpo})
     }).then(function (r) { return r.json(); });
   }
 
@@ -86,9 +91,9 @@
       pinta();
       return;
     }
-    var url = fila.shift();
+    var item = fila.shift(), url = item.url;
     baixar(url).then(function (corpo) {
-      return entregar(url, corpo);
+      return entregar(item, corpo);
     }).then(function (r) {
       soma.paginas++;
       (r.proximas || []).forEach(enfileira);

@@ -48,7 +48,25 @@ origens diferentes e nossa sessão não chega lá.
 ## 3. O que é lido
 
 Roteiro: entradas (`cursos-em-inscricao.asp`, `admcursosand_ext_pre.asp`) → unidade
-(FEQ) → oferecimentos → as 3 abas de cada um.
+(FEQ) → oferecimentos → **os 3 relatórios de contato** → as 3 abas de cada um.
+
+**Os relatórios vêm primeiro, e isso é a decisão de desenho mais importante daqui.**
+Cada aba tem o seu "Relatório de telefones e e-mails" (`reltel.asp`, `reltel_mat.asp`,
+`reltel_canc.asp`) e é ele — não a listagem — que traz o **telefone**. Como telefone é a
+chave de identidade de todo o sistema (CLAUDE.md §7), lê-lo *antes* de criar qualquer
+card faz o lead que já falava conosco pelo WhatsApp ser **reencontrado** em vez de virar
+um segundo card para fundir depois. Foi assim que o caso real apareceu no teste: o card
+do WhatsApp dizia "Barbara D." e a Extecamp diz "BÁRBARA ABADE MENDES DÜREN" — nome
+nunca casaria; telefone casa.
+
+O parser dos relatórios é **cego ao layout**: casa pelo *formato* do dado (e-mail e
+telefone brasileiro têm forma inequívoca) em vez de posição de coluna, então o mesmo
+código serve às três telas. Duas travas obrigatórias:
+- **o rodapé é cortado antes de procurar contato** — os telefones da própria secretaria
+  aparecem em toda página do sistema e, sem isso, todo inscrito herdaria o número dela
+  (trava estrutural, não lista de números proibidos: continua valendo se eles trocarem);
+- **celular na frente do fixo** — o canal é WhatsApp; guardar o fixo daria um card que
+  nenhuma cadência alcança.
 
 **A cor da linha é a única fonte do estado da taxa** — não existe coluna de texto com
 esse dado. Combinada com o *Status documentação*, ela vira a ação do operador:
@@ -83,17 +101,16 @@ da Extecamp para trazer turmas que não estão em campanha nenhuma. `todos:true`
 | Matriculados | Matriculado |
 | Cancelados | Perdido |
 
-**Identidade — o ponto frágil, declarado.** Essas telas mostram o **nome e mais nada**,
-e o sistema inteiro dedupe por telefone (CLAUDE.md §7). Então:
-1. tenta casar com um card **existente** por nome normalizado *dentro do mesmo curso* —
-   é o lead que veio do WhatsApp/LP e agora apareceu na Extecamp;
-2. só se não achar, cria card com id derivado de `(curso, turma, nome)`, estável entre
-   as abas: a mesma pessoa migrando de Inscritos para Matriculados **muda de coluna em
-   vez de virar dois cards**.
+**Identidade, em ordem de força:**
+1. **telefone** do relatório de contato — reencontra com certeza o lead que já falava
+   conosco, mesmo com o nome grafado de outro jeito;
+2. **nome normalizado** dentro do mesmo curso, quando o relatório não trouxe aquela pessoa;
+3. só então card novo, com id derivado de `(curso, turma, nome)`, estável entre as abas:
+   quem migra de Inscritos para Matriculados **muda de coluna em vez de virar dois cards**.
 
-Card criado assim **nasce sem telefone** e a tela diz isso. É o correto: não temos canal
-nem consentimento, só o fato de a pessoa existir lá — e sem telefone nenhuma cadência a
-alcança. A Extecamp nunca apaga um telefone que já tínhamos.
+Quem não aparece no relatório fica **sem telefone** e a tela diz isso — não se inventa
+contato. O que já era nosso nunca é sobrescrito: telefone e nome que o operador já usou
+valem mais que o cadastro da Extecamp.
 
 Idempotência sem tabela de controle: o próprio id determinístico + comparação do estado
 guardado (`leads.extecamp_json`) decidem se houve mudança. Recoletar sem novidade
@@ -101,12 +118,13 @@ devolve tudo zerado — é assim que o operador sabe que não veio nada novo.
 
 ## 5. Pendências
 
-- **Telefone/e-mail dos inscritos**: o ADM Cursos tem o relatório `reltel.asp`
-  ("Relatório de telefones e e-mails") por oferecimento. Com ele o casamento passa a ser
-  por telefone — a regra do resto do sistema — e o card nasce contactável. Falta uma
-  amostra do HTML dessa página para escrever o parser. **É a maior melhoria pendente.**
-- Homônimo no mesmo oferecimento hoje colapsa em um card só (consequência de casar por
-  nome); resolve-se junto com o item acima.
+- **Layout real dos relatórios não conferido**: o parser é cego ao layout e foi
+  exercitado contra duas fixturas com estruturas diferentes + a trava do rodapé sobre
+  HTML real, mas ninguém viu a página verdadeira. Na primeira coleta de verdade, conferir
+  se o número de contatos bate com o total de inscritos do oferecimento — o retorno da
+  coleta já mostra os dois lado a lado.
+- Homônimo no mesmo oferecimento **sem telefone no relatório** ainda colapsa em um card
+  só; com telefone, não.
 - Coleta é **manual** (o operador dispara). Automatizar depende de a sessão da Extecamp
   durar, o que não controlamos.
 
@@ -118,3 +136,5 @@ devolve tudo zerado — é assim que o operador sabe que não veio nada novo.
 - AC4 As 3 abas de um oferecimento concordam nos totais (checagem cruzada da coleta).
 - AC5 Falha ao ler uma página não derruba a coleta das demais.
 - AC6 A fila de trabalho ordena por urgência (termo pendente e taxa vencida primeiro).
+- AC7 Contato da secretaria (rodapé de toda página) nunca vira telefone de lead.
+- AC8 Telefone/nome já existentes no card não são sobrescritos pela Extecamp.

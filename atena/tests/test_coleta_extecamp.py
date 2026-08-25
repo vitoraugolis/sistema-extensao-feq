@@ -192,4 +192,76 @@ check(S.card_id_de("FEQ-1000", "018", "José da Silva")
 check(S.card_id_de("FEQ-1000", "018", "X") != S.card_id_de("FEQ-1000", "019", "X"),
       "mesma pessoa em OUTRO oferecimento é outro card (é outra inscrição)")
 
+# --------------------------------------------------- 4) relatório de contatos
+# É ele que traz o TELEFONE — as listagens não têm essa coluna. Sem telefone o
+# card nasce inalcançável e o lead que já falava conosco vira duplicata.
+#
+# As duas fixturas descrevem o MESMO conteúdo em layouts diferentes de propósito:
+# não vimos a página real, então o parser casa pelo FORMATO do dado (e-mail e
+# telefone brasileiro têm forma inequívoca) em vez de posição de coluna. Se o
+# layout real for um terceiro, ele continua valendo.
+ra = E.parse_relatorio_contatos(_fix("relatorio_a.html"))
+rb = E.parse_relatorio_contatos(_fix("relatorio_b.html"))
+check(len(ra) == 2 and len(rb) == 2, "os dois layouts devolvem 2 contatos")
+check({c["nome"] for c in ra} == {c["nome"] for c in rb},
+      "mesmos nomes nos dois layouts (parser cego ao layout)")
+check(rb[0]["nome"] == "ALCIDES HENRIQUE LEITE WROBLEWSKI",
+      f"prefixo '5 - ' removido do nome no relatório: {rb[0]['nome']}")
+check("5541998123456" in ra[0]["telefones"] and "alcides.w@gmail.com" in ra[0]["emails"],
+      "telefone normalizado e e-mail extraídos")
+
+# A ARMADILHA: o rodapé com os telefones da própria Extecamp está em TODA página
+# do sistema. Sem a trava, todo inscrito herdaria o número da secretaria.
+for c in ra + rb:
+    check(not any(t in E._INSTITUCIONAIS for t in c["telefones"]),
+          f"{c['nome'][:18]}: não pegou telefone da secretaria")
+    check(not any("extecamp.unicamp.br" in m for m in c["emails"]),
+          f"{c['nome'][:18]}: não pegou e-mail institucional")
+check(E.parse_relatorio_contatos(_fix("inscritos.html")) == [],
+      "rodar o extrator na LISTAGEM real não inventa contato nenhum")
+check(E._telefones("09/03/2026 14:07:54 CPF 123.456.789-09") == [],
+      "data e CPF não viram telefone")
+
+check(E.classificar("https://x/admcursos/reltel.asp?sigla=A&of=B") == "contatos"
+      and E.classificar("reltel_mat.asp?a=1") == "contatos"
+      and E.classificar("reltel_canc.asp?a=1") == "contatos",
+      "os três relatórios (inscritos/matriculados/cancelados) são reconhecidos")
+check(set(E.urls_relatorios({"sigla": "S", "of": "O"})) == {"inscritos", "matriculados", "cancelados"},
+      "um relatório por aba")
+
+# celular na frente do fixo: o canal é WhatsApp
+idx = S.indexar_contatos([{"nome": "X", "telefones": ["(41) 3333-1010", "(41) 99812-3456"],
+                           "emails": []}])
+check(idx["X"]["telefone"] == "5541998123456",
+      f"escolhe o CELULAR, não o fixo (veio {idx['X']['telefone']})")
+
+# --------------------------------------------------- 5) identidade por telefone
+# O ganho real: o card do WhatsApp tem o nome grafado de outro jeito. Casar por
+# nome criaria duplicata; o telefone reencontra a pessoa.
+est6 = _est()
+est6.upsert_lead("wa-5519998887766", nome="Barbara D.", telefone="5519998887766",
+                 curso="FEQ-1000", fase="Prospect")
+contatos = S.indexar_contatos(ra)
+r7 = S.sincronizar(est6, d, contatos=contatos)
+check(len(est6.listar_leads()) == 5,
+      f"nome diferente, MESMO telefone -> não duplicou ({len(est6.listar_leads())} cards)")
+bd = est6.get_lead("wa-5519998887766")
+check(bd["fase"] == "Inscrito", "o card do WhatsApp foi movido para Inscrito")
+check(bd["nome"] == "Barbara D.",
+      "o nome que o operador já tinha NÃO é sobrescrito pelo cadastro da Extecamp")
+alc = next(l for l in est6.listar_leads() if "ALCIDES" in (l["nome"] or ""))
+check(alc["telefone"] == "5541998123456" and alc["email"] == "alcides.w@gmail.com",
+      "card novo nasce contactável quando o relatório trouxe o contato")
+sem = next(l for l in est6.listar_leads() if "MAYARA" in (l["nome"] or ""))
+check(sem["telefone"] == "",
+      "quem não está no relatório fica sem telefone — e não inventa um")
+
+# telefone que o operador já usou vale mais que o cadastro da Extecamp
+est7 = _est()
+est7.upsert_lead("wa-5511111111111", nome="ALCIDES HENRIQUE LEITE WROBLEWSKI",
+                 telefone="5511111111111", curso="FEQ-1000", fase="Lead")
+S.sincronizar(est7, d, contatos=contatos)
+check(est7.get_lead("wa-5511111111111")["telefone"] == "5511111111111",
+      "telefone existente nunca é sobrescrito pelo do relatório")
+
 print(f"\n{ok} checks OK — coleta Extecamp")

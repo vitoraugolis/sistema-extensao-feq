@@ -1583,15 +1583,40 @@ def coleta_pagina():
             conhecidos = {m["curso"] for m in GRW.cursos()}
             todos = bool(b.get("todos"))
             for c in coleta_extecamp.parse_lista_cursos(pagina):
-                if todos or c["curso"] in conhecidos:
-                    resposta["proximas"] += list(
-                        coleta_extecamp.urls_das_abas(c["chaves"]).values())
+                if not (todos or c["curso"] in conhecidos):
+                    continue
+                ctx = {"curso": c["curso"], "turma": c["turma"]}
+                # RELATÓRIOS PRIMEIRO. Eles trazem o telefone, e telefone é a chave
+                # de identidade do sistema: sabendo o contato ANTES de criar o card,
+                # o lead que já falava conosco pelo WhatsApp é reencontrado em vez de
+                # virar um segundo card para fundir depois.
+                for aba, u in coleta_extecamp.urls_relatorios(c["chaves"]).items():
+                    resposta["proximas"].append({"url": u, "ctx": dict(ctx, aba=aba)})
+                for u in coleta_extecamp.urls_das_abas(c["chaves"]).values():
+                    resposta["proximas"].append({"url": u, "ctx": ctx})
+        elif tipo == "contatos":
+            # Guardado por oferecimento até a listagem correspondente chegar. Config
+            # em vez de tabela nova: é cache de uma passada de coleta, não histórico.
+            ctx = b.get("ctx") or {}
+            contatos = coleta_extecamp.parse_relatorio_contatos(pagina)
+            chave = f"coleta_contatos:{ctx.get('curso')}/{ctx.get('turma')}"
+            guardado = coleta_sinc.indexar_contatos(contatos)
+            if guardado:
+                anterior = json.loads(EST.get_config(chave) or "{}")
+                anterior.update(guardado)
+                EST.set_config(chave, json.dumps(anterior, ensure_ascii=False))
+            resposta["resumo"] = {"ok": True, "aba": "contatos", "curso": ctx.get("curso"),
+                                  "turma": ctx.get("turma"), "vistos": len(contatos),
+                                  "criados": [], "movidos": [], "atualizados": [],
+                                  "com_telefone": sum(1 for v in guardado.values() if v["telefone"])}
         elif tipo in coleta_extecamp.ABAS:
             parse = {"inscritos": coleta_extecamp.parse_inscritos,
                      "matriculados": coleta_extecamp.parse_matriculados,
                      "cancelados": coleta_extecamp.parse_cancelados}[tipo]
             dados = parse(pagina)
-            r = coleta_sinc.sincronizar(EST, dados)
+            chave = f"coleta_contatos:{dados.get('curso')}/{dados.get('turma')}"
+            contatos = json.loads(EST.get_config(chave) or "{}")
+            r = coleta_sinc.sincronizar(EST, dados, contatos=contatos)
             resposta["resumo"] = r
             # a listagem pagina de 20 em 20: enfileira as páginas 2..N
             if dados.get("paginas", 1) > 1 and "pagina_form" not in url:
