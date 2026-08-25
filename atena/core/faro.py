@@ -18,6 +18,15 @@ STAGES = {  # fase local -> UUID no FARO (spec 02)
     "Em espera": "295a20bc-c84d-4159-859b-23ccea643747",
     "Perdido": "5a16e79b-dd4a-471d-ae50-ddbce03ddd13",
 }
+# O pipeline do FARO tem 6 fases e não conhece os degraus internos da inscrição
+# (spec 20). Todos eles são "Inscrito" lá — e "Cancelado" é perda. Espelhar assim
+# mantém o FARO correto no vocabulário DELE; o detalhe fino vive na Central.
+STAGES.update({
+    "Taxa aceita": STAGES["Inscrito"],
+    "Taxa paga": STAGES["Inscrito"],
+    "Documento entregue": STAGES["Inscrito"],
+    "Cancelado": STAGES["Perdido"],
+})
 
 
 class Faro:

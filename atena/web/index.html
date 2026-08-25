@@ -1363,6 +1363,7 @@ async function renderKanban(){
   const casa = c => !q || _busca(c.nome).includes(q) || _busca(c.id).includes(q)
     || (qNum && _digitos(c.telefone).includes(qNum));
   const passa = c => (!filtro || (c.cursos||[c.curso]).includes(filtro)) && casa(c);
+  window.FASES = d.colunas.map(c=>c.fase);   // fonte única: o backend manda as fases
   const board = $('#kbBoard');
   board.dataset.board = 'leads';
   board.innerHTML = d.colunas.map(col=>{
@@ -1876,7 +1877,7 @@ function renderChrome(d){
         <div style="margin-left:auto;display:flex;gap:6px;align-items:center;">
           <button class="btn ${d.modo==='manual'?'btn-p':'btn-g'}" style="padding:6px 10px;" title="${d.modo==='manual'?'Modo manual: o agente NÃO responde — clique para voltar ao automático':'Modo automático: o agente propõe respostas — clique para assumir a conversa manualmente'}" onclick="setModo('${d.id}','${d.modo==='manual'?'auto':'manual'}')"><i class="ti ti-${d.modo==='manual'?'hand-stop':'robot'}"></i> ${d.modo==='manual'?'Manual':'Auto'}</button>
           <select id="convFaseSel" title="mover fase" style="width:auto;padding:5px 8px;font-size:12px;" onchange="moverFase('${d.id}',this.value)">
-            ${['Lead','Prospect','Inscrito','Matriculado','Em espera','Perdido'].map(f=>`<option ${f===d.fase?'selected':''}>${f}</option>`).join('')}
+            ${(window.FASES||['Lead','Prospect','Inscrito','Matriculado','Em espera','Perdido']).map(f=>`<option ${f===d.fase?'selected':''}>${escapeHtml(f)}</option>`).join('')}
           </select>
           <button class="btn btn-g" style="padding:6px 10px;" title="Enviar reengajamento" onclick="reativarLead('${d.id}')"><i class="ti ti-refresh"></i></button>
           <button class="btn btn-g" style="padding:6px 10px;" title="Iniciar/reiniciar a conversa (envia a mensagem de abertura, com ou sem histórico)" onclick="conversaNova('${d.id}')"><i class="ti ti-message-plus"></i></button>

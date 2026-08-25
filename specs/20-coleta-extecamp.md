@@ -95,11 +95,32 @@ da Extecamp para trazer turmas que não estão em campanha nenhuma. `todos:true`
 
 ## 4. Como vira funil
 
-| Aba da Extecamp | Coluna do funil |
-|---|---|
-| Inscritos | Inscrito |
-| Matriculados | Matriculado |
-| Cancelados | Perdido |
+A esteira ganhou os degraus que só o ADM Cursos revela. Antes, tudo entre inscrever-se
+e matricular-se era um "Inscrito" só — e era exatamente aí que o funil sangrava sem que
+ninguém visse onde.
+
+| Aba | Cor / documentação | Coluna do funil |
+|---|---|---|
+| Inscritos | cinza (não aceitou o termo) | **Inscrito** |
+| Inscritos | amarelo (aceitou, não pagou) | **Taxa aceita** |
+| Inscritos | vermelho (aceitou, venceu) | **Taxa aceita** |
+| Inscritos | verde + doc PENDENTE | **Taxa paga** |
+| Inscritos | verde + doc EM ANÁLISE / APROVADO | **Documento entregue** |
+| Matriculados | — | **Matriculado** |
+| Cancelados | — | **Cancelado** |
+
+Duas decisões que parecem detalhe e não são:
+- **vermelho continua em "Taxa aceita"**. A pessoa *aceitou* o termo; o que venceu foi o
+  boleto. Rebaixá-la para "Inscrito" apagaria um degrau que ela subiu — o que fazer com
+  ela vem da *ação*, não da coluna.
+- **"Cancelado" é coluna separada de "Perdido"**. Perdido é perda nossa (gate acadêmico,
+  opt-out); Cancelado é quem já tinha se inscrito e desistiu. Problemas diferentes, donos
+  diferentes, e juntá-los esconderia a evasão pós-inscrição.
+
+**Fase é ordinal, não string.** Quem precisa saber "esse lead é inscrito?" usa
+`estado.alcancou(fase, "Inscrito")`, nunca uma lista fixa: a contagem de inscritos é
+cumulativa, senão o número *cairia* toda vez que alguém avançasse de degrau. Foi o que
+teria acontecido em `medicao.py` e no `/api/stats`, silenciosamente.
 
 **Identidade, em ordem de força:**
 1. **telefone** do relatório de contato — reencontra com certeza o lead que já falava

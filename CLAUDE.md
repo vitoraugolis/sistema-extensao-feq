@@ -12,8 +12,12 @@ Leads vêm de campanhas Meta/Google, e agentes autônomos (com guardrails) fazem
 qualificação, nutrição e suporte à conversão pelo WhatsApp, movendo cada lead por:
 
 ```
-Lead → Prospect → Inscrito → Matriculado
+Lead → Prospect → Inscrito → Taxa aceita → Taxa paga → Documento entregue → Matriculado
+                                        (saídas: Em espera · Perdido · Cancelado)
 ```
+Os quatro degraus entre Inscrito e Matriculado são o que a coleta do ADM Cursos da
+Extecamp deixa ver de dentro do processo (spec 20). Nunca teste fase por lista de
+strings: use `estado.alcancou(fase, "Inscrito")` — a esteira cresce.
 
 A orquestradora se chama **Atena**. O sistema de registro (system of record) é o
 **FARO CRM** (já existente, API REST sobre Supabase). A Atena NÃO armazena dados de lead —

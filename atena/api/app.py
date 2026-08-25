@@ -123,17 +123,22 @@ def assets(arq):
 
 @app.route("/api/stats")
 def stats():
+    from atena.core.estado import ESTEIRA, alcancou
     f = EST.stats_funil()
     total = sum(f.values())
+    insc = sum(n for fase, n in f.items() if alcancou(fase, "Inscrito"))
     funil = [
         {"fase": "Leads", "n": total, "nota": f"{f['Lead']} em Lead"},
         {"fase": "Prospects", "n": f["Prospect"], "nota": _pct(f["Prospect"], total) + " do total"},
-        {"fase": "Inscritos", "n": f["Inscrito"], "nota": _pct(f["Inscrito"], max(f["Prospect"], 1)) + " dos prospects"},
-        {"fase": "Matriculados", "n": f["Matriculado"], "nota": _pct(f["Matriculado"], max(f["Inscrito"], 1)) + " dos inscritos"},
+        # CUMULATIVO: quem está em "Taxa paga" é inscrito também. Contar só a coluna
+        # "Inscrito" faria a conversão despencar sempre que alguém avançasse.
+        {"fase": "Inscritos", "n": insc, "nota": _pct(insc, max(f["Prospect"], 1)) + " dos prospects"},
+        {"fase": "Matriculados", "n": f["Matriculado"], "nota": _pct(f["Matriculado"], max(insc, 1)) + " dos inscritos"},
     ]
     escal = sum(1 for l in EST.listar_leads() if l["estado_conversa"] == "escalado_humano")
     return jsonify({"funil": funil, "escalonamentos_abertos": escal,
-                    "em_espera": f["Em espera"], "perdidos": f["Perdido"]})
+                    "em_espera": f["Em espera"],
+                    "perdidos": f["Perdido"] + f.get("Cancelado", 0)})
 
 
 @app.route("/api/captabilidade")
@@ -271,7 +276,7 @@ def conversa_modo(card_id):
     return jsonify({"ok": True, "modo": modo})
 
 
-FASES = ("Lead", "Prospect", "Inscrito", "Matriculado", "Em espera", "Perdido")
+from atena.core.estado import FASES          # esteira + saídas, fonte única
 
 
 @app.route("/api/kanban")

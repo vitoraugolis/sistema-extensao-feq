@@ -133,8 +133,30 @@ def _est():
 est = _est()
 r1 = S.sincronizar(est, d)
 check(r1["ok"] and len(r1["criados"]) == 5, f"1ª coleta cria os 5 cards: {len(r1['criados'])}")
-check(all(est.get_lead(x["card_id"])["fase"] == "Inscrito" for x in r1["criados"]),
-      "aba Inscritos -> coluna Inscrito do funil")
+# Cada degrau da Extecamp vira uma COLUNA — é o que mostra onde o funil sangra
+_fase = {est.get_lead(x["card_id"])["nome"]: est.get_lead(x["card_id"])["fase"]
+         for x in r1["criados"]}
+check(_fase["BÁRBARA ABADE MENDES DÜREN"] == "Inscrito",
+      "cinza (não aceitou o termo) -> Inscrito, o degrau zero")
+check(_fase["DENIS EDUARDO SILVA"] == "Taxa aceita",
+      "amarelo (aceitou, não pagou) -> Taxa aceita")
+check(_fase["MAYARA CRIS RIBEIRO DA SILVA LESSA"] == "Taxa aceita",
+      "vermelho (venceu) também é Taxa aceita: ela ACEITOU; o que venceu foi o boleto")
+check(_fase["ALCIDES HENRIQUE LEITE WROBLEWSKI"] == "Documento entregue",
+      "verde + APROVADO -> Documento entregue")
+check(S.fase_de("inscritos", "taxa_paga", "PENDENTE") == "Taxa paga",
+      "verde + documentação PENDENTE para em Taxa paga")
+check(S.fase_de("inscritos", "taxa_paga", "EM ANÁLISE") == "Documento entregue",
+      "EM ANÁLISE já é documento entregue (a bola está com a secretaria)")
+
+from atena.core.estado import ESTEIRA, alcancou                 # noqa: E402
+check(all(f in ESTEIRA for f in _fase.values()), "toda fase usada existe na esteira")
+check(all(alcancou(f, "Inscrito") for f in _fase.values()),
+      "todo inscrito da Extecamp conta como inscrito, em qualquer degrau")
+# a razão de existir o ordinal: contagem por lista de strings cairia aqui
+_ff = est.stats_funil()
+check(sum(n for fa, n in _ff.items() if alcancou(fa, "Inscrito")) == 5,
+      "contagem de inscritos é CUMULATIVA (não some quando o lead avança de degrau)")
 r2 = S.sincronizar(est, d)
 check(not r2["criados"] and not r2["movidos"] and r2["inalterados"] == 5,
       "2ª coleta idêntica não cria nem move nada (idempotente)")
@@ -147,11 +169,13 @@ est2.upsert_lead("wa-5519999990001", nome="Mayara Cris Ribeiro da Silva Lessa",
 r3 = S.sincronizar(est2, d)
 check(len(est2.listar_leads()) == 5, "casou com o card existente em vez de duplicar")
 lead = est2.get_lead("wa-5519999990001")
-check(lead["fase"] == "Inscrito", "o card existente foi MOVIDO para Inscrito")
+check(lead["fase"] == "Taxa aceita",
+      f"o card existente foi movido para o degrau REAL dela, não para 'Inscrito' "
+      f"genérico (veio {lead['fase']})")
 check(lead["telefone"] == "5519999990001",
       "e manteve o telefone — a Extecamp não tem telefone e não pode apagar o nosso")
-check(any(x["de"] == "Prospect" and x["para"] == "Inscrito" for x in r3["movidos"]),
-      "a movimentação é reportada (o operador vê o que mudou)")
+check(any(x["de"] == "Prospect" and x["para"] == "Taxa aceita" for x in r3["movidos"]),
+      f"a movimentação é reportada com o degrau exato: {r3['movidos']}")
 
 # a MESMA pessoa migrando de aba reusa o card — é o caminho normal do funil
 est3 = _est()
@@ -169,8 +193,9 @@ check(any("ALANA" in x["nome"] and x["para"] == "Matriculado" for x in r4["movid
 # cancelado cai em Perdido
 est4 = _est()
 r5 = S.sincronizar(est4, c)
-check(all(est4.get_lead(x["card_id"])["fase"] == "Perdido" for x in r5["criados"]),
-      "aba Cancelados -> coluna Perdido")
+check(all(est4.get_lead(x["card_id"])["fase"] == "Cancelado" for x in r5["criados"]),
+      "aba Cancelados -> coluna Cancelado (não 'Perdido': quem cancelou tinha se "
+      "inscrito, é outro problema e outro dono)")
 
 # mudança de situação DENTRO da mesma fase é detectada (é o que muda a ação)
 est5 = _est()
@@ -181,9 +206,10 @@ S.sincronizar(est5, base)
 depois = json.loads(json.dumps(base))
 depois["itens"][0].update(taxa="taxa_paga", situacao="pago", acao="pedir documentos")
 r6 = S.sincronizar(est5, depois)
-check(len(r6["atualizados"]) == 1 and not r6["movidos"],
-      "taxa vencida -> paga é reportado como atualização, sem mover de coluna")
-guardado = json.loads(est5.get_lead(r6["atualizados"][0]["card_id"])["extecamp_json"])
+check(len(r6["movidos"]) == 1 and r6["movidos"][0]["de"] == "Taxa aceita"
+      and r6["movidos"][0]["para"] == "Taxa paga",
+      f"pagar a taxa SOBE um degrau no funil: {r6['movidos']}")
+guardado = json.loads(est5.get_lead(r6["movidos"][0]["card_id"])["extecamp_json"])
 check(guardado["taxa"] == "taxa_paga", "o estado da Extecamp fica gravado no card")
 
 check(S.card_id_de("FEQ-1000", "018", "José da Silva")
@@ -246,7 +272,8 @@ r7 = S.sincronizar(est6, d, contatos=contatos)
 check(len(est6.listar_leads()) == 5,
       f"nome diferente, MESMO telefone -> não duplicou ({len(est6.listar_leads())} cards)")
 bd = est6.get_lead("wa-5519998887766")
-check(bd["fase"] == "Inscrito", "o card do WhatsApp foi movido para Inscrito")
+check(bd["fase"] == "Inscrito",
+      "o card do WhatsApp foi para Inscrito — ela ainda não aceitou o termo da taxa")
 check(bd["nome"] == "Barbara D.",
       "o nome que o operador já tinha NÃO é sobrescrito pelo cadastro da Extecamp")
 alc = next(l for l in est6.listar_leads() if "ALCIDES" in (l["nome"] or ""))

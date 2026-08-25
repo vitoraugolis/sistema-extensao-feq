@@ -71,7 +71,31 @@ CREATE TABLE IF NOT EXISTS modulo_acesso(
 FASES_PROFESSOR = ["Lead", "Aquecimento", "Proposta enviada", "Em negociação",
                    "Aceito", "Recusado", "Revisitar", "Inviável"]
 
-FASES = ["Lead", "Prospect", "Inscrito", "Matriculado", "Em espera", "Perdido"]
+# A ESTEIRA do funil, em ordem. As quatro fases entre Inscrito e Matriculado são o
+# que o ADM Cursos da Extecamp deixa ver de dentro do processo (spec 20): a pessoa
+# se inscreve, aceita o termo da taxa, paga, entrega documentos e só então é
+# matriculada. Antes tudo isso era um "Inscrito" só, e o operador não sabia em qual
+# degrau o lead tinha parado — que é justamente onde o funil sangra.
+ESTEIRA = ["Lead", "Prospect", "Inscrito", "Taxa aceita", "Taxa paga",
+           "Documento entregue", "Matriculado"]
+# Saídas: não são degraus, são fins de linha. "Perdido" é perda NOSSA (gate
+# acadêmico, opt-out, descarte); "Cancelado" é desistência registrada na Extecamp,
+# depois de já ter se inscrito — problemas diferentes, times diferentes.
+SAIDAS = ["Em espera", "Perdido", "Cancelado"]
+FASES = ESTEIRA + SAIDAS
+
+
+def ordem_fase(fase):
+    """Posição na esteira, ou None para saída/desconhecida.
+    Existe para ninguém mais perguntar 'é inscrito?' com lista de strings — foi
+    assim que as fases novas quase derrubaram as métricas em silêncio."""
+    return ESTEIRA.index(fase) if fase in ESTEIRA else None
+
+
+def alcancou(fase, marco):
+    """A pessoa chegou AO MENOS a `marco`? ('Taxa paga' alcançou 'Inscrito')."""
+    a, b = ordem_fase(fase), ordem_fase(marco)
+    return a is not None and b is not None and a >= b
 
 
 def _agora():
@@ -493,11 +517,12 @@ class Estado:
 
     # -------------------------------------------------------------- LGPD
     def anonimizar_antigos(self, dias=180):
-        """Leads perdidos há mais de N dias: apaga PII e o conteúdo das conversas."""
+        """Leads em fim de linha há mais de N dias: apaga PII e o conteúdo das conversas."""
         limite = (datetime.datetime.now() - datetime.timedelta(days=dias)).isoformat()
         n = 0
         for l in self.listar_leads():
-            if l["fase"] == "Perdido" and (l["atualizado"] or "9999") < limite and l["telefone"]:
+            if l["fase"] in ("Perdido", "Cancelado") and (l["atualizado"] or "9999") < limite \
+                    and l["telefone"]:
                 with self._lock:
                     self.conn.execute(
                         "UPDATE leads SET nome='(anonimizado)', telefone='', email='',"

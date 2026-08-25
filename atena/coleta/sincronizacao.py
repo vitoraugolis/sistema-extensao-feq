@@ -24,10 +24,33 @@ import hashlib
 import unicodedata
 import datetime
 
-# Aba da Extecamp -> coluna do nosso funil. A Extecamp manda nestas três: quem
-# está lá está lá, e o funil só reflete.
+# Aba da Extecamp -> coluna do funil. A Extecamp manda: quem está lá está lá.
 FASE_POR_ABA = {"inscritos": "Inscrito", "matriculados": "Matriculado",
-                "cancelados": "Perdido"}
+                "cancelados": "Cancelado"}
+
+
+def fase_de(aba, taxa=None, doc=None):
+    """A coluna exata do funil para este aluno.
+
+    Dentro de "Inscritos" a Extecamp mostra QUÃO LONGE a pessoa chegou — pela cor
+    da linha (estado da taxa) e pelo Status documentação. Colapsar isso num
+    "Inscrito" só era perder exatamente a informação que diz onde o funil sangra:
+    quem travou no aceite do termo é um problema; quem pagou e não mandou
+    documento é outro, e com outro dono.
+
+    'taxa_vencida' cai em "Taxa aceita" de propósito: a pessoa ACEITOU o termo, o
+    que venceu foi o boleto. O que fazer com ela vem da ação, não da coluna —
+    voltá-la para "Inscrito" apagaria o degrau que ela já subiu.
+    """
+    if aba == "matriculados":
+        return "Matriculado"
+    if aba == "cancelados":
+        return "Cancelado"
+    if taxa == "taxa_paga":
+        return "Documento entregue" if doc in ("EM ANÁLISE", "APROVADO") else "Taxa paga"
+    if taxa in ("taxa_a_pagar", "taxa_vencida"):
+        return "Taxa aceita"
+    return "Inscrito"            # termo_pendente (ou cor desconhecida): degrau zero
 
 
 def _agora():
@@ -102,9 +125,8 @@ def sincronizar(est, dados, contatos=None, agora=None):
     """
     agora = agora or _agora()
     aba = dados.get("aba")
-    fase = FASE_POR_ABA.get(aba)
     curso, turma = dados.get("curso"), dados.get("turma")
-    if not fase or not curso:
+    if aba not in FASE_POR_ABA or not curso:
         return {"ok": False, "erro": f"aba desconhecida ou curso ausente ({aba}/{curso})"}
 
     criados, movidos, atualizados, inalterados = [], [], [], []
@@ -112,6 +134,7 @@ def sincronizar(est, dados, contatos=None, agora=None):
         nome = item.get("nome") or ""
         if not nome:
             continue
+        fase = fase_de(aba, item.get("taxa"), item.get("documentacao"))
         contato = (contatos or {}).get(normalizar_nome(nome)) or {}
         card_id = identificar(est, curso, turma, nome, contato)
         lead = est.get_lead(card_id)

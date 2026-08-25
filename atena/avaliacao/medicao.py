@@ -32,8 +32,12 @@ def _db_padrao():
 
 # fase é o marco DURÁVEL do lead (estado_conversa é o estado corrente da conversa,
 # e os dois divergem de propósito: dá para ser Prospect e estar aguardando resposta)
-FASES_QUALIFICADO = ("Prospect", "Inscrito", "Matriculado")
-FASES_INSCRITO = ("Inscrito", "Matriculado")
+# Derivadas da esteira, não escritas à mão: quando entraram as fases da Extecamp
+# (Taxa aceita, Taxa paga, Documento entregue), uma lista fixa teria feito o
+# inscrito "sumir" da métrica ao avançar de degrau — queda silenciosa de conversão.
+from atena.core.estado import ESTEIRA, alcancou             # noqa: E402
+FASES_QUALIFICADO = tuple(f for f in ESTEIRA if alcancou(f, "Prospect"))
+FASES_INSCRITO = tuple(f for f in ESTEIRA if alcancou(f, "Inscrito"))
 
 # O rótulo importa: `inicio_inscricao` é gravado quando o lead ENVIA O FORMULÁRIO DA
 # NOSSA LP e é encaminhado à Extecamp — não é inscrição feita lá. É exatamente neste
