@@ -54,5 +54,19 @@
     "autor": "vitor",
     "motivo": "FEQ-0670: correção do dia de aula — inclui terças (era só segundas e quintas)",
     "pre_imagem": "catalogo_pre_v0008_1787746398.jsonld"
+  },
+  {
+    "versao": "v0009",
+    "ts": "2026-08-26T09:25:46",
+    "autor": "vitor",
+    "motivo": "FEQ-0670: horário completo (16h-20h) em destaque no card de Formato e no selo do topo",
+    "pre_imagem": "catalogo_pre_v0009_1787747146.jsonld"
+  },
+  {
+    "versao": "v0010",
+    "ts": "2026-08-26T09:26:01",
+    "autor": "vitor",
+    "motivo": "FEQ-0670: +2 professores adicionais (Nikolas Ferreira de Souza, Emerson Parazzi Lyra)",
+    "pre_imagem": "catalogo_pre_v0010_1787747161.jsonld"
   }
 ]

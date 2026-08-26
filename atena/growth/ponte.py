@@ -113,6 +113,11 @@ CERTIFICADO_MODELO = {
 }
 
 PROFESSOR_FOTOS = {
+    # Enviadas pelo usuário (26/08/2026), já hospedadas na biblioteca da própria FEQ.
+    "André de Freitas Gonçalves":
+        f"{_UPLOADS}/2026/08/andre-de-freitas-goncalves-feq-0670.jpeg",
+    "Luiz Guilherme Lomônaco":
+        f"{_UPLOADS}/2026/08/luiz-guilherme-lomonaco-feq-0670.png",
     "Flavio Vasconcelos da Silva":
         "https://www.feq.unicamp.br/wp-content/uploads/2025/09/D-Flavio-Vasconcelos-da-Silva-1.jpg",
     "Luis Fernando Mercier Franco":
@@ -184,6 +189,9 @@ PROFESSOR_CREDENCIAL = {
 # confiança; nomes sem entrada aqui aparecem SEM link (nunca adivinhamos Lattes —
 # o ID é opaco — nem cravamos um perfil de nome homônimo sem contexto batendo).
 PROFESSOR_LINK = {
+    "Nikolas Ferreira de Souza": {"tipo": "Portal Docente Unicamp",
+        "url": "https://portal.dados.unicamp.br/perfil?origem=&docente=330243&sigla_unidade=&nome_unidade=&nome_programa="},
+    "Emerson Parazzi Lyra": {"tipo": "LinkedIn", "url": "https://www.linkedin.com/in/emersonparazzilyra/?locale=pt"},
     "Flavio Vasconcelos da Silva": {"tipo": "Lattes", "url": "http://lattes.cnpq.br/1108208002886617"},
     "Claudio Vieira Neto": {"tipo": "LinkedIn", "url": "https://www.linkedin.com/in/claudio-vieira-neto"},
     "Douglas Alves Goulart": {"tipo": "LinkedIn", "url": "https://www.linkedin.com/in/douglas-alves-goulart/"},

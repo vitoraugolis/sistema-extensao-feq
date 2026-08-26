@@ -637,13 +637,15 @@
       "codigo": "FEQ-0670",
       "nome": "Simulação Molecular: Princípios e Prática",
       "modalidade": "A distância (Online)",
-      "horarioAula": "segundas, terças e quintas",
-      "formatoAulasResumo": "Aulas online ao vivo",
-      "formatoAulasDetalhe": "Aulas online ao vivo às segundas, terças e quintas, com laboratórios práticos de simulação.",
+      "horarioAula": "segundas, terças e quintas, das 16h às 20h",
+      "formatoAulasResumo": "Segundas, terças e quintas, 16h às 20h",
+      "formatoAulasDetalhe": "Aulas online ao vivo, com laboratórios práticos de simulação.",
       "professorResponsavel": "Luis Fernando Mercier Franco",
       "professoresAdicionais": [
         "André de Freitas Gonçalves",
-        "Luiz Guilherme Lomônaco"
+        "Luiz Guilherme Lomônaco",
+        "Nikolas Ferreira de Souza",
+        "Emerson Parazzi Lyra"
       ],
       "requisito": {
         "@type": "feq:RequisitoAcademico",
