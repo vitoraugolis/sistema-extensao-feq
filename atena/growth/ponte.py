@@ -192,6 +192,7 @@ PROFESSOR_LINK = {
     "Nikolas Ferreira de Souza": {"tipo": "Portal Docente Unicamp",
         "url": "https://portal.dados.unicamp.br/perfil?origem=&docente=330243&sigla_unidade=&nome_unidade=&nome_programa="},
     "Emerson Parazzi Lyra": {"tipo": "LinkedIn", "url": "https://www.linkedin.com/in/emersonparazzilyra/?locale=pt"},
+    "Nathan Barros de Souza": {"tipo": "LinkedIn", "url": "https://www.linkedin.com/in/nathan-b-souza/"},
     "Flavio Vasconcelos da Silva": {"tipo": "Lattes", "url": "http://lattes.cnpq.br/1108208002886617"},
     "Claudio Vieira Neto": {"tipo": "LinkedIn", "url": "https://www.linkedin.com/in/claudio-vieira-neto"},
     "Douglas Alves Goulart": {"tipo": "LinkedIn", "url": "https://www.linkedin.com/in/douglas-alves-goulart/"},

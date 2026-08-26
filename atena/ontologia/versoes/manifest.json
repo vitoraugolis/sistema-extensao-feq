@@ -68,5 +68,12 @@
     "autor": "vitor",
     "motivo": "FEQ-0670: +2 professores adicionais (Nikolas Ferreira de Souza, Emerson Parazzi Lyra)",
     "pre_imagem": "catalogo_pre_v0010_1787747161.jsonld"
+  },
+  {
+    "versao": "v0011",
+    "ts": "2026-08-26T09:32:06",
+    "autor": "vitor",
+    "motivo": "FEQ-0670: +1 professor adicional (Nathan Barros de Souza, nome confirmado pelo usuário)",
+    "pre_imagem": "catalogo_pre_v0011_1787747526.jsonld"
   }
 ]

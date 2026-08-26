@@ -645,7 +645,8 @@
         "André de Freitas Gonçalves",
         "Luiz Guilherme Lomônaco",
         "Nikolas Ferreira de Souza",
-        "Emerson Parazzi Lyra"
+        "Emerson Parazzi Lyra",
+        "Nathan Barros de Souza"
       ],
       "requisito": {
         "@type": "feq:RequisitoAcademico",
