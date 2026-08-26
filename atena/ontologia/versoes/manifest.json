@@ -47,5 +47,12 @@
     "autor": "vitor",
     "motivo": "FEQ-0295: ficha BÁSICA (proposta Extecamp) + captação antecipada no site próprio",
     "pre_imagem": "catalogo_pre_v0007_1787582885.jsonld"
+  },
+  {
+    "versao": "v0008",
+    "ts": "2026-08-26T09:13:18",
+    "autor": "vitor",
+    "motivo": "FEQ-0670: correção do dia de aula — inclui terças (era só segundas e quintas)",
+    "pre_imagem": "catalogo_pre_v0008_1787746398.jsonld"
   }
 ]
