@@ -745,10 +745,17 @@ def _professor_credencial_html(nome):
             f'class="link">Currículo Lattes</a></p>')
 
 
-def _outros_professores_html(nomes):
+def _outros_professores_html(nomes, codigo=None):
     """Lista dos demais professores do curso, abaixo do card do responsável.
     Cada nome ganha link (Lattes/LinkedIn/Google Scholar) SÓ se PROFESSOR_LINK tem
-    uma entrada verificada; sem entrada -> nome puro, sem link (nunca inventamos)."""
+    uma entrada verificada; sem entrada -> nome puro, sem link (nunca inventamos).
+
+    Quem já tem card de DESTAQUE (com foto, em PROFESSOR_DESTAQUE) sai desta lista —
+    senão a mesma pessoa aparece duas vezes na página, uma com foto e outra como
+    nome solto logo abaixo. Bug real no FEQ-0670 (André e Luiz Guilherme
+    duplicados) que valia para qualquer curso com PROFESSOR_DESTAQUE."""
+    destaque = set(PROFESSOR_DESTAQUE.get(codigo or "", []))
+    nomes = [n for n in (nomes or []) if n not in destaque]
     if not nomes:
         return ""
     itens = []
@@ -1094,7 +1101,7 @@ def render_tokens(meta_row, c, aberto=True, recuperavel=False,
         "INVESTIMENTO_ITENS": _investimento_itens(c),
         "FOTO_PROFESSOR_HTML": _foto_professor_html(c.get("professor")),
         "PROFESSOR_CREDENCIAL_HTML": _professor_credencial_html(c.get("professor")),
-        "OUTROS_PROFESSORES_HTML": _outros_professores_html(c.get("professores_adicionais")),
+        "OUTROS_PROFESSORES_HTML": _outros_professores_html(c.get("professores_adicionais"), c.get("codigo")),
         # Conteúdo rico das páginas oficiais preexistentes (seções somem se sem dado):
         "SECAO_OBJETIVOS": _secao_objetivos_html(c.get("objetivos")),
         "SECAO_DEPOIMENTOS": _secao_depoimentos_html(c.get("depoimentos")),

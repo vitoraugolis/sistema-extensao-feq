@@ -686,6 +686,26 @@ op580 = ponte._outros_professores_html(_c0580["professores_adicionais"])
 check('href="https://www.linkedin.com/in/claudio-vieira-neto"' in op580,
       "PROFESSOR_LINK vale pro nome em qualquer curso (mesma pessoa, mesma entrada)")
 
+# quem já tem card de DESTAQUE (com foto) some da lista solta — bug real no FEQ-0670:
+# André e Luiz Guilherme apareciam com foto em cima E como nome solto logo abaixo
+_c0670 = _ont_real.curso("FEQ-0670")
+op670_sem_codigo = ponte._outros_professores_html(_c0670["professores_adicionais"])
+check("André de Freitas Gonçalves" in op670_sem_codigo,
+      "sem passar o código do curso, ninguém é filtrado (comportamento antigo preservado)")
+op670 = ponte._outros_professores_html(_c0670["professores_adicionais"], "FEQ-0670")
+check("André de Freitas Gonçalves" not in op670 and "Luiz Guilherme Lomônaco" not in op670,
+      "com o código do curso, quem tem card de destaque não duplica na lista solta")
+check("Nikolas Ferreira de Souza" in op670 and "Emerson Parazzi Lyra" in op670,
+      "quem NÃO tem card de destaque continua aparecendo normalmente")
+lp_0670 = ponte.render(g5, _ont_real, "FEQ-0670")
+# 2 ocorrências legítimas por pessoa DENTRO do card de destaque (alt da foto +
+# legenda) — 3+ seria a duplicação antiga voltando como nome solto embaixo
+check(lp_0670.count("André de Freitas Gonçalves") == 2
+      and lp_0670.count("Luiz Guilherme Lomônaco") == 2,
+      "cada um aparece só no card de destaque, não mais também na lista solta "
+      f"(veio {lp_0670.count('André de Freitas Gonçalves')}x / "
+      f"{lp_0670.count('Luiz Guilherme Lomônaco')}x)")
+
 # --- bloco de cursos da HOME (gerado da ontologia) -------------------------------
 _home = ponte.home_cursos_html(g5, _ont_real)
 check(_home.count('class="feq-card"') == len(g5.cursos()) == 10,
