@@ -75,5 +75,19 @@
     "autor": "vitor",
     "motivo": "FEQ-0670: +1 professor adicional (Nathan Barros de Souza, nome confirmado pelo usuário)",
     "pre_imagem": "catalogo_pre_v0011_1787747526.jsonld"
+  },
+  {
+    "versao": "v0012",
+    "ts": "2026-08-26T15:34:31",
+    "autor": "vitor",
+    "motivo": "FEQ-0299: curso passa a ser assíncrono/gravado — remove toda menção a \"aulas ao vivo\"",
+    "pre_imagem": "catalogo_pre_v0012_1787769271.jsonld"
+  },
+  {
+    "versao": "v0013",
+    "ts": "2026-08-26T15:36:19",
+    "autor": "vitor",
+    "motivo": "FEQ-0299: avaliacaoTexto também dizia \"aulas online ao vivo\" — última menção corrigida",
+    "pre_imagem": "catalogo_pre_v0013_1787769379.jsonld"
   }
 ]
