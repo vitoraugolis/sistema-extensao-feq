@@ -1308,6 +1308,126 @@ def conversa_enviar_template(card_id):
     return jsonify({"envio": r})
 
 
+# --------------------------------------------------------------- campanhas
+# Disparo em lote de um template para um público filtrado. Ritmo pausado (lotes de
+# CAMPANHA_LOTE, pausa CAMPANHA_PAUSA_S entre lotes) para reduzir risco de a Meta marcar
+# a conta por rajada em público frio — não há teto de tamanho de público (decisão do
+# usuário), só de VELOCIDADE. Env-overridable, mesmo padrão de GROWTH_CPL_MAX etc.
+CAMPANHA_LOTE = int(os.environ.get("CAMPANHA_LOTE", "20"))
+CAMPANHA_PAUSA_S = float(os.environ.get("CAMPANHA_PAUSA_S", "3"))
+CAMPANHA_TIER_AVISO = 1000  # limite padrão da Meta p/ conta nova: 1.000 destinatários únicos/24h
+
+
+def _disparar_campanha(campanha_id, leads, tpl):
+    """Roda em background (mesmo padrão de _processar_meta/_processar_whatsapp — a rota
+    que criou a campanha já respondeu ao operador antes disto começar). Cada envio é uma
+    linha normal em `conversas` marcada com campanha_id; falha TAMBÉM é registrada aqui
+    (diferente do envio avulso, que só devolve o erro na resposta) porque "quantos
+    falharam" é exatamente a métrica que o operador veio acompanhar numa campanha."""
+    enviados = 0
+    try:
+        for i, lead in enumerate(leads):
+            if i and i % CAMPANHA_LOTE == 0:
+                time.sleep(CAMPANHA_PAUSA_S)
+            if EST.campanha_cancelada(campanha_id):
+                break
+            params = [_valor_param(p["k"], lead) for p in tpl["params"]] or None
+            r = WA.enviar_template(lead["telefone"], tpl["nome"], idioma=tpl["idioma"], params=params)
+            destino = lead["telefone"]
+            if r.get("ok"):
+                rotulo = f"[campanha {tpl['nome']}]" + (f" {' · '.join(params)}" if params else "")
+                EST.add_conversa(lead["card_id"], "agente", rotulo, wamid=r.get("wamid"),
+                                 status="enviado", autor="template", destino=destino,
+                                 campanha_id=campanha_id)
+                enviados += 1
+            else:
+                motivo = r.get("motivo") or "erro ao enviar"
+                EST.add_conversa(lead["card_id"], "agente", f"[campanha {tpl['nome']}] FALHOU: {motivo}",
+                                 status="falhou", autor="template", destino=destino,
+                                 campanha_id=campanha_id)
+    except Exception as e:
+        print(f"[campanha-{campanha_id}] falha: {e}", flush=True)
+        EST.add_alerta("campanha", f"campanha {campanha_id} interrompida por erro: {e}")
+    finally:
+        status_final = "cancelada" if EST.campanha_cancelada(campanha_id) else "concluida"
+        EST.concluir_campanha(campanha_id, status_final)
+        EST.log_acao("sistema",
+                     f"campanha {campanha_id} ({tpl['nome']}): {enviados}/{len(leads)} enviado(s), "
+                     f"status {status_final}")
+
+
+@app.route("/api/campanhas/templates")
+def campanhas_templates():
+    """Templates aprovados, SEM prefill por lead (a campanha atinge muitos leads — o
+    prefill de nome/curso acontece por destinatário dentro de _disparar_campanha)."""
+    return jsonify([{"nome": t["nome"], "idioma": t["idioma"], "titulo": t["titulo"],
+                     "n_params": len(t["params"])} for t in _templates_enviaveis()])
+
+
+@app.route("/api/campanhas/preview")
+def campanhas_preview():
+    """Contagem do público ANTES de disparar — o operador confirma o alvo, não adivinha."""
+    optout_arg = request.args.get("optout")
+    leads = EST.filtrar_leads(
+        curso=request.args.get("curso") or None, fase=request.args.get("fase") or None,
+        estado_conversa=request.args.get("estado_conversa") or None,
+        optout=(int(optout_arg) if optout_arg not in (None, "") else None))
+    total = len(leads)
+    amostra = [{"card_id": l["card_id"], "nome": l.get("nome"), "telefone": l.get("telefone"),
+               "curso": l.get("curso"), "fase": l.get("fase")} for l in leads[:20]]
+    aviso_tier = (
+        f"{total} destinatários: contas Meta novas/padrão têm limite de "
+        f"{CAMPANHA_TIER_AVISO} destinatários únicos por 24h — parte do disparo pode ser "
+        "recusada pela própria API, independente do nosso ritmo de envio."
+    ) if total >= CAMPANHA_TIER_AVISO else None
+    return jsonify({"total": total, "amostra": amostra, "aviso_tier": aviso_tier})
+
+
+@app.route("/api/campanhas", methods=["GET", "POST"])
+def campanhas_ep():
+    if request.method == "GET":
+        campanhas = EST.listar_campanhas()
+        for c in campanhas:
+            c["contagens"] = EST.campanha_contagens(c["id"])
+        return jsonify(campanhas)
+    b = request.get_json(silent=True) or {}
+    tpl = next((t for t in _templates_enviaveis() if t["nome"] == b.get("template_nome")), None)
+    if not tpl:
+        return jsonify({"erro": "template indisponível (não está aprovado na Meta)"}), 400
+    filtro = b.get("filtro") or {}
+    leads = EST.filtrar_leads(curso=filtro.get("curso") or None, fase=filtro.get("fase") or None,
+                              estado_conversa=filtro.get("estado_conversa") or None,
+                              optout=filtro.get("optout"))
+    leads = [l for l in leads if not l.get("optout")]   # nunca dispara p/ opt-out, seja qual for o filtro
+    if not leads:
+        return jsonify({"erro": "nenhum lead corresponde a este filtro"}), 400
+    nome = (b.get("nome") or "").strip() or tpl["nome"]
+    campanha_id = EST.criar_campanha(nome, tpl["nome"], tpl["idioma"], filtro, len(leads),
+                                     session.get("usuario", "operador"))
+    threading.Thread(target=_disparar_campanha, args=(campanha_id, leads, tpl), daemon=True).start()
+    EST.log_acao(session.get("usuario", "operador"),
+                 f"disparou campanha '{nome}' ({tpl['nome']}) para {len(leads)} lead(s)")
+    return jsonify({"id": campanha_id, "total_alvo": len(leads)})
+
+
+@app.route("/api/campanhas/<int:campanha_id>")
+def campanha_detalhe(campanha_id):
+    c = EST.get_campanha(campanha_id)
+    if not c:
+        return jsonify({"erro": "campanha inexistente"}), 404
+    c["contagens"] = EST.campanha_contagens(campanha_id)
+    return jsonify(c)
+
+
+@app.route("/api/campanhas/<int:campanha_id>/cancelar", methods=["POST"])
+def campanha_cancelar(campanha_id):
+    if not EST.get_campanha(campanha_id):
+        return jsonify({"erro": "campanha inexistente"}), 404
+    EST.cancelar_campanha(campanha_id)
+    EST.log_acao(session.get("usuario", "operador"), f"cancelou campanha {campanha_id}")
+    return jsonify({"ok": True})
+
+
 @app.route("/api/config", methods=["GET", "POST"])
 def config_ep():
     if request.method == "POST":

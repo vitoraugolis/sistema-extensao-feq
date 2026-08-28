@@ -325,6 +325,17 @@ class WhatsApp:
                     tel = m.get("from", "")
                     nome_perfil = perfis.get(tel, "")
                     tipo, texto, media_id, mime = extrair_mensagem(m)
+                    if m.get("type") in ("button", "interactive"):
+                        # Clique em botão de campanha: só existe sinal da Meta para
+                        # quick-reply (context.id = wamid da mensagem respondida) — botão
+                        # de LINK nunca gera webhook nenhum, limitação da plataforma, não
+                        # do código. Silencioso se não achar campanha (resposta normal a
+                        # um template avulso, fora de campanha).
+                        ctx_id = (m.get("context") or {}).get("id")
+                        if ctx_id:
+                            cid_clique = self.est.registrar_clique(ctx_id)
+                            if cid_clique:
+                                out.append({"card_id": cid_clique, "acao": "campanha_clique"})
                     transcricao = None
                     if media_id:
                         self._baixar_midia(media_id, mime)

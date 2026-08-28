@@ -65,6 +65,14 @@ CREATE TABLE IF NOT EXISTS professores(
 CREATE TABLE IF NOT EXISTS modulo_acesso(
   usuario TEXT, modulo TEXT, concedido_por TEXT, criado TEXT,
   PRIMARY KEY(usuario, modulo));
+-- Disparo de template em lote (campanha). O envio de cada destinatário é uma linha
+-- normal em `conversas` marcada com campanha_id — esta tabela só guarda o que É a
+-- campanha (público, template, status); contagens de entrega/leitura/clique são
+-- sempre calculadas ao vivo a partir de `conversas`, nunca contador denormalizado.
+CREATE TABLE IF NOT EXISTS campanhas(
+  id INTEGER PRIMARY KEY AUTOINCREMENT, nome TEXT, template_nome TEXT, template_idioma TEXT,
+  filtro_json TEXT, status TEXT DEFAULT 'rascunho', total_alvo INTEGER DEFAULT 0,
+  criado TEXT, criado_por TEXT, cancelar INTEGER DEFAULT 0);
 """
 
 # Fases do funil comercial de professores (ordem = ordem das colunas no quadro).
@@ -201,7 +209,14 @@ class Estado:
                     "ALTER TABLE alertas ADD COLUMN lido_ts TEXT",
                     # Alvo do alerta: sem isto a notificação é um texto solto e o
                     # operador tem de caçar o lead pelo nome na mão.
-                    "ALTER TABLE alertas ADD COLUMN card_id TEXT"):
+                    "ALTER TABLE alertas ADD COLUMN card_id TEXT",
+                    # Campanha (disparo em lote): qual campanha gerou este envio.
+                    "ALTER TABLE conversas ADD COLUMN campanha_id INTEGER",
+                    # Clique em botão quick-reply de template de campanha. Coluna
+                    # SEPARADA de `status` de propósito: clique não é um estágio de
+                    # entrega (leads_sem_entrega() filtra status IN ('entregue','lido') —
+                    # se clique sobrescrevesse status, essa query perderia o rastro).
+                    "ALTER TABLE conversas ADD COLUMN clicado_ts TEXT"):
             try:
                 self.conn.execute(mig)
             except sqlite3.OperationalError:
@@ -252,6 +267,24 @@ class Estado:
         with self._lock:
             rows = self.conn.execute("SELECT * FROM leads ORDER BY atualizado DESC").fetchall()
         return [dict(r) for r in rows]
+
+    def filtrar_leads(self, curso=None, fase=None, estado_conversa=None, optout=None):
+        """Público-alvo de uma campanha. Filtro em Python sobre listar_leads() — é o
+        único padrão de filtro que existe no projeto (ver nutricao.py::_elegivel); não
+        há WHERE server-side em lugar nenhum hoje. Curso casa contra o conjunto de
+        interesse INTEIRO (ativo + interesse), igual ao filtro client-side do Funil/
+        Conversas — reaproveita cursos_interesse() para não duplicar essa regra de novo."""
+        leads = self.listar_leads()
+        if curso:
+            leads = [l for l in leads if curso in self.cursos_interesse(l)]
+        if fase:
+            leads = [l for l in leads if l.get("fase") == fase]
+        if estado_conversa:
+            leads = [l for l in leads if l.get("estado_conversa") == estado_conversa]
+        if optout is not None:
+            alvo = 1 if optout else 0
+            leads = [l for l in leads if (l.get("optout") or 0) == alvo]
+        return leads
 
     @staticmethod
     def utm_de(lead):
@@ -562,17 +595,19 @@ class Estado:
 
     # ------------------------------------------------------------ conversas
     def add_conversa(self, card_id, papel, texto, tipo="texto", media_id=None,
-                     wamid=None, status=None, autor=None, destino=None, transcricao=None):
+                     wamid=None, status=None, autor=None, destino=None, transcricao=None,
+                     campanha_id=None):
         """autor: quem produziu a fala do 'agente' — 'humano:<usuario>' (digitada na
         Central), 'llm' (cérebro), 'template', 'coordenacao'. É o que permite ao corpus
         aprender com as resoluções humanas (spec 18).
-        transcricao: leitura automática da mídia (áudio/imagem) — nunca fala do lead."""
+        transcricao: leitura automática da mídia (áudio/imagem) — nunca fala do lead.
+        campanha_id: marca este envio como parte de um disparo em lote (ver campanhas)."""
         with self._lock:
             self.conn.execute(
                 "INSERT INTO conversas(card_id,papel,texto,tipo,media_id,wamid,status,ts,autor,"
-                "destino,transcricao) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+                "destino,transcricao,campanha_id) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
                 (card_id, papel, texto, tipo, media_id, wamid, status, _agora(), autor,
-                 destino, transcricao))
+                 destino, transcricao, campanha_id))
             self.conn.commit()
 
     def set_transcricao(self, conversa_id, transcricao):
@@ -661,6 +696,26 @@ class Estado:
                 self.conn.commit()
             return r["card_id"]
 
+    def registrar_clique(self, wamid):
+        """context.id de um clique em botão quick-reply de campanha (o único clique que
+        a Cloud API avisa — botão de link nunca gera webhook). Idempotente (2º clique no
+        mesmo botão não duplica). NÃO mexe em `status` — clique é informação adicional
+        sobre a mensagem, não um novo estágio de entrega (ver clicado_ts no schema).
+        Silencioso se o wamid não existe ou não pertence a campanha nenhuma."""
+        if not wamid:
+            return None
+        with self._lock:
+            r = self.conn.execute(
+                "SELECT card_id FROM conversas WHERE wamid=? AND campanha_id IS NOT NULL",
+                (wamid,)).fetchone()
+            if not r:
+                return None
+            self.conn.execute(
+                "UPDATE conversas SET clicado_ts=COALESCE(clicado_ts,?) WHERE wamid=?",
+                (_agora(), wamid))
+            self.conn.commit()
+        return r["card_id"]
+
     def envio_por_wamid(self, wamid):
         with self._lock:
             r = self.conn.execute(
@@ -690,6 +745,61 @@ class Estado:
                 " AND NOT EXISTS(SELECT 1 FROM conversas c WHERE c.card_id=l.card_id"
                 "                AND c.papel='lead')").fetchall()
         return [dict(r) for r in rows]
+
+    # ------------------------------------------------------------ campanhas
+    def criar_campanha(self, nome, template_nome, template_idioma, filtro, total_alvo, criado_por):
+        with self._lock:
+            cur = self.conn.execute(
+                "INSERT INTO campanhas(nome,template_nome,template_idioma,filtro_json,status,"
+                "total_alvo,criado,criado_por) VALUES(?,?,?,?,?,?,?,?)",
+                (nome, template_nome, template_idioma, json.dumps(filtro or {}, ensure_ascii=False),
+                 "enviando", total_alvo, _agora(), criado_por))
+            self.conn.commit()
+            return cur.lastrowid
+
+    def get_campanha(self, campanha_id):
+        with self._lock:
+            r = self.conn.execute("SELECT * FROM campanhas WHERE id=?", (campanha_id,)).fetchone()
+        return dict(r) if r else None
+
+    def listar_campanhas(self):
+        with self._lock:
+            rows = self.conn.execute("SELECT * FROM campanhas ORDER BY id DESC").fetchall()
+        return [dict(r) for r in rows]
+
+    def campanha_contagens(self, campanha_id):
+        """Contagens SEMPRE ao vivo a partir de conversas — nunca contador denormalizado
+        na própria campanha, para não desalinhar se um webhook de status chegar atrasado
+        ou fora de ordem."""
+        with self._lock:
+            rows = self.conn.execute(
+                "SELECT status, COUNT(*) n FROM conversas WHERE campanha_id=? GROUP BY status",
+                (campanha_id,)).fetchall()
+            cliques = self.conn.execute(
+                "SELECT COUNT(*) n FROM conversas WHERE campanha_id=? AND clicado_ts IS NOT NULL",
+                (campanha_id,)).fetchone()
+        contagens = {"enviado": 0, "entregue": 0, "lido": 0, "falhou": 0}
+        for r in rows:
+            if r["status"] in contagens:
+                contagens[r["status"]] = r["n"]
+        contagens["clicado"] = cliques["n"] if cliques else 0
+        return contagens
+
+    def campanha_cancelada(self, campanha_id):
+        with self._lock:
+            r = self.conn.execute("SELECT cancelar FROM campanhas WHERE id=?",
+                                  (campanha_id,)).fetchone()
+        return bool(r and r["cancelar"])
+
+    def cancelar_campanha(self, campanha_id):
+        with self._lock:
+            self.conn.execute("UPDATE campanhas SET cancelar=1 WHERE id=?", (campanha_id,))
+            self.conn.commit()
+
+    def concluir_campanha(self, campanha_id, status="concluida"):
+        with self._lock:
+            self.conn.execute("UPDATE campanhas SET status=? WHERE id=?", (status, campanha_id))
+            self.conn.commit()
 
     # --------------------------------------------------------------- mídias
     # ------------------------------------------------------------- LPs editadas

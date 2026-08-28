@@ -5,99 +5,157 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Central de Operação · Extensão FEQ</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.7.0/dist/tabler-icons.min.css">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
-/* Neobrutalismo (spec: pedido do usuário, ref. Pinterest 39617671719796967):
-   fundo creme de papel, bordas pretas grossas, sombras DURAS deslocadas (sem
-   blur), cores chapadas — laranja Guará como primária, teal FEQ como
-   secundária, vermelho Unicamp para o negativo. Mesmas classes/IDs do glass
-   antigo: o JS não muda uma linha. */
-:root{--ink:#141414;--ink2:#3a3a3a;--ink3:#6d6459;--b:#141414;
- --paper:#FAF3E8;--guara:#F96A10;--feq:#1CA8B4;--uni:#ED1C24;
- --sun:#FFD23F;--mint:#8BEBAF;--sky:#9BD6FF;--rosa:#FFAFA6;--laranjinha:#FFE1CC;
- --accent:#F96A10;--ok:#0b5c3d;--warn:#6e4a00;--bad:#a01212;}
+/* Liquid Glass (ref. SwiftUI Liquid Glass da Apple, adaptado a CSS web) — claro/escuro.
+   Migração pura de tema, mesmo espírito da troca anterior p/ neobrutalismo (commit
+   5cf9d7e): MESMAS classes/IDs, o JS não muda de lógica — só o material visual. Cores
+   de marca (Guará/FEQ/Unicamp) ficam fixas nos dois temas; tudo que é "papel visual"
+   (superfície, texto, borda, sombra) é token semântico redefinido por tema. */
+:root{
+  --guara:#F96A10; --feq:#1CA8B4; --uni:#ED1C24;   /* marca institucional — não muda com o tema */
+  --r-s:10px; --r-m:16px; --r-l:22px; --r-pill:999px;
+}
+:root, [data-theme="light"]{
+  --bg:#eef1f6;
+  --bg-grad:radial-gradient(circle at 12% 6%, rgba(249,106,16,.10), transparent 42%),
+            radial-gradient(circle at 88% 0%, rgba(28,168,180,.10), transparent 38%),
+            radial-gradient(circle at 50% 105%, rgba(237,28,36,.05), transparent 46%);
+  --surface:rgba(255,255,255,.62); --surface-2:rgba(255,255,255,.40); --surface-solid:#ffffff;
+  --text:#1c1c1e; --text-2:#3a3a3c; --text-muted:#6e6e73;
+  --border:rgba(0,0,0,.08); --highlight:rgba(255,255,255,.8);
+  --shadow:0 1px 1px rgba(20,20,30,.03), 0 10px 26px rgba(20,20,30,.10);
+  --shadow-lg:0 24px 64px rgba(20,20,30,.20);
+  --ok:#1f8a4c; --ok-bg:rgba(52,199,89,.16);
+  --warn:#8a5a00; --warn-bg:rgba(255,204,0,.22);
+  --bad:#c62a20; --bad-bg:rgba(255,59,48,.15);
+  --info:#0b63c6; --info-bg:rgba(10,132,255,.14);
+  --guara-bg:rgba(249,106,16,.14); --overlay:rgba(20,20,24,.35);
+}
+[data-theme="dark"]{
+  --bg:#08080b;
+  --bg-grad:radial-gradient(circle at 12% 6%, rgba(249,106,16,.16), transparent 42%),
+            radial-gradient(circle at 88% 0%, rgba(28,168,180,.15), transparent 38%),
+            radial-gradient(circle at 50% 105%, rgba(237,28,36,.08), transparent 46%);
+  --surface:rgba(255,255,255,.07); --surface-2:rgba(255,255,255,.045); --surface-solid:#1c1c1e;
+  --text:#f5f5f7; --text-2:#d1d1d6; --text-muted:#98989d;
+  --border:rgba(255,255,255,.12); --highlight:rgba(255,255,255,.16);
+  --shadow:0 1px 1px rgba(0,0,0,.3), 0 10px 26px rgba(0,0,0,.45);
+  --shadow-lg:0 26px 72px rgba(0,0,0,.6);
+  --ok:#30d158; --ok-bg:rgba(48,209,88,.20);
+  --warn:#ffd60a; --warn-bg:rgba(255,214,10,.20);
+  --bad:#ff453a; --bad-bg:rgba(255,69,58,.22);
+  --info:#409cff; --info-bg:rgba(10,132,255,.22);
+  --guara-bg:rgba(249,106,16,.22); --overlay:rgba(0,0,0,.55);
+}
+@media(prefers-color-scheme:dark){
+  :root:not([data-theme]){
+    --bg:#08080b;
+    --bg-grad:radial-gradient(circle at 12% 6%, rgba(249,106,16,.16), transparent 42%),
+              radial-gradient(circle at 88% 0%, rgba(28,168,180,.15), transparent 38%),
+              radial-gradient(circle at 50% 105%, rgba(237,28,36,.08), transparent 46%);
+    --surface:rgba(255,255,255,.07); --surface-2:rgba(255,255,255,.045); --surface-solid:#1c1c1e;
+    --text:#f5f5f7; --text-2:#d1d1d6; --text-muted:#98989d;
+    --border:rgba(255,255,255,.12); --highlight:rgba(255,255,255,.16);
+    --shadow:0 1px 1px rgba(0,0,0,.3), 0 10px 26px rgba(0,0,0,.45);
+    --shadow-lg:0 26px 72px rgba(0,0,0,.6);
+    --ok:#30d158; --ok-bg:rgba(48,209,88,.20);
+    --warn:#ffd60a; --warn-bg:rgba(255,214,10,.20);
+    --bad:#ff453a; --bad-bg:rgba(255,69,58,.22);
+    --info:#409cff; --info-bg:rgba(10,132,255,.22);
+    --guara-bg:rgba(249,106,16,.22); --overlay:rgba(0,0,0,.55);
+  }
+}
 *{box-sizing:border-box;}
-body{margin:0;min-height:100vh;color:var(--ink);
- font:15px/1.55 "Space Grotesk",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
- background:var(--paper);
- background-image:radial-gradient(rgba(20,20,20,.09) 1.2px,transparent 1.2px);
- background-size:22px 22px;}
+html{background:var(--bg);}
+body{margin:0;min-height:100vh;color:var(--text);
+ font:15px/1.55 -apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,sans-serif;
+ background:var(--bg);background-image:var(--bg-grad);background-attachment:fixed;
+ transition:background-color .2s ease,color .2s ease;}
 .wrap{max-width:1080px;margin:0 auto;padding:22px;}
-.g{background:#fff;border:2px solid var(--b);border-radius:12px;box-shadow:6px 6px 0 var(--b);}
+.g{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-l);
+ box-shadow:inset 0 1px 0 var(--highlight), var(--shadow);
+ backdrop-filter:blur(28px) saturate(1.7);-webkit-backdrop-filter:blur(28px) saturate(1.7);}
 .top{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;gap:12px;flex-wrap:wrap;}
 .brand{display:flex;align-items:center;gap:12px;}
-.logo{width:46px;height:46px;border-radius:10px;background:#fff;border:2px solid var(--b);
- box-shadow:3px 3px 0 var(--b);padding:5px;object-fit:contain;display:flex;align-items:center;justify-content:center;}
+.logo{width:46px;height:46px;border-radius:var(--r-s);background:var(--surface-solid);border:1px solid var(--border);
+ box-shadow:var(--shadow);padding:5px;object-fit:contain;display:flex;align-items:center;justify-content:center;}
 .brand-title{font-weight:700;font-size:16px;letter-spacing:-.01em;}
 .logos-inst{display:flex;align-items:center;gap:8px;}
-.logo-plaque{height:44px;background:#fff;border:2px solid var(--b);border-radius:10px;
- box-shadow:3px 3px 0 var(--b);padding:6px 10px;display:flex;align-items:center;}
+.logo-plaque{height:44px;background:var(--surface-solid);border:1px solid var(--border);border-radius:var(--r-s);
+ box-shadow:var(--shadow);padding:6px 10px;display:flex;align-items:center;}
 .logo-plaque img{height:100%;width:auto;display:block;}
-.pill{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:700;padding:5px 10px;
- border-radius:8px;border:2px solid var(--b);box-shadow:2px 2px 0 var(--b);color:var(--ink);}
+.pill{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:700;padding:6px 12px;
+ border-radius:var(--r-pill);border:1px solid var(--border);color:var(--text);background:var(--surface);
+ backdrop-filter:blur(20px) saturate(1.6);-webkit-backdrop-filter:blur(20px) saturate(1.6);}
+.theme-tgl{border:1px solid var(--border);background:var(--surface);color:var(--text);width:34px;height:34px;
+ border-radius:50%;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;font-size:16px;
+ backdrop-filter:blur(20px) saturate(1.6);-webkit-backdrop-filter:blur(20px) saturate(1.6);box-shadow:var(--shadow);}
+.theme-tgl:hover{background:var(--surface-2);}
 .layout{display:grid;grid-template-columns:178px 1fr;gap:18px;}
 .layout>main{min-width:0;} /* sem isto o 1fr cresce com o kanban em vez de deixá-lo rolar */
 .nav{padding:10px 9px;align-self:start;position:sticky;top:22px;}
-.navi{display:flex;align-items:center;gap:9px;padding:9px 11px;border-radius:9px;font-size:13.5px;font-weight:500;
- color:var(--ink);cursor:pointer;border:2px solid transparent;background:none;width:100%;text-align:left;font-family:inherit;margin-bottom:3px;}
-.navi:hover{background:var(--sun);border-color:var(--b);}
-.navi.on{background:var(--guara);color:#fff;border-color:var(--b);box-shadow:3px 3px 0 var(--b);font-weight:700;}
+.navi{display:flex;align-items:center;gap:9px;padding:10px 13px;border-radius:var(--r-pill);font-size:13.5px;font-weight:500;
+ color:var(--text);cursor:pointer;border:1px solid transparent;background:none;width:100%;text-align:left;font-family:inherit;
+ margin-bottom:3px;transition:background .15s ease;}
+.navi:hover{background:var(--surface-2);}
+.navi.on{background:var(--guara);color:#fff;font-weight:700;box-shadow:var(--shadow);}
 .navi i{font-size:18px;}
 .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin-bottom:18px;}
 .card{padding:13px 15px;}
-.lab{font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--ink3);margin:0;}
+.lab{font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);margin:0;}
 .num{font-size:30px;font-weight:700;margin:3px 0 0;letter-spacing:-.02em;}
 .sec{padding:16px 18px;margin-bottom:18px;}
 .sec h2{font-size:15px;font-weight:700;margin:0 0 12px;}
 .hidden{display:none;}
-.row{display:flex;align-items:center;gap:10px;padding:9px 11px;border-radius:9px;background:var(--paper);
- border:2px solid var(--b);margin-bottom:8px;font-size:13px;}
-.tag{font-size:11px;font-weight:700;padding:3px 8px;border-radius:7px;margin-left:auto;white-space:nowrap;
- border:2px solid var(--b);color:var(--ink);}
-.t-ok{background:var(--mint);color:var(--ink);}
-.t-bad{background:var(--rosa);color:var(--ink);}
-.t-acc{background:var(--sky);color:var(--ink);}
-.t-warn{background:var(--sun);color:var(--ink);}
-.bubble{max-width:80%;padding:9px 12px;font-size:13.5px;border:2px solid var(--b);box-shadow:3px 3px 0 var(--b);position:relative;}
+.row{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:var(--r-s);background:var(--surface-2);
+ border:1px solid var(--border);margin-bottom:8px;font-size:13px;}
+.tag{font-size:11px;font-weight:700;padding:4px 10px;border-radius:var(--r-pill);margin-left:auto;white-space:nowrap;
+ color:var(--text);}
+.t-ok{background:var(--ok-bg);color:var(--ok);}
+.t-bad{background:var(--bad-bg);color:var(--bad);}
+.t-acc{background:var(--info-bg);color:var(--info);}
+.t-warn{background:var(--warn-bg);color:var(--warn);}
+.bubble{max-width:80%;padding:10px 13px;font-size:13.5px;border:1px solid var(--border);position:relative;
+ box-shadow:var(--shadow);backdrop-filter:blur(18px) saturate(1.6);-webkit-backdrop-filter:blur(18px) saturate(1.6);}
 /* Reagir: ícone só aparece no hover da bolha (como no WhatsApp Web) — sem isso a thread
    fica poluída de ícone em toda mensagem o tempo todo. */
 .bubble-reagir{position:absolute;top:-11px;right:-11px;width:22px;height:22px;border-radius:50%;
- background:#fff;border:2px solid var(--b);display:flex;align-items:center;justify-content:center;
- cursor:pointer;opacity:0;transition:opacity .1s;padding:0;font-size:12px;}
+ background:var(--surface-solid);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;
+ cursor:pointer;opacity:0;transition:opacity .1s;padding:0;font-size:12px;box-shadow:var(--shadow);}
 .bubble:hover .bubble-reagir{opacity:1;}
-.bubble-reacao{position:absolute;bottom:-10px;left:10px;background:#fff;border:2px solid var(--b);
- border-radius:999px;padding:1px 5px;font-size:12px;line-height:1.4;}
+.bubble-reacao{position:absolute;bottom:-10px;left:10px;background:var(--surface-solid);border:1px solid var(--border);
+ border-radius:var(--r-pill);padding:1px 5px;font-size:12px;line-height:1.4;box-shadow:var(--shadow);}
 .b-ag .bubble-reacao{left:auto;right:10px;}
-.reacao-picker{position:absolute;z-index:20;top:-40px;right:0;background:#fff;border:2px solid var(--b);
- border-radius:10px;box-shadow:3px 3px 0 var(--b);padding:4px 6px;display:flex;gap:2px;}
+.reacao-picker{position:absolute;z-index:20;top:-40px;right:0;background:var(--surface-solid);border:1px solid var(--border);
+ border-radius:var(--r-s);box-shadow:var(--shadow-lg);padding:4px 6px;display:flex;gap:2px;}
 .reacao-picker button{border:0;background:none;font-size:17px;cursor:pointer;padding:3px 4px;
  border-radius:6px;}
-.reacao-picker button:hover{background:var(--paper);}
-.contato-card{display:flex;align-items:center;gap:9px;background:rgba(0,0,0,.04);
- border:1.5px solid var(--b);border-radius:9px;padding:7px 10px;}
+.reacao-picker button:hover{background:var(--surface-2);}
+.contato-card{display:flex;align-items:center;gap:9px;background:var(--surface-2);
+ border:1px solid var(--border);border-radius:var(--r-s);padding:7px 10px;}
 .contato-card:not(:last-child){margin-bottom:6px;}
 .contato-card i{font-size:20px;}
 /* Leitura automática de mídia: fica DENTRO da bolha mas visualmente separada do que o
    lead escreveu — quem lê precisa distinguir "o lead disse" de "a máquina entendeu". */
-.leitura-auto{margin-top:7px;padding:7px 9px;border-radius:8px;background:rgba(0,0,0,.05);
- border-left:3px solid var(--acc);font-size:13px;line-height:1.45;font-style:italic;}
+.leitura-auto{margin-top:7px;padding:7px 9px;border-radius:8px;background:var(--surface-2);
+ border-left:3px solid var(--guara);font-size:13px;line-height:1.45;font-style:italic;}
 .leitura-auto-rot{display:block;font-style:normal;font-weight:700;font-size:10px;
  text-transform:uppercase;letter-spacing:.06em;opacity:.65;margin-bottom:3px;}
 .leitura-auto-rot i{font-size:12px;}
 .leitura-auto-acao{margin-top:6px;}
-.leitura-auto-acao button{border:1.5px solid var(--b);background:none;border-radius:7px;
+.leitura-auto-acao button{border:1px solid var(--border);background:none;border-radius:7px;
  padding:4px 9px;font:inherit;font-size:12px;cursor:pointer;display:inline-flex;
  align-items:center;gap:5px;color:inherit;opacity:.75;}
-.leitura-auto-acao button:hover{opacity:1;background:rgba(0,0,0,.04);}
+.leitura-auto-acao button:hover{opacity:1;background:var(--surface-2);}
 /* ---- Funil de professores: ficha em modal + cards do quadro ---- */
-.pf-modal{position:fixed;inset:0;z-index:70;background:rgba(0,0,0,.45);
+.pf-modal{position:fixed;inset:0;z-index:70;background:var(--overlay);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
  display:flex;align-items:flex-start;justify-content:center;padding:26px 16px;overflow-y:auto;}
 /* .hidden é declarada lá em cima (linha ~53) e tem a MESMA especificidade que
    .pf-modal — a regra posterior venceria e o modal nasceria aberto. Reafirmar
    aqui resolve sem recorrer a !important. */
 .pf-modal.hidden{display:none;}
-.pf-card-modal{background:var(--paper);width:min(720px,100%);padding:20px 22px;}
+.pf-card-modal{background:var(--surface-solid);width:min(720px,100%);padding:20px 22px;border-radius:var(--r-l);
+ box-shadow:var(--shadow-lg);}
 .pf-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:14px;}
 .pf-grid label{display:flex;flex-direction:column;gap:4px;font-size:12.5px;font-weight:700;}
 .pf-grid .pf-largo{grid-column:1/-1;}
@@ -105,111 +163,115 @@ body{margin:0;min-height:100vh;color:var(--ink);
 .pf-grid textarea{resize:vertical;}
 @media(max-width:620px){.pf-grid{grid-template-columns:1fr;}}
 .pf-wa{display:inline-flex;align-items:center;gap:4px;font-size:10.5px;font-weight:700;
- color:#0b7a3b;text-decoration:none;margin-top:6px;border:1.5px solid var(--b);
- border-radius:6px;padding:2px 7px;background:#eafaf0;}
-.pf-wa:hover{background:#d6f5e2;}
-.pf-linha{font-size:10.5px;color:#5b5b5b;margin-top:3px;display:flex;align-items:center;gap:4px;}
+ color:var(--ok);text-decoration:none;margin-top:6px;border:1px solid var(--border);
+ border-radius:6px;padding:2px 7px;background:var(--ok-bg);}
+.pf-wa:hover{filter:brightness(.96);}
+.pf-linha{font-size:10.5px;color:var(--text-muted);margin-top:3px;display:flex;align-items:center;gap:4px;}
 .pf-linha i{font-size:12px;flex-shrink:0;}
-.pf-acesso-item{display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1.5px solid var(--b);}
+.pf-acesso-item{display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--border);}
 .pf-acesso-item:last-child{border-bottom:none;}
 .emoji-grid{display:grid;grid-template-columns:repeat(9,1fr);gap:2px;max-width:280px;}
 .emoji-grid button{border:0;background:none;font-size:19px;cursor:pointer;padding:5px;border-radius:6px;}
-.emoji-grid button:hover{background:var(--paper);}
-.b-lead{align-self:flex-start;background:#fff;border-radius:12px 12px 12px 2px;}
-.b-ag{align-self:flex-end;background:var(--laranjinha);border-radius:12px 12px 2px 12px;}
-input,select,textarea{width:100%;border-radius:8px;border:2px solid var(--b);background:#fff;
- padding:9px 11px;font:inherit;font-size:13.5px;color:var(--ink);}
-input:focus,select:focus,textarea:focus{outline:none;box-shadow:3px 3px 0 var(--guara);}
-.btn{border:2px solid var(--b);border-radius:9px;padding:9px 14px;font-size:13px;font-weight:700;cursor:pointer;
- font-family:inherit;box-shadow:3px 3px 0 var(--b);transition:transform .06s,box-shadow .06s;}
-.btn:active{transform:translate(3px,3px);box-shadow:0 0 0 var(--b);}
-.btn-p{background:var(--guara);color:#fff;}
-.btn-v{background:var(--feq);color:#fff;}
-.btn-g{background:#fff;color:var(--ink);}
-.chip{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:700;padding:3px 8px;
- border-radius:7px;border:1.5px solid var(--b);color:var(--ink);margin:3px 4px 0 0;background:#fff;}
-.muted{color:var(--ink3);font-size:12px;font-weight:400;}
+.emoji-grid button:hover{background:var(--surface-2);}
+.b-lead{align-self:flex-start;background:var(--surface);border-radius:var(--r-m) var(--r-m) var(--r-m) 4px;}
+.b-ag{align-self:flex-end;background:var(--guara-bg);border-color:rgba(249,106,16,.35);
+ border-radius:var(--r-m) var(--r-m) 4px var(--r-m);}
+input,select,textarea{width:100%;border-radius:var(--r-s);border:1px solid var(--border);background:var(--surface-solid);
+ padding:9px 11px;font:inherit;font-size:13.5px;color:var(--text);}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--guara);box-shadow:0 0 0 3px var(--guara-bg);}
+.btn{border:1px solid var(--border);border-radius:var(--r-pill);padding:9px 16px;font-size:13px;font-weight:600;cursor:pointer;
+ font-family:inherit;background:var(--surface);color:var(--text);box-shadow:var(--shadow);
+ backdrop-filter:blur(20px) saturate(1.6);-webkit-backdrop-filter:blur(20px) saturate(1.6);
+ transition:transform .12s ease,box-shadow .12s ease,filter .12s ease;}
+.btn:hover{transform:translateY(-1px);box-shadow:var(--shadow-lg);}
+.btn:active{transform:translateY(0) scale(.98);filter:brightness(.95);}
+.btn-p{background:var(--guara);color:#fff;border-color:transparent;}
+.btn-v{background:var(--feq);color:#fff;border-color:transparent;}
+.btn-g{background:var(--surface);color:var(--text);}
+.chip{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:700;padding:4px 10px;
+ border-radius:var(--r-pill);border:1px solid var(--border);color:var(--text);margin:3px 4px 0 0;background:var(--surface-2);}
+.muted{color:var(--text-muted);font-size:12px;font-weight:400;}
 .conv-shell{display:grid;grid-template-columns:270px 1fr;height:72vh;min-height:420px;overflow:hidden;padding:0;}  /* 72vh é fallback: ajustarAltura() mede e preenche até o rodapé */
-.conv-side{border-right:2px solid var(--b);display:flex;flex-direction:column;overflow:hidden;}
-.conv-search{padding:12px;border-bottom:2px solid var(--b);flex-shrink:0;background:var(--sun);}
-.conv-search input{width:100%;border-radius:8px;border:2px solid var(--b);background:#fff;padding:8px 10px;font:inherit;font-size:13px;}
+.conv-side{border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;}
+.conv-search{padding:12px;border-bottom:1px solid var(--border);flex-shrink:0;background:var(--surface-2);}
+.conv-search input{width:100%;border-radius:var(--r-s);border:1px solid var(--border);background:var(--surface-solid);padding:8px 10px;font:inherit;font-size:13px;}
 .conv-list{overflow-y:auto;flex:1;}
-.conv-item{display:flex;align-items:center;gap:10px;padding:11px 13px;cursor:pointer;border-bottom:1.5px solid rgba(20,20,20,.18);}
-.conv-item:hover{background:var(--paper);}
-.conv-item.on{background:var(--laranjinha);box-shadow:inset 4px 0 0 var(--guara);}
-.conv-ava{width:38px;height:38px;flex-shrink:0;border-radius:9px;background:var(--sun);border:2px solid var(--b);
- color:var(--ink);display:flex;align-items:center;justify-content:center;font-size:12.5px;font-weight:700;}
+.conv-item{display:flex;align-items:center;gap:10px;padding:11px 13px;cursor:pointer;border-bottom:1px solid var(--border);}
+.conv-item:hover{background:var(--surface-2);}
+.conv-item.on{background:var(--guara-bg);box-shadow:inset 4px 0 0 var(--guara);}
+.conv-ava{width:38px;height:38px;flex-shrink:0;border-radius:var(--r-s);background:var(--warn-bg);border:1px solid var(--border);
+ color:var(--text);display:flex;align-items:center;justify-content:center;font-size:12.5px;font-weight:700;}
 .conv-meta{min-width:0;flex:1;}
 .conv-nome{font-size:13.5px;font-weight:700;display:flex;justify-content:space-between;gap:6px;}
-.conv-prev{font-size:12px;color:var(--ink3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px;}
-.conv-dot{width:11px;height:11px;border-radius:50%;background:var(--guara);border:2px solid var(--b);flex-shrink:0;}
+.conv-prev{font-size:12px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px;}
+.conv-dot{width:11px;height:11px;border-radius:50%;background:var(--guara);flex-shrink:0;box-shadow:0 0 0 2px var(--surface-solid);}
 /* Não lidas: o contador conta só mensagens DO LEAD, então continua aceso mesmo com a
    IA respondendo — é justamente o que o operador precisa enxergar. */
-.conv-badge{min-width:20px;height:20px;padding:0 6px;border-radius:999px;background:var(--ok);
- color:#fff;border:2px solid var(--b);flex-shrink:0;display:flex;align-items:center;
+.conv-badge{min-width:20px;height:20px;padding:0 6px;border-radius:var(--r-pill);background:var(--ok);
+ color:#fff;flex-shrink:0;display:flex;align-items:center;
  justify-content:center;font-size:11px;font-weight:800;line-height:1;}
 .conv-item.nao-lida .conv-nome{font-weight:800;}
-.conv-item.nao-lida .conv-prev{color:var(--ink);font-weight:600;}
-.conv-item.nao-lida{background:rgba(11,92,61,.06);}
+.conv-item.nao-lida .conv-prev{color:var(--text);font-weight:600;}
+.conv-item.nao-lida{background:var(--ok-bg);}
 /* Linha de corte no thread: mostra ONDE o operador parou de ler */
 .thread-corte{display:flex;align-items:center;gap:8px;margin:12px 2px;color:var(--ok);
  font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;}
-.thread-corte::before,.thread-corte::after{content:"";flex:1;height:2px;background:var(--ok);opacity:.35;}
+.thread-corte::before,.thread-corte::after{content:"";flex:1;height:1px;background:var(--ok);opacity:.35;}
 .conv-main{display:flex;flex-direction:column;overflow:hidden;}
-.conv-head{padding:12px 16px;border-bottom:2px solid var(--b);flex-shrink:0;background:var(--paper);}
+.conv-head{padding:12px 16px;border-bottom:1px solid var(--border);flex-shrink:0;background:var(--surface-2);}
 .conv-thread{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:11px;}
-.conv-ts{font-size:10px;color:var(--ink3);margin-top:3px;}
-.conv-composer{padding:11px;border-top:2px solid var(--b);display:flex;gap:8px;align-items:flex-end;flex-shrink:0;background:var(--paper);}
+.conv-ts{font-size:10px;color:var(--text-muted);margin-top:3px;}
+.conv-composer{padding:11px;border-top:1px solid var(--border);display:flex;gap:8px;align-items:flex-end;flex-shrink:0;background:var(--surface-2);}
 .conv-composer textarea{resize:none;max-height:110px;}
 .conv-mais-wrap{position:relative;flex-shrink:0;}
 .conv-mais-menu{position:absolute;bottom:calc(100% + 9px);left:0;z-index:40;min-width:236px;
- background:#fff;border:2px solid var(--b);border-radius:10px;box-shadow:4px 4px 0 var(--b);
+ background:var(--surface-solid);border:1px solid var(--border);border-radius:var(--r-m);box-shadow:var(--shadow-lg);
  padding:5px;display:flex;flex-direction:column;}
 .conv-mais-menu button{display:flex;align-items:center;gap:9px;width:100%;background:none;border:0;
- border-radius:7px;padding:8px 10px;font:inherit;font-size:12.5px;font-weight:600;color:var(--ink);
+ border-radius:7px;padding:8px 10px;font:inherit;font-size:12.5px;font-weight:600;color:var(--text);
  cursor:pointer;text-align:left;white-space:nowrap;}
-.conv-mais-menu button:hover{background:var(--laranjinha);}
-.conv-mais-menu button i{font-size:16px;color:var(--ink3);flex-shrink:0;}
+.conv-mais-menu button:hover{background:var(--surface-2);}
+.conv-mais-menu button i{font-size:16px;color:var(--text-muted);flex-shrink:0;}
 /* .hidden é uma classe só, igual a .conv-mais-menu: sem este par a regra de baixo
    (display:flex) vencia por ordem e o menu ficava aberto para sempre. Mesmo
    remédio já usado em .pf-modal.hidden. */
 .conv-mais-menu.hidden{display:none;}
-.conv-blocked{font-size:12px;font-weight:500;color:var(--ink);background:var(--rosa);border:2px solid var(--b);
- border-radius:9px;padding:7px 10px;margin:0 11px 9px;}
-.conv-ficha{padding:8px 14px;border-bottom:2px solid var(--b);background:#fff;font-size:12px;
+.conv-blocked{font-size:12px;font-weight:500;color:var(--bad);background:var(--bad-bg);
+ border-radius:var(--r-s);padding:7px 10px;margin:0 11px 9px;}
+.conv-ficha{padding:8px 14px;border-bottom:1px solid var(--border);background:var(--surface-2);font-size:12px;
  display:flex;flex-direction:column;gap:6px;flex-shrink:0;}
 .conv-ficha-linha{display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
-.conv-dado{display:flex;align-items:center;gap:5px;color:#3b3b3b;}
-.conv-dado i{font-size:14px;color:#6b6b6b;}
+.conv-dado{display:flex;align-items:center;gap:5px;color:var(--text-2);}
+.conv-dado i{font-size:14px;color:var(--text-muted);}
 .conv-dado a{color:inherit;}
 .conv-ficha textarea{width:100%;resize:vertical;min-height:34px;max-height:120px;font-size:12px;}
 .conv-notas-topo{display:flex;align-items:center;gap:6px;width:100%;background:none;
- border:none;padding:2px 0;cursor:pointer;font:inherit;font-size:11px;color:#5b5b5b;text-align:left;}
-.conv-notas-topo:hover{color:var(--ink);}
+ border:none;padding:2px 0;cursor:pointer;font:inherit;font-size:11px;color:var(--text-muted);text-align:left;}
+.conv-notas-topo:hover{color:var(--text);}
 .conv-notas-topo i{font-size:13px;}
-.conv-manual-nota{font-size:11.5px;font-weight:600;color:#fff;background:var(--guara);border-top:2px solid var(--b);
+.conv-manual-nota{font-size:11.5px;font-weight:600;color:#fff;background:var(--guara);
  padding:6px 12px;display:flex;align-items:center;gap:6px;}
-.conv-tpl{border-top:2px solid var(--b);background:var(--paper);padding:10px 12px;font-size:12.5px;}
+.conv-tpl{border-top:1px solid var(--border);background:var(--surface-2);padding:10px 12px;font-size:12.5px;}
 .conv-tpl-top{display:flex;align-items:center;margin-bottom:7px;}
-.conv-tpl-x{margin-left:auto;background:none;border:none;font-size:14px;cursor:pointer;color:var(--ink);padding:0 4px;}
+.conv-tpl-x{margin-left:auto;background:none;border:none;font-size:14px;cursor:pointer;color:var(--text);padding:0 4px;}
 .conv-tpl select{width:100%;}
 .tpl-campo{display:block;margin-top:6px;}
 .tpl-campo span{display:block;font-size:11px;margin-bottom:2px;}
 /* Faixa da decisão automática da Verificação */
-.vf-auto{display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:var(--paper);
- border:2px solid var(--b);border-radius:11px;padding:10px 13px;margin-bottom:12px;}
-.vf-auto.on{background:var(--laranjinha);border-color:var(--guara);}
+.vf-auto{display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:var(--surface-2);
+ border:1px solid var(--border);border-radius:var(--r-m);padding:10px 13px;margin-bottom:12px;}
+.vf-auto.on{background:var(--guara-bg);}
 
 /* Chave estilo iOS — liga o modo de mover leads no funil */
 .chave{display:inline-flex;align-items:center;gap:8px;cursor:pointer;user-select:none;font-size:12.5px;font-weight:600;}
 .chave input{position:absolute;opacity:0;width:0;height:0;}
-.chave .trilho{width:44px;height:26px;border-radius:999px;background:#cfcfcf;border:2px solid var(--b);
+.chave .trilho{width:44px;height:26px;border-radius:var(--r-pill);background:var(--surface-2);border:1px solid var(--border);
  position:relative;transition:background .18s ease;flex-shrink:0;}
 .chave .btn-chave{position:absolute;top:1px;left:1px;width:20px;height:20px;border-radius:50%;
- background:#fff;border:2px solid var(--b);transition:transform .18s ease;}
+ background:#fff;box-shadow:var(--shadow);transition:transform .18s ease;}
 .chave input:checked + .trilho{background:var(--guara);}
 .chave input:checked + .trilho .btn-chave{transform:translateX(18px);}
-.chave input:focus-visible + .trilho{box-shadow:0 0 0 3px var(--sun);}
+.chave input:focus-visible + .trilho{box-shadow:0 0 0 3px var(--guara-bg);}
 
 /* Modo mover: card vira alça de arraste; coluna vira alvo */
 .kb-board.movendo .kb-card{cursor:grab;touch-action:none;}
@@ -217,25 +279,25 @@ input:focus,select:focus,textarea:focus{outline:none;box-shadow:3px 3px 0 var(--
 .kb-board.movendo .kb-col{border-style:dashed;}
 .kb-card.arrastando{opacity:.35;}
 .kb-fantasma{position:fixed;z-index:60;pointer-events:none;width:196px;opacity:.95;
- transform:rotate(-1.5deg);box-shadow:6px 6px 0 var(--b);margin:0;}
-.kb-col.alvo{background:var(--laranjinha);border-color:var(--guara);border-style:solid;}
+ transform:rotate(-1.5deg);box-shadow:var(--shadow-lg);margin:0;}
+.kb-col.alvo{background:var(--guara-bg);border-color:var(--guara);border-style:solid;}
 
 /* Medição do funil — barras proporcionais + destaque do gargalo */
 .md-etapa{margin-bottom:11px;}
 .md-rot{font-size:12.5px;margin-bottom:3px;}
-.md-barra-fora{display:flex;align-items:center;gap:8px;background:var(--paper);
- border:2px solid var(--b);border-radius:9px;padding:3px;}
-.md-barra{height:20px;border-radius:6px;background:var(--feq);border:1.5px solid var(--b);min-width:6px;}
+.md-barra-fora{display:flex;align-items:center;gap:8px;background:var(--surface-2);
+ border:1px solid var(--border);border-radius:var(--r-s);padding:3px;}
+.md-barra{height:20px;border-radius:6px;background:var(--feq);min-width:6px;}
 .md-gargalo{background:var(--guara);}
 .md-n{font-size:12.5px;font-weight:700;white-space:nowrap;padding-right:6px;}
-.md-passo{font-size:11.5px;color:#5b5b5b;margin:3px 0 0 3px;}
+.md-passo{font-size:11.5px;color:var(--text-muted);margin:3px 0 0 3px;}
 .md-alerta{color:var(--bad);font-weight:700;}
 .md-serie{display:flex;align-items:flex-end;gap:3px;height:110px;padding:4px;
- background:var(--paper);border:2px solid var(--b);border-radius:9px;overflow-x:auto;}
+ background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r-s);overflow-x:auto;}
 .md-dia{display:flex;flex-direction:column;align-items:center;justify-content:flex-end;
  height:100%;min-width:22px;flex:1;}
-.md-col{width:70%;background:var(--feq);border:1.5px solid var(--b);border-radius:3px 3px 0 0;min-height:2px;}
-.md-data{font-size:8.5px;color:#5b5b5b;margin-top:2px;white-space:nowrap;}
+.md-col{width:70%;background:var(--feq);border-radius:3px 3px 0 0;min-height:2px;}
+.md-data{font-size:8.5px;color:var(--text-muted);margin-top:2px;white-space:nowrap;}
 
 /* Gestão de LPs — editor lado a lado: código à esquerda, página ao vivo à direita */
 .lp-ed-top{display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:4px;}
@@ -243,19 +305,35 @@ input:focus,select:focus,textarea:focus{outline:none;box-shadow:3px 3px 0 var(--
 .lp-split{display:grid;grid-template-columns:1fr 1fr;gap:10px;height:min(72vh,720px);}
 .lp-split textarea{height:100%;resize:none;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
  font-size:12px;line-height:1.5;white-space:pre;overflow:auto;tab-size:2;}
-.lp-split iframe{width:100%;height:100%;border:2px solid var(--b);border-radius:11px;background:#0f172a;
- box-shadow:3px 3px 0 var(--b);}
+.lp-split iframe{width:100%;height:100%;border:1px solid var(--border);border-radius:var(--r-m);background:#0f172a;
+ box-shadow:var(--shadow);}
 @media(max-width:900px){.lp-split{grid-template-columns:1fr;height:auto;}
  .lp-split textarea{height:340px;} .lp-split iframe{height:420px;}}
-.lp-linha{display:flex;align-items:center;gap:10px;padding:9px 11px;border-radius:9px;
- background:var(--paper);border:2px solid var(--b);margin-bottom:7px;flex-wrap:wrap;}
+.lp-linha{display:flex;align-items:center;gap:10px;padding:9px 11px;border-radius:var(--r-s);
+ background:var(--surface-2);border:1px solid var(--border);margin-bottom:7px;flex-wrap:wrap;}
 .lp-linha a{font-size:12px;}
 .tpl-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
 @media(max-width:640px){.tpl-grid{grid-template-columns:1fr;}}
-.tpl-previa{background:var(--laranjinha);border:2px solid var(--b);border-radius:11px;
- padding:10px 12px;font-size:13px;max-width:340px;box-shadow:3px 3px 0 var(--b);}
+.tpl-previa{background:var(--guara-bg);border:1px solid var(--border);border-radius:var(--r-m);
+ padding:10px 12px;font-size:13px;max-width:340px;box-shadow:var(--shadow);}
+
+/* Campanhas — construtor de público + progresso por status (mesmo componente de
+   barra proporcional da Medição, sem lib nova) */
+.camp-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;}
+.camp-card{background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r-m);
+ padding:11px 13px;margin-bottom:10px;}
+.camp-topo{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px;}
+.camp-nome{font-weight:700;font-size:13.5px;}
+.camp-barras{display:flex;flex-direction:column;gap:5px;}
+.camp-linha{display:flex;align-items:center;gap:8px;font-size:11.5px;}
+.camp-linha .md-barra-fora{flex:1;}
+.camp-linha .md-barra{background:var(--info);}
+.camp-linha.lido .md-barra{background:var(--feq);}
+.camp-linha.clicado .md-barra{background:var(--guara);}
+.camp-linha.falhou .md-barra{background:var(--bad);}
+.camp-rotulo{width:76px;flex-shrink:0;color:var(--text-muted);}
 .conv-back{display:none;align-items:center;justify-content:center;width:30px;height:30px;flex-shrink:0;border-radius:8px;
- border:2px solid var(--b);background:#fff;cursor:pointer;margin-right:2px;font-size:15px;color:var(--ink);box-shadow:2px 2px 0 var(--b);}
+ border:1px solid var(--border);background:var(--surface-solid);cursor:pointer;margin-right:2px;font-size:15px;color:var(--text);box-shadow:var(--shadow);}
 @media (max-width:900px){
   .conv-shell{grid-template-columns:1fr;}
   .conv-shell:not(.chat-open) .conv-main{display:none;}
@@ -264,25 +342,30 @@ input:focus,select:focus,textarea:focus{outline:none;box-shadow:3px 3px 0 var(--
   .logos-inst{display:none;}
 }
 .kb-board{display:flex;gap:14px;overflow-x:auto;padding:4px 2px 10px;}
-.kb-col{flex:0 0 214px;background:var(--paper);border:2px solid var(--b);border-radius:11px;
- box-shadow:4px 4px 0 var(--b);padding:10px 9px;align-self:flex-start;}
+.kb-col{flex:0 0 214px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r-m);
+ box-shadow:var(--shadow);padding:10px 9px;align-self:flex-start;}
 .kb-col-h{display:flex;justify-content:space-between;align-items:center;font-size:12.5px;font-weight:700;
- text-transform:uppercase;letter-spacing:.04em;margin:2px 4px 9px;color:var(--ink);}
-.kb-count{color:var(--ink);font-weight:700;background:var(--sun);border:1.5px solid var(--b);border-radius:7px;padding:1px 8px;font-size:11px;}
-.kb-card{background:#fff;border:2px solid var(--b);border-radius:9px;padding:9px 11px;margin-bottom:9px;cursor:pointer;
- transition:transform .06s,box-shadow .06s;}
-.kb-card:hover{transform:translate(-2px,-2px);box-shadow:3px 3px 0 var(--b);}
-.kb-contato{display:flex;align-items:center;gap:4px;font-size:10.5px;color:#5b5b5b;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+ text-transform:uppercase;letter-spacing:.04em;margin:2px 4px 9px;color:var(--text);}
+.kb-count{color:var(--warn);font-weight:700;background:var(--warn-bg);border-radius:var(--r-pill);padding:1px 8px;font-size:11px;}
+.kb-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-s);padding:9px 11px;margin-bottom:9px;cursor:pointer;
+ transition:transform .12s ease,box-shadow .12s ease;}
+.kb-card:hover{transform:translateY(-2px);box-shadow:var(--shadow);}
+.kb-contato{display:flex;align-items:center;gap:4px;font-size:10.5px;color:var(--text-muted);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .kb-contato i{font-size:12px;flex-shrink:0;}
 .kb-nome{font-size:13px;font-weight:700;display:flex;align-items:center;gap:7px;}
-.kb-sub{font-size:11px;color:var(--ink3);margin-top:3px;}
+.kb-sub{font-size:11px;color:var(--text-muted);margin-top:3px;}
 .kb-badges{display:flex;flex-wrap:wrap;gap:4px;margin-top:7px;}
-.kb-empty{color:var(--ink3);font-size:11.5px;padding:6px 4px;}
+.kb-empty{color:var(--text-muted);font-size:11.5px;padding:6px 4px;}
 </style>
 </head>
 <body>
-<div id="login" style="display:none;position:fixed;inset:0;background:rgba(20,20,20,.55);align-items:center;justify-content:center;z-index:50;">
-  <div class="g" style="padding:24px;width:320px;box-shadow:9px 9px 0 var(--b);text-align:center;">
+<script>
+// Aplica o tema salvo ANTES do primeiro paint perceptível (evita flash do tema errado).
+// Sem escolha salva, o CSS já segue prefers-color-scheme sozinho — não seta nada aqui.
+try{ const t = localStorage.getItem('tema'); if(t) document.documentElement.dataset.theme = t; }catch(e){}
+</script>
+<div id="login" style="display:none;position:fixed;inset:0;background:var(--overlay);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);align-items:center;justify-content:center;z-index:50;">
+  <div class="g" style="padding:24px;width:320px;box-shadow:var(--shadow-lg);text-align:center;">
     <img src="/assets/guara.png" alt="Guará Marketing" style="width:64px;height:64px;object-fit:contain;margin-bottom:6px;">
     <div style="font-weight:700;font-size:16px;margin-bottom:14px;">Central FEQ — acesso</div>
     <input id="lu" placeholder="usuário" style="margin-bottom:8px;">
@@ -305,8 +388,9 @@ input:focus,select:focus,textarea:focus{outline:none;box-shadow:3px 3px 0 var(--
         <span class="logo-plaque"><img src="/assets/feq.png" alt="FEQ"></span>
         <span class="logo-plaque"><img src="/assets/unicamp.svg" alt="Unicamp"></span>
       </div>
-      <button id="autoTgl" class="pill" style="cursor:pointer;font-family:inherit;background:#fff;" onclick="toggleAuto()"><i class="ti ti-bolt"></i> aprovação automática: OFF</button>
-      <span class="pill" style="background:var(--mint);"><i class="ti ti-circle-filled" style="font-size:9px;"></i> sistema ativo</span>
+      <button id="autoTgl" class="pill" style="cursor:pointer;font-family:inherit;background:var(--surface);" onclick="toggleAuto()"><i class="ti ti-bolt"></i> aprovação automática: OFF</button>
+      <span class="pill" style="background:var(--ok-bg);"><i class="ti ti-circle-filled" style="font-size:9px;"></i> sistema ativo</span>
+      <button id="temaTgl" class="theme-tgl" onclick="alternarTema()" title="Alternar tema claro/escuro"><i class="ti ti-moon"></i></button>
     </div>
   </div>
 
@@ -326,6 +410,7 @@ input:focus,select:focus,textarea:focus{outline:none;box-shadow:3px 3px 0 var(--
       <button class="navi" data-sec="medicao"><i class="ti ti-chart-arrows-vertical"></i> Medição</button>
       <button class="navi" data-sec="lps"><i class="ti ti-browser"></i> LPs</button>
       <button class="navi" data-sec="templates"><i class="ti ti-mail-cog"></i> Templates</button>
+      <button class="navi" data-sec="campanhas"><i class="ti ti-send"></i> Campanhas</button>
       <button class="navi" data-sec="revisor"><i class="ti ti-eye-search"></i> Revisor ao vivo</button>
       <!-- Módulo restrito: nasce OCULTO e só aparece se /api/me disser que este
            usuário tem acesso. Esconder é conveniência — quem barra é o guard do
@@ -557,6 +642,50 @@ input:focus,select:focus,textarea:focus{outline:none;box-shadow:3px 3px 0 var(--
         </div>
       </section>
 
+      <section id="campanhas" class="hidden">
+        <div class="g sec">
+          <h2><i class="ti ti-send"></i> Disparo em lote</h2>
+          <p class="muted" style="margin:0 0 10px;">Escolha um público e um template aprovado, confira a
+            contagem e dispare para todos de uma vez. O envio é em lotes pacientes (não é instantâneo) —
+            protege a conta contra bloqueio por rajada em público frio.</p>
+          <div class="camp-grid">
+            <label class="tpl-campo"><span class="muted">Nome da campanha (opcional)</span>
+              <input id="campNome" placeholder="Reengajamento agosto"></label>
+            <label class="tpl-campo"><span class="muted">Curso</span>
+              <select id="campCurso" onchange="campPreview()"><option value="">Todos os cursos</option></select></label>
+            <label class="tpl-campo"><span class="muted">Fase</span>
+              <select id="campFase" onchange="campPreview()">
+                <option value="">Todas as fases</option>
+                <option value="Lead">Lead</option><option value="Prospect">Prospect</option>
+                <option value="Inscrito">Inscrito</option><option value="Taxa aceita">Taxa aceita</option>
+                <option value="Taxa paga">Taxa paga</option><option value="Documento entregue">Documento entregue</option>
+                <option value="Matriculado">Matriculado</option><option value="Em espera">Em espera</option>
+                <option value="Perdido">Perdido</option><option value="Cancelado">Cancelado</option>
+              </select></label>
+            <label class="tpl-campo"><span class="muted">Estado da conversa</span>
+              <select id="campEstadoConv" onchange="campPreview()">
+                <option value="">Qualquer</option>
+                <option value="aguardando_1o_contato">Aguardando 1º contato</option>
+                <option value="aguardando_resposta">Aguardando resposta</option>
+                <option value="qualificacao">Qualificação</option>
+                <option value="escalado_humano">Escalado para humano</option>
+                <option value="manual_humano">Modo manual</option>
+              </select></label>
+            <label class="tpl-campo"><span class="muted">Template aprovado</span>
+              <select id="campTemplate"></select></label>
+          </div>
+          <div id="campPreviewOut" style="margin-top:10px;"></div>
+          <div style="display:flex;gap:8px;align-items:center;margin-top:12px;">
+            <button class="btn btn-p" onclick="campDisparar()"><i class="ti ti-send"></i> Disparar campanha</button>
+            <span class="muted">ação externa — manda WhatsApp de verdade para o público acima</span>
+          </div>
+        </div>
+        <div class="g sec">
+          <h3 style="margin:0 0 10px;"><i class="ti ti-list-details"></i> Campanhas</h3>
+          <div id="campLista"></div>
+        </div>
+      </section>
+
       <section id="injetor" class="hidden">
         <div class="g sec">
           <h2><i class="ti ti-database-import"></i> Injetor de conhecimento</h2>
@@ -726,6 +855,7 @@ document.querySelectorAll('.navi').forEach(b=>b.onclick=()=>{
   if(b.dataset.sec==='kanban') renderKanban();
   if(b.dataset.sec==='professores') renderProfessores();
   if(b.dataset.sec==='templates') tplCarregar();
+  if(b.dataset.sec==='campanhas') campCarregar();
   if(b.dataset.sec==='lps') lpCarregar();
   if(b.dataset.sec==='medicao') mdCarregar();
   if(b.dataset.sec==='injetor') ofCursosCarregar();
@@ -744,7 +874,7 @@ async function carregar(){
   $('#capt').innerHTML = cap.cursos.map(c=>{
     const cls = c.status==='aberta'?'t-ok':(c.status==='encerrada'?'t-bad':'t-warn');
     const al = c.alerta?` <i class="ti ti-alert-triangle" title="${c.alerta}" style="color:var(--warn);"></i>`:'';
-    return `<div class="row"><strong>${c.curso}</strong>${al}<span style="color:var(--ink2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${c.nome}</span><span class="tag ${cls}">${c.status}</span></div>`;
+    return `<div class="row"><strong>${c.curso}</strong>${al}<span style="color:var(--text-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${c.nome}</span><span class="tag ${cls}">${c.status}</span></div>`;
   }).join('');
 
   if(!$('#rcurso').options.length) $('#rcurso').innerHTML = cap.cursos.map(c=>`<option value="${c.curso}">${c.curso}</option>`).join('');
@@ -842,7 +972,7 @@ async function testarRevisor(){
   const head = r.aprovado
     ? `<span class="tag t-ok"><i class="ti ti-check"></i> aprovado</span>`
     : `<span class="tag t-bad"><i class="ti ti-ban"></i> bloqueado</span>`;
-  const bl = (r.bloqueios||[]).map(b=>`<div class="row" style="background:var(--rosa);"><i class="ti ti-alert-triangle" style="color:var(--bad);"></i><span>${b}</span></div>`).join('');
+  const bl = (r.bloqueios||[]).map(b=>`<div class="row" style="background:var(--bad-bg);"><i class="ti ti-alert-triangle" style="color:var(--bad);"></i><span>${b}</span></div>`).join('');
   const an = (r.ancoras||[]).map(a=>`<span class="chip t-ok"><i class="ti ti-check"></i> ${a}</span>`).join('');
   $('#rout').innerHTML = `<div style="margin-bottom:8px;">${head}</div>${bl}${an?('<div style="margin-top:6px;">'+an+'</div>'):''}`;
 }
@@ -916,13 +1046,13 @@ let LP_ABERTA = null, LP_SUJO = false;
 async function lpCarregar(){
   const d = await api('/api/lps');
   $('#lpAviso').innerHTML = d.wp_configurado ? ''
-    : '<div class="row t-warn" style="background:var(--sun);"><i class="ti ti-alert-triangle"></i><span>Sem <code>WP_URL</code> no .env: dá para editar e pré-visualizar, mas publicar roda em dry-run.</span></div>';
+    : '<div class="row t-warn" style="background:var(--warn-bg);"><i class="ti ti-alert-triangle"></i><span>Sem <code>WP_URL</code> no .env: dá para editar e pré-visualizar, mas publicar roda em dry-run.</span></div>';
   $('#lpLista').innerHTML = (d.lps||[]).map(l=>{
     const insc = l.aberto ? '<span class="chip t-ok" style="margin:0;">inscrição aberta</span>'
                           : '<span class="chip t-warn" style="margin:0;">lista de espera</span>';
     const edit = l.editada
       ? `<span class="chip t-acc" style="margin:0;" title="Editada em ${l.editada_em||''} — não recebe mais atualizações da ontologia"><i class="ti ti-pencil"></i> editada à mão</span>`
-      : '<span class="chip" style="margin:0;background:var(--paper);">gerada</span>';
+      : '<span class="chip" style="margin:0;background:var(--surface-2);">gerada</span>';
     // só existe quando editada=true: LP gerada se auto-atualiza sozinha (lp_auto), não desatualiza
     const drift = l.drift
       ? '<span class="chip t-bad" style="margin:0;" title="A ontologia mudou desde esta edição — a página no ar pode estar desatualizada"><i class="ti ti-alert-triangle"></i> pode estar desatualizada</span>'
@@ -942,7 +1072,7 @@ async function lpCarregar(){
 }
 async function lpAbrir(curso){
   const d = await api('/api/lps/'+curso);
-  if(d.erro){ $('#lpEdOut').innerHTML = `<div class="row t-bad" style="background:var(--rosa);">${d.erro}</div>`; return; }
+  if(d.erro){ $('#lpEdOut').innerHTML = `<div class="row t-bad" style="background:var(--bad-bg);">${d.erro}</div>`; return; }
   LP_ABERTA = curso; LP_SUJO = false;
   $('#lpEditor').classList.remove('hidden');
   $('#lpEdTitulo').textContent = `Editando ${curso}`;
@@ -975,7 +1105,7 @@ async function lpSalvar(silencioso){
   if(!LP_ABERTA) return false;
   const r = await api('/api/lps/'+LP_ABERTA,{method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({html: $('#lpCodigo').value})});
-  if(r.erro){ $('#lpEdOut').innerHTML = `<div class="row t-bad" style="background:var(--rosa);"><i class="ti ti-ban"></i><span>${escapeHtml(r.erro)}</span></div>`; return false; }
+  if(r.erro){ $('#lpEdOut').innerHTML = `<div class="row t-bad" style="background:var(--bad-bg);"><i class="ti ti-ban"></i><span>${escapeHtml(r.erro)}</span></div>`; return false; }
   LP_SUJO = false;
   if(!silencioso) $('#lpEdOut').innerHTML = '<span class="chip t-ok"><i class="ti ti-check"></i> salvo — publique para o lead ver</span>';
   await lpCarregar();
@@ -986,7 +1116,7 @@ async function lpRestaurar(){
   if(!LP_ABERTA) return;
   if(!confirm('Descartar a edição desta LP e voltar ao HTML gerado pela ontologia?')) return;
   const r = await api('/api/lps/'+LP_ABERTA+'/restaurar',{method:'POST'});
-  if(r.erro){ $('#lpEdOut').innerHTML = `<div class="row t-bad" style="background:var(--rosa);">${escapeHtml(r.erro)}</div>`; return; }
+  if(r.erro){ $('#lpEdOut').innerHTML = `<div class="row t-bad" style="background:var(--bad-bg);">${escapeHtml(r.erro)}</div>`; return; }
   const curso = LP_ABERTA; await lpCarregar(); await lpAbrir(curso);
   $('#lpEdOut').innerHTML = '<span class="chip t-ok"><i class="ti ti-rotate"></i> restaurada — voltou a ser gerada pela ontologia</span>';
 }
@@ -996,12 +1126,12 @@ async function lpPublicar(){
   if(!await lpSalvar(true)) return;
   $('#lpEdOut').innerHTML = '<span class="chip t-acc"><i class="ti ti-loader"></i> publicando…</span>';
   const r = await api('/api/lps/'+LP_ABERTA+'/publicar',{method:'POST'});
-  if(r.erro){ $('#lpEdOut').innerHTML = `<div class="row t-bad" style="background:var(--rosa);"><i class="ti ti-ban"></i><span>${escapeHtml(r.erro)}</span></div>`; return; }
+  if(r.erro){ $('#lpEdOut').innerHTML = `<div class="row t-bad" style="background:var(--bad-bg);"><i class="ti ti-ban"></i><span>${escapeHtml(r.erro)}</span></div>`; return; }
   const ok = r.status==='publicado', dry = r.status==='dry_run';
   $('#lpEdOut').innerHTML = ok
-    ? `<div class="row t-ok" style="background:var(--mint);"><i class="ti ti-circle-check"></i><span>Publicada — <a href="${r.link}" target="_blank">abrir no site</a></span></div>`
-    : dry ? '<div class="row t-warn" style="background:var(--sun);"><i class="ti ti-flask"></i><span>Dry-run: sem credenciais do WordPress, nada foi publicado.</span></div>'
-          : `<div class="row t-bad" style="background:var(--rosa);"><i class="ti ti-ban"></i><span>Falhou: ${escapeHtml(r.motivo||r.status||'')}</span></div>`;
+    ? `<div class="row t-ok" style="background:var(--ok-bg);"><i class="ti ti-circle-check"></i><span>Publicada — <a href="${r.link}" target="_blank">abrir no site</a></span></div>`
+    : dry ? '<div class="row t-warn" style="background:var(--warn-bg);"><i class="ti ti-flask"></i><span>Dry-run: sem credenciais do WordPress, nada foi publicado.</span></div>'
+          : `<div class="row t-bad" style="background:var(--bad-bg);"><i class="ti ti-ban"></i><span>Falhou: ${escapeHtml(r.motivo||r.status||'')}</span></div>`;
   await lpCarregar();
 }
 
@@ -1017,7 +1147,7 @@ async function tplCarregar(forcar){
   $('#tplConexao').innerHTML = d.conectado
     ? `<span class="chip t-ok"><i class="ti ti-plug-connected"></i> conectado à WABA</span>
        <button class="btn btn-g" style="margin-left:6px;padding:4px 9px;" onclick="tplCarregar(1)"><i class="ti ti-refresh"></i> Atualizar</button>`
-    : `<div class="row t-warn" style="background:var(--sun);"><i class="ti ti-alert-triangle"></i><span>Sem <code>WHATSAPP_WABA_ID</code>/token no .env — não dá para consultar nem criar na Meta. Abaixo, o rol que o sistema usa no envio.</span></div>`;
+    : `<div class="row t-warn" style="background:var(--warn-bg);"><i class="ti ti-alert-triangle"></i><span>Sem <code>WHATSAPP_WABA_ID</code>/token no .env — não dá para consultar nem criar na Meta. Abaixo, o rol que o sistema usa no envio.</span></div>`;
   const ts = d.templates||[];
   $('#tplLista').innerHTML = ts.length ? ts.map(t=>{
     const st = TPL_STATUS[t.status] || ['t-acc', t.status||'—'];
@@ -1052,7 +1182,7 @@ function tplPreview(){
   p.innerHTML = (head?`<div style="font-weight:700;margin-bottom:4px;">${escapeHtml(head)}</div>`:'')
     + `<div>${escapeHtml(corpo).replace(/\n/g,'<br>') || '<span class="muted">(escreva o corpo da mensagem)</span>'}</div>`
     + (foot?`<div class="muted" style="margin-top:5px;font-size:11px;">${escapeHtml(foot)}</div>`:'')
-    + (btns.length?`<div style="margin-top:7px;display:flex;gap:5px;flex-wrap:wrap;">${btns.map(b=>`<span class="chip" style="margin:0;background:#fff;">${escapeHtml(b)}</span>`).join('')}</div>`:'');
+    + (btns.length?`<div style="margin-top:7px;display:flex;gap:5px;flex-wrap:wrap;">${btns.map(b=>`<span class="chip" style="margin:0;background:var(--surface-solid);">${escapeHtml(b)}</span>`).join('')}</div>`:'');
 }
 async function criarTemplate(){
   const vars = tplVars();
@@ -1067,12 +1197,93 @@ async function criarTemplate(){
   };
   $('#tplOut').innerHTML = '<span class="chip t-acc"><i class="ti ti-loader"></i> enviando para a Meta…</span>';
   const r = await api('/api/templates',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-  if(!r.ok){ $('#tplOut').innerHTML = `<div class="row t-bad" style="background:var(--rosa);"><i class="ti ti-ban"></i><span>${escapeHtml(r.erro||'falhou')}</span></div>`; return; }
-  if(r.status==='dry_run'){ $('#tplOut').innerHTML = `<div class="row t-warn" style="background:var(--sun);"><i class="ti ti-flask"></i><span>Validado, mas <strong>nada foi criado</strong>: ${escapeHtml(r.aviso||'')}</span></div>`; return; }
-  $('#tplOut').innerHTML = `<div class="row t-ok" style="background:var(--mint);"><i class="ti ti-circle-check"></i><span><strong>${escapeHtml(r.nome)}</strong> enviado — status <strong>${escapeHtml(r.status)}</strong>. A Meta costuma revisar em minutos; atualize a lista para ver.</span></div>`;
+  if(!r.ok){ $('#tplOut').innerHTML = `<div class="row t-bad" style="background:var(--bad-bg);"><i class="ti ti-ban"></i><span>${escapeHtml(r.erro||'falhou')}</span></div>`; return; }
+  if(r.status==='dry_run'){ $('#tplOut').innerHTML = `<div class="row t-warn" style="background:var(--warn-bg);"><i class="ti ti-flask"></i><span>Validado, mas <strong>nada foi criado</strong>: ${escapeHtml(r.aviso||'')}</span></div>`; return; }
+  $('#tplOut').innerHTML = `<div class="row t-ok" style="background:var(--ok-bg);"><i class="ti ti-circle-check"></i><span><strong>${escapeHtml(r.nome)}</strong> enviado — status <strong>${escapeHtml(r.status)}</strong>. A Meta costuma revisar em minutos; atualize a lista para ver.</span></div>`;
   ['#tplNome','#tplCorpo','#tplHead','#tplFoot','#tplBtns'].forEach(s=>{ const e=$(s); if(e) e.value=''; });
   const bx = $('#tplExemplos'); if(bx){ bx.innerHTML=''; bx.dataset.n=''; }
   tplCarregar(1);
+}
+
+// ------------------------------------------------------------- Campanhas
+let CAMP_ENVIANDO = false;   // true enquanto alguma campanha listada está 'enviando' — liga o poll
+async function campCarregar(){
+  const sel = $('#campCurso');
+  if(sel && sel.options.length<=1 && window.CURSOS_ALL)
+    sel.innerHTML = '<option value="">Todos os cursos</option>' +
+      window.CURSOS_ALL.map(c=>`<option value="${c}">${c}</option>`).join('');
+  const tsel = $('#campTemplate');
+  if(tsel && !tsel.options.length){
+    const ts = await api('/api/campanhas/templates');
+    tsel.innerHTML = ts.length ? ts.map(t=>`<option value="${t.nome}" data-idioma="${t.idioma}">${escapeHtml(t.titulo)} (${t.nome})</option>`).join('')
+      : '<option value="">Nenhum template aprovado</option>';
+  }
+  await campPreview();
+  await campListar();
+}
+async function campPreview(){
+  const qs = new URLSearchParams();
+  const curso = ($('#campCurso')||{}).value, fase = ($('#campFase')||{}).value,
+        ec = ($('#campEstadoConv')||{}).value;
+  if(curso) qs.set('curso', curso);
+  if(fase) qs.set('fase', fase);
+  if(ec) qs.set('estado_conversa', ec);
+  const r = await api('/api/campanhas/preview?'+qs.toString());
+  $('#campPreviewOut').innerHTML =
+    `<span class="chip ${r.total?'t-ok':'t-warn'}"><i class="ti ti-users"></i> ${r.total} lead(s) correspondem a este filtro</span>` +
+    (r.aviso_tier?`<div class="row t-warn" style="background:var(--warn-bg);margin-top:8px;"><i class="ti ti-alert-triangle"></i><span>${escapeHtml(r.aviso_tier)}</span></div>`:'');
+  return r.total;
+}
+async function campDisparar(){
+  const total = await campPreview();
+  if(!total){ alert('Nenhum lead corresponde a este filtro.'); return; }
+  const tsel = $('#campTemplate'); const tpl = tsel && tsel.value;
+  if(!tpl){ alert('Escolha um template aprovado.'); return; }
+  const titulo = tsel.options[tsel.selectedIndex].textContent;
+  if(!confirm(`Disparar "${titulo}" para ${total} lead(s) agora? Isto manda WhatsApp de verdade.`)) return;
+  const body = {
+    nome: ($('#campNome')||{}).value||'', template_nome: tpl,
+    filtro: { curso: ($('#campCurso')||{}).value||null, fase: ($('#campFase')||{}).value||null,
+             estado_conversa: ($('#campEstadoConv')||{}).value||null }
+  };
+  const r = await api('/api/campanhas',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  if(r.erro){ alert(r.erro); return; }
+  $('#campNome').value = '';
+  await campListar();
+}
+async function campCancelar(id){
+  if(!confirm('Cancelar esta campanha? Quem já recebeu não muda; o resto do envio para.')) return;
+  await api('/api/campanhas/'+id+'/cancelar',{method:'POST'});
+  await campListar();
+}
+const CAMP_STATUS_ROT = {rascunho:'rascunho', enviando:'enviando…', concluida:'concluída', cancelada:'cancelada'};
+function campBarra(rotulo, n, total, classe){
+  const larg = total ? Math.max(2, Math.round(100*n/total)) : 0;
+  return `<div class="camp-linha ${classe}"><span class="camp-rotulo">${rotulo}</span>
+    <div class="md-barra-fora"><div class="md-barra" style="width:${larg}%;"></div></div>
+    <span>${n}</span></div>`;
+}
+async function campListar(){
+  const cs = await api('/api/campanhas');
+  CAMP_ENVIANDO = cs.some(c=>c.status==='enviando');
+  $('#campLista').innerHTML = cs.length ? cs.map(c=>{
+    const g = c.contagens||{};
+    const st = CAMP_STATUS_ROT[c.status]||c.status;
+    const stCls = c.status==='enviando' ? 't-acc' : (c.status==='cancelada' ? 't-bad' : 't-ok');
+    return `<div class="camp-card">
+      <div class="camp-topo"><span class="camp-nome">${escapeHtml(c.nome||c.template_nome)}</span>
+        <span class="tag ${stCls}">${st}</span>
+        <span class="muted">${c.template_nome} · ${c.total_alvo} alvo(s) · ${escapeHtml(c.criado_por||'')}</span>
+        ${c.status==='enviando'?`<button class="btn btn-g" style="margin-left:auto;padding:4px 9px;" onclick="campCancelar(${c.id})"><i class="ti ti-player-stop"></i> Cancelar</button>`:''}
+      </div>
+      <div class="camp-barras">
+        ${campBarra('Enviado', g.enviado||0, c.total_alvo, 'enviado')}
+        ${campBarra('Entregue', g.entregue||0, c.total_alvo, 'entregue')}
+        ${campBarra('Lido', g.lido||0, c.total_alvo, 'lido')}
+        ${campBarra('Clicado', g.clicado||0, c.total_alvo, 'clicado')}
+        ${campBarra('Falhou', g.falhou||0, c.total_alvo, 'falhou')}
+      </div></div>`;
+  }).join('') : '<div class="muted">Nenhuma campanha disparada ainda.</div>';
 }
 
 async function analisarInjetor(){
@@ -1090,7 +1301,7 @@ function renderProposta(p){
         ? `<span class="tag t-warn"><i class="ti ti-help"></i> precisa de esclarecimento</span>`
         : `<span class="tag t-bad"><i class="ti ti-ban"></i> ${p.status}</span>`);
   const diff = (p.diff||[]).map(d=>`<div class="row"><i class="ti ti-arrow-right"></i><span><strong>${d.campo}</strong>: <span style="color:var(--bad);">${d.de??'—'}</span> → <span style="color:var(--ok);font-weight:700;">${d.para}</span></span></div>`).join('');
-  const imp = (p.impacto||[]).map(i=>`<div class="row t-acc" style="background:var(--sky);"><i class="ti ti-bolt"></i><span>${i}</span></div>`).join('');
+  const imp = (p.impacto||[]).map(i=>`<div class="row t-acc" style="background:var(--info-bg);"><i class="ti ti-bolt"></i><span>${i}</span></div>`).join('');
   const aprovar = p.status==='proposta'
     ? `<div style="margin-top:10px;display:flex;gap:8px;"><button class="btn btn-p" onclick="aprovarProposta('${p.id}')"><i class="ti ti-check"></i> Aprovar e aplicar</button><button class="btn btn-g" onclick="api('/api/injetor/${p.id}/rejeitar',{method:'POST'}).then(()=>{$('#injout').innerHTML='';carregar();})">Rejeitar</button></div>`
     : '';
@@ -1105,10 +1316,10 @@ async function aprovarProposta(pid){
     // oferecimento: sem 'versao' (é diff+cursos_metas+publicação, não só versionamento do jsonld)
     const msg = r.versao ? `Aplicado e versionado (${r.versao.versao}). Ontologia recarregada.`
       : `Ontologia atualizada${r.lp?' e LP republicada':''}.${r.aviso?' ⚠️ '+r.aviso:''}`;
-    $('#injout').innerHTML = `<div class="row t-ok" style="background:var(--mint);"><i class="ti ti-circle-check"></i><span>${msg}</span></div>`;
+    $('#injout').innerHTML = `<div class="row t-ok" style="background:var(--ok-bg);"><i class="ti ti-circle-check"></i><span>${msg}</span></div>`;
     carregar();
   }
-  else { $('#injout').innerHTML = `<div class="row t-bad" style="background:var(--rosa);"><i class="ti ti-ban"></i><span>${r.erro}</span></div>`; }
+  else { $('#injout').innerHTML = `<div class="row t-bad" style="background:var(--bad-bg);"><i class="ti ti-ban"></i><span>${r.erro}</span></div>`; }
 }
 
 async function ofCursosCarregar(){
@@ -1288,8 +1499,8 @@ async function otCarregar(){
     <div style="margin:4px 0 10px;">
       <div style="display:flex;justify-content:space-between;font-size:11.5px;" class="muted">
         <span>${rot}</span><span>${n} / ${d}</span></div>
-      <div style="height:6px;background:#eef1f4;border:1px solid var(--b);">
-        <div style="height:100%;width:${pct(n,d)}%;background:var(--acc);"></div></div>
+      <div style="height:6px;background:var(--surface-2);border:1px solid var(--border);">
+        <div style="height:100%;width:${pct(n,d)}%;background:var(--guara);"></div></div>
     </div>`;
   cx.innerHTML = `
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px;">
@@ -1392,8 +1603,8 @@ function kbCard(c){
     c.telefone ? `<div class="kb-contato"><i class="ti ti-phone"></i>${escapeHtml(fmtTel(c.telefone))}</div>` : '',
     c.email ? `<div class="kb-contato"><i class="ti ti-mail"></i>${escapeHtml(c.email)}</div>` : '',
   ].join('');
-  if(origem) b.push(`<span class="chip" style="margin:0;background:var(--sky);" title="${escapeHtml(campanha||origem)}"><i class="ti ti-target-arrow"></i> ${escapeHtml(origem)}</span>`);
-  if(c.tem_notas) b.push('<span class="chip" style="margin:0;background:var(--sun);" title="tem notas"><i class="ti ti-notes"></i></span>');
+  if(origem) b.push(`<span class="chip" style="margin:0;background:var(--info-bg);" title="${escapeHtml(campanha||origem)}"><i class="ti ti-target-arrow"></i> ${escapeHtml(origem)}</span>`);
+  if(c.tem_notas) b.push('<span class="chip" style="margin:0;background:var(--warn-bg);" title="tem notas"><i class="ti ti-notes"></i></span>');
   return `<div class="kb-card" data-id="${escapeHtml(c.id)}" onclick="kbClique('${c.id}')">
     <div class="kb-nome"><span class="conv-ava" style="width:22px;height:22px;font-size:9.5px;">${escapeHtml(c.iniciais)}</span>${escapeHtml(c.nome || (c.telefone?fmtTel(c.telefone):'') || '(sem nome)')}</div>
     <div class="kb-sub">${cursoTxt} · ${c.ha}</div>
@@ -1556,7 +1767,7 @@ async function setModo(id, modo){
 async function reativarLead(id){
   const r = await api('/api/leads/'+id+'/reativar',{method:'POST'});
   if(r.envio && !r.envio.ok){ marcarErro(id, {}, 'não reativado — '+(r.envio.motivo||'')); return; }
-  CONV_ERRO = {id, html:'<div class="conv-blocked" style="background:var(--mint);"><i class="ti ti-check"></i> Reengajamento enviado.</div>'};
+  CONV_ERRO = {id, html:'<div class="conv-blocked" style="background:var(--ok-bg);"><i class="ti ti-check"></i> Reengajamento enviado.</div>'};
   aposAcao();
 }
 // Iniciar/reiniciar a conversa a qualquer momento — cobre o lead que nunca recebeu
@@ -1566,7 +1777,7 @@ async function reativarLead(id){
 async function conversaNova(id){
   const r = await api('/api/conversas/'+id+'/nova',{method:'POST'});
   if(r.envio && !r.envio.ok){ marcarErro(id, {}, 'não enviado — '+(r.envio.motivo||r.envio.erro||'')); return; }
-  CONV_ERRO = {id, html:'<div class="conv-blocked" style="background:var(--mint);"><i class="ti ti-check"></i> Conversa iniciada.</div>'};
+  CONV_ERRO = {id, html:'<div class="conv-blocked" style="background:var(--ok-bg);"><i class="ti ti-check"></i> Conversa iniciada.</div>'};
   aposAcao();
 }
 
@@ -1676,13 +1887,13 @@ async function coletaSessao(){
   // O atalho é um link para ARRASTAR até a barra de favoritos: um bookmarklet é a
   // única forma de rodar nosso código na origem da Extecamp sem instalar extensão.
   cx.innerHTML = `
-    <div style="border:2px solid var(--b);border-radius:9px;padding:12px;background:var(--laranjinha);">
+    <div style="border:1px solid var(--border);border-radius:9px;padding:12px;background:var(--guara-bg);">
       <p style="font-weight:800;margin:0 0 6px;">3. Arraste este botão para a barra de favoritos</p>
       <p class="muted" style="margin:0 0 9px;">Depois, já dentro do ADM Cursos, clique nele. A coleta
         aparece num painel no canto da tela. Validade: ${r.validade_horas}h.</p>
       <a href="${r.bookmarklet}" onclick="alert('Não clique aqui: ARRASTE este botão para a barra de favoritos e clique nele já dentro do ADM Cursos.');return false;"
          style="display:inline-block;background:var(--guara);color:#fff;font-weight:800;text-decoration:none;
-                border:2px solid var(--b);border-radius:9px;padding:8px 14px;box-shadow:3px 3px 0 var(--b);cursor:grab;">
+                border:1px solid var(--border);border-radius:9px;padding:8px 14px;box-shadow:var(--shadow);cursor:grab;">
         ⬇ Coletar Extecamp</a>
     </div>`;
 }
@@ -1701,19 +1912,19 @@ async function coletaCarregar(){
   $('#coletaCursos').innerHTML = (d.cursos||[]).length ? `
     <table style="width:100%;border-collapse:collapse;font-size:12.5px;">
       <tr style="text-align:left;"><th>Curso</th><th>Turma</th><th>Inscritos</th><th>Matriculados</th><th>Cancelados</th></tr>
-      ${d.cursos.map(c=>`<tr style="border-top:1px solid var(--b);">
+      ${d.cursos.map(c=>`<tr style="border-top:1px solid var(--border);">
         <td><strong>${escapeHtml(c.curso||'')}</strong></td><td>${escapeHtml(c.turma||'')}</td>
         <td>${c.inscritos||0}</td><td>${c.matriculados||0}</td><td>${c.cancelados||0}</td></tr>`).join('')}
     </table>` : '';
   $('#coletaFila').innerHTML = (d.fila||[]).length ? d.fila.map(g=>`
-    <div style="border:2px solid var(--b);border-radius:9px;margin-bottom:10px;overflow:hidden;">
-      <div style="padding:8px 11px;background:var(--paper);border-bottom:2px solid var(--b);">
+    <div style="border:1px solid var(--border);border-radius:9px;margin-bottom:10px;overflow:hidden;">
+      <div style="padding:8px 11px;background:var(--surface-2);border-bottom:1px solid var(--border);">
         <span class="chip ${coletaChip(g.taxa)}" style="margin:0;">${g.leads.length}</span>
         <strong style="margin-left:6px;">${escapeHtml(g.situacao||'')}</strong>
         <div class="muted" style="margin-top:3px;">${escapeHtml(g.acao||'')}</div>
       </div>
       <div style="padding:6px 11px;">
-        ${g.leads.map(l=>`<div style="display:flex;gap:8px;align-items:center;padding:4px 0;border-top:1px solid #eee;">
+        ${g.leads.map(l=>`<div style="display:flex;gap:8px;align-items:center;padding:4px 0;border-top:1px solid var(--border);">
           <span style="flex:1;">${escapeHtml(l.nome||'(sem nome)')}</span>
           <span class="muted">${escapeHtml(l.curso||'')}/${escapeHtml(l.turma||'')}</span>
           ${l.telefone ? `<button class="btn btn-g" style="padding:3px 9px;font-size:11.5px;"
@@ -1855,8 +2066,8 @@ async function enviarReacao(cardId, wamid, emoji){
 }
 function statusGlyph(t){   // ✓ enviado · ✓✓ entregue · ✓✓ azul lido · ! falhou (só msgs do agente)
   if(t.papel!=='agente'||!t.status) return '';
-  if(t.status==='falhou') return ' <i class="ti ti-alert-circle" style="color:#ef4444;" title="não entregue"></i>';
-  const g = {enviado:['ti-check',''], entregue:['ti-checks',''], lido:['ti-checks','color:#3b82f6;']}[t.status];
+  if(t.status==='falhou') return ' <i class="ti ti-alert-circle" style="color:var(--bad);" title="não entregue"></i>';
+  const g = {enviado:['ti-check',''], entregue:['ti-checks',''], lido:['ti-checks','color:var(--info);']}[t.status];
   return g ? ` <i class="ti ${g[0]}" style="${g[1]}" title="${t.status}"></i>` : '';
 }
 function renderThread(d){
@@ -1889,7 +2100,7 @@ function renderChrome(d){
         </div>
       </div>
     </div>
-    <div id="convCursos" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:7px 14px;border-bottom:2px solid var(--b);background:var(--paper);font-size:12px;flex-shrink:0;"></div>
+    <div id="convCursos" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:7px 14px;border-bottom:1px solid var(--border);background:var(--surface-2);font-size:12px;flex-shrink:0;"></div>
     <div id="convFicha" class="conv-ficha"></div>
     <div class="conv-thread" id="convThread"></div>
     <div id="convErro"></div>
@@ -1969,7 +2180,7 @@ function renderFicha(d){
         ? `<a href="mailto:${escapeHtml(email)}">${escapeHtml(email)}</a>`
         : `<button class="btn btn-g" style="padding:2px 8px;font-size:11px;" onclick="pedirEmail('${d.id}')">+ e-mail</button>`}</span>
       ${d.criado?`<span class="conv-dado muted"><i class="ti ti-calendar"></i>desde ${(d.criado||'').slice(0,10).split('-').reverse().join('/')}</span>`:''}
-      ${origem?`<span class="chip" style="margin:0;background:var(--sky);" title="${escapeHtml(detalhe||origem)}"><i class="ti ti-target-arrow"></i> ${escapeHtml(origem)}</span>`
+      ${origem?`<span class="chip" style="margin:0;background:var(--info-bg);" title="${escapeHtml(detalhe||origem)}"><i class="ti ti-target-arrow"></i> ${escapeHtml(origem)}</span>`
               :'<span class="muted" style="font-size:11px;">sem UTM (lead anterior à captura)</span>'}
     </div>
     <div>
@@ -2031,7 +2242,7 @@ function barraCursosHTML(d){
   const cursos = d.cursos || [d.curso];
   const chips = cursos.map(c => c===d.curso
     ? `<span class="chip t-acc" style="margin:0;" title="curso ativo — o agente conversa este">${c} ★</span>`
-    : `<span class="chip" style="margin:0;background:var(--paper);cursor:pointer;" title="tornar ativo" onclick="tornarAtivo('${d.id}','${c}')">${c}</span>`).join(' ');
+    : `<span class="chip" style="margin:0;background:var(--surface-2);cursor:pointer;" title="tornar ativo" onclick="tornarAtivo('${d.id}','${c}')">${c}</span>`).join(' ');
   const opts = (window.CURSOS_ALL||[]).filter(x=>!cursos.includes(x)).map(x=>`<option value="${x}">${x}</option>`).join('');
   return `<span class="muted">Interesse:</span> ${chips}
     <select onchange="addInteresse('${d.id}',this.value)" style="width:auto;padding:3px 7px;font-size:11.5px;margin-left:2px;"><option value="">+ curso…</option>${opts}</select>`;
@@ -2074,7 +2285,7 @@ function renderMensagens(d){
     // reagir exige wamid (mensagem que passou pela Meta) — propostas locais/dry-run não têm
     const reagirBtn = t.wamid ? `<button class="bubble-reagir" onclick="event.stopPropagation();toggleReacaoPicker(this,'${d.id}','${t.wamid}')" title="Reagir"><i class="ti ti-mood-plus"></i></button>` : '';
     const badge = t.reacao ? `<span class="bubble-reacao" title="reação">${escapeHtml(t.reacao)}</span>` : '';
-    return sep + `<div class="bubble ${eu?'b-ag':'b-lead'}" style="align-self:${eu?'flex-end':'flex-start'};${falhou?'border:1.5px solid #ef4444;':''}">
+    return sep + `<div class="bubble ${eu?'b-ag':'b-lead'}" style="align-self:${eu?'flex-end':'flex-start'};${falhou?'border:1px solid var(--bad);':''}">
       ${bolhaConteudo(t)}<div class="conv-ts">${eu?'Vinícius · ':''}${(t.ts||'').slice(11,16)}${statusGlyph(t)}</div>${reagirBtn}${badge}</div>`;
   }).join('');
   const prop = d.proposta?`
@@ -2313,8 +2524,22 @@ let AUTO=false;
 function pintaAuto(){
   const b=document.getElementById('autoTgl');
   b.innerHTML='<i class="ti ti-bolt"></i> aprovação automática: '+(AUTO?'ON':'OFF');
-  b.style.background=AUTO?'var(--sun)':'#fff';
-  b.style.color='var(--ink)';
+  b.style.background=AUTO?'var(--warn-bg)':'var(--surface)';
+  b.style.color='var(--text)';
+}
+function temaAtual(){
+  return document.documentElement.dataset.theme
+    || (matchMedia('(prefers-color-scheme:dark)').matches ? 'dark' : 'light');
+}
+function pintaTemaIcone(){
+  const b = $('#temaTgl'); if(!b) return;
+  b.innerHTML = temaAtual()==='dark' ? '<i class="ti ti-sun"></i>' : '<i class="ti ti-moon"></i>';
+}
+function alternarTema(){
+  const novo = temaAtual()==='dark' ? 'light' : 'dark';
+  document.documentElement.dataset.theme = novo;
+  try{ localStorage.setItem('tema', novo); }catch(e){}
+  pintaTemaIcone();
 }
 async function toggleAuto(){
   const r=await api('/api/config',{method:'POST',headers:{'Content-Type':'application/json'},
@@ -2407,6 +2632,7 @@ function paraInjetor(id){
   if(v) $('#inj').value = v;
 }
 async function boot(){
+  pintaTemaIcone();
   const me = await api('/api/me');
   if(!me.usuario){ document.getElementById('login').style.display='flex'; return; }
   document.getElementById('login').style.display='none';
@@ -2427,6 +2653,11 @@ async function boot(){
   LOGADO=true; carregar();
 }
 setInterval(()=>{ if(LOGADO) carregar(); }, 5000);
+// Campanhas em andamento pedem progresso ao vivo — só faz sentido pollar com a aba
+// aberta E alguma campanha realmente 'enviando' (mesmo espírito do poll de Conversas).
+setInterval(()=>{
+  if(LOGADO && CAMP_ENVIANDO && !$('#campanhas').classList.contains('hidden')) campListar();
+}, 5000);
 async function login(){
   const r = await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({usuario:$('#lu').value,senha:$('#lp').value})});
