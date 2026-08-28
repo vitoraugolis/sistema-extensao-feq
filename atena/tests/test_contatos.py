@@ -76,10 +76,11 @@ check("emails" in p, "secretaria tem e-mail — entra no payload")
 check("emails" not in payload_contato("whatsapp"), "contato sem e-mail não inventa o campo")
 check(payload_contato("chave_inexistente") is None, "chave desconhecida devolve None, não quebra")
 
-# BUG REAL (10/08/2026): secretaria é fixo institucional, sem conta de WhatsApp — mandar
-# wa_id pra esse número faz o WhatsApp do lead mostrar "este número não está no WhatsApp".
-check("wa_id" not in p["phones"][0],
-      "fixo sem WhatsApp NÃO leva wa_id (senão o app do lead tenta resolver e erra)")
+# Reteste via API em 28/08/2026 confirmou que a secretaria PASSOU a ter WhatsApp
+# (o bug de 10/08/2026 — "este número não está no WhatsApp" — não se repetiu):
+# agora o wa_id entra no payload dela também.
+check(p["phones"][0].get("wa_id") == "551935213911",
+      "secretaria tem WhatsApp confirmado: leva wa_id (clique-para-conversar)")
 check(payload_contato("whatsapp")["phones"][0]["wa_id"] == "5519982620072",
       "número que TEM WhatsApp de verdade continua levando wa_id (clique-para-conversar)")
 
