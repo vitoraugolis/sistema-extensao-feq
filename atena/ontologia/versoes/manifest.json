@@ -89,5 +89,12 @@
     "autor": "vitor",
     "motivo": "FEQ-0299: avaliacaoTexto também dizia \"aulas online ao vivo\" — última menção corrigida",
     "pre_imagem": "catalogo_pre_v0013_1787769379.jsonld"
+  },
+  {
+    "versao": "v0014",
+    "ts": "2026-08-28T00:27:02",
+    "autor": "vitor",
+    "motivo": "Injetor: prorrogacao em FEQ-1000",
+    "pre_imagem": "catalogo_pre_v0014_1787887622.jsonld"
   }
 ]

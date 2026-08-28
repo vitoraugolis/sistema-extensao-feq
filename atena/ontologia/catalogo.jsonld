@@ -285,7 +285,7 @@
       "janelaInscricao": {
         "@type": "feq:JanelaTemporal",
         "inicio": "2026-02-20",
-        "fim": "2026-08-05"
+        "fim": "2026-09-03"
       },
       "janelaOferecimento": {
         "@type": "feq:JanelaTemporal",

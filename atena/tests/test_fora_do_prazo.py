@@ -33,16 +33,20 @@ def check(c, msg):
 
 
 # ------------------------------------------------------- 1) o estado novo
-# FEQ-1000: inscrições até 05/08/2026, aulas começam 05/09/2026.
+# FEQ-1000: prorrogado em 28/08/2026 — inscrições até 03/09/2026, aulas começam
+# 05/09/2026. A janela de recuperação encolheu para 1 dia só (04/09): datas fixas
+# de um curso real são frágeis por natureza (já quebrou 2x nesta suíte por causa
+# disso — test_promocao.py e test_growth.py) mas o comportamento sob teste é o da
+# MÁQUINA DE ESTADOS, não do calendário do FEQ-1000 em si.
 D = datetime.date
-cap = ONT.captavel("FEQ-1000", D(2026, 8, 7))
+cap = ONT.captavel("FEQ-1000", D(2026, 9, 4))
 check(cap["status"] == "fora_do_prazo", "prazo vencido + turma por começar = fora_do_prazo")
 check(cap["recuperavel"] is True, "o estado se declara recuperável")
 check(cap["captavel"] is False,
       "mas NÃO vira captável: inscrição pública segue fechada (nada mais muda sozinho)")
 check(cap["aulas_inicio"] == "2026-09-05", "expõe quando as aulas começam")
 
-check(ONT.captavel("FEQ-1000", D(2026, 8, 5))["status"] == "aberta",
+check(ONT.captavel("FEQ-1000", D(2026, 9, 3))["status"] == "aberta",
       "no último dia do prazo ainda é inscrição normal")
 check(ONT.captavel("FEQ-1000", D(2026, 9, 4))["status"] == "fora_do_prazo",
       "véspera da 1ª aula ainda é recuperável")
@@ -59,6 +63,13 @@ _ENCERRADO = next(c for c in sorted(ONT.cursos())
 check(ONT.captavel(_ENCERRADO, D(2026, 8, 7))["status"] == "encerrada",
       f"{_ENCERRADO} (aulas no passado) segue encerrado")
 
+# Idem para "fora do prazo" NO CALENDÁRIO REAL (sem hoje= fixo) — as seções 3 e 4
+# usam Bibliotecario/brain_deterministico, que sempre olham a data de verdade.
+# FEQ-1000 era o exemplo até a prorrogação de 28/08/2026 fechar a janela de
+# recuperação dele para 1 dia só (04/09) — de novo, o teste não pode depender de
+# qual curso está nessa janela hoje.
+_FORA_DO_PRAZO = next(c for c in sorted(ONT.cursos()) if ONT.captavel(c)["status"] == "fora_do_prazo")
+
 # ------------------------------------------------------- 2) política ancorada
 pol = ONT.politica("politicaForaDoPrazo")
 check(pol and "vagas remanescentes" in pol and "24 horas" in pol,
@@ -67,8 +78,9 @@ check(ONT.politica("inexistente") is None, "política desconhecida devolve None"
 
 # ------------------------------------------------------- 3) instrução ao agente
 bib = Bibliotecario(ONT)
-ctx = bib.contexto("FEQ-1000", "Superior completo")
-check(ctx.get("politica_fora_do_prazo"), "contexto carrega a política quando aplicável")
+ctx = bib.contexto(_FORA_DO_PRAZO, "Superior completo")
+check(ctx.get("politica_fora_do_prazo"),
+      f"contexto carrega a política quando aplicável ({_FORA_DO_PRAZO})")
 check(bib.contexto("FEQ-0480", "Superior completo").get("politica_fora_do_prazo") is None,
       "curso aberto não carrega a política (prompt não é depósito de regra)")
 
@@ -88,14 +100,14 @@ check(_bloco_janela(bib.contexto("FEQ-0480", "Superior completo")) == "",
       "curso aberto não recebe bloco nenhum")
 
 # ------------------------------------------------------- 4) fallback determinístico
-d = brain_deterministico(ONT, {"card_id": "x", "curso": "FEQ-1000", "nome": "Ana",
+d = brain_deterministico(ONT, {"card_id": "x", "curso": _FORA_DO_PRAZO, "nome": "Ana",
                                "escolaridade": "Superior completo"},
                          "ainda dá para entrar?", [])
 check(d.proxima_acao == "escalar_humano", "sem LLM, escala para o humano gerar o link")
 check(d.mensagem_ao_lead and "vagas remanescentes" in d.mensagem_ao_lead,
       "mas JÁ responde ao lead — antes ele ficava mudo até alguém abrir a Central")
 check("e-mail" in d.mensagem_ao_lead.lower(), "o fallback também pede o e-mail")
-check(revisar_estrutural("FEQ-1000", d.mensagem_ao_lead, ONT)["aprovado"],
+check(revisar_estrutural(_FORA_DO_PRAZO, d.mensagem_ao_lead, ONT)["aprovado"],
       "a mensagem do fallback passa pelo Revisor (as '24 horas' não são carga horária)")
 
 # ------------------------------------------------------- 5) a LP diz o mesmo
