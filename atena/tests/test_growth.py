@@ -779,16 +779,18 @@ check(wpd._limpar_cache_elementor(_SessaoFake(erro=OSError("rede caiu")), "https
       "rede caindo não derruba a publicação: o dado já foi gravado")
 # imagens dos cards: uma por curso, todas na biblioteca de mídia da PRÓPRIA FEQ
 # (a grade antiga hotlinkava agencia.fapesp.br e ictq.com.br — servidor de terceiro
-# muda o arquivo e o card fica quebrado sem ninguém perceber). FEQ-0295 (12/08/2026)
-# ainda não tem imagem curada na biblioteca da FEQ — mesmo tratamento do
-# CERTIFICADO_MODELO: some do card, nunca inventa hotlink.
-check(all(ponte.CURSO_IMAGEM.get(m["curso"]) for m in g5.cursos() if m["curso"] != "FEQ-0295"),
-      "home: todo curso com imagem curada tem card ilustrado")
+# muda o arquivo e o card fica quebrado sem ninguém perceber). FEQ-0295 ganhou a
+# dela em 28/08/2026 (offshore.jpg, achada na própria biblioteca — diferente do
+# offshore.webp do FEQ-0360, que é outro arquivo).
+check(all(ponte.CURSO_IMAGEM.get(m["curso"]) for m in g5.cursos()),
+      "home: todo curso do catálogo tem imagem curada")
+check(len(set(ponte.CURSO_IMAGEM.values())) == len(ponte.CURSO_IMAGEM),
+      "nenhuma imagem repetida entre cursos diferentes (cada um com a sua)")
 check(all(u.startswith("https://cursos-extensao.feq.unicamp.br/")
           for u in ponte.CURSO_IMAGEM.values()),
       "home: nenhuma imagem de card vem de servidor de terceiro")
-check(_home.count('class="feq-capa"') == len(g5.cursos()) - 1,
-      "home: a capa aparece em todo card com imagem curada (FEQ-0295 ainda não tem)")
+check(_home.count('class="feq-capa"') == len(g5.cursos()),
+      "home: a capa aparece em todos os cards")
 # data do boleto (spec 17 §3e): só entra quando a coordenação declarou
 check("boleto" in ponte._passos_html(_ont_real.curso("FEQ-0360")).lower()
       and "07/01/2027" in ponte._passos_html(_ont_real.curso("FEQ-0360")),

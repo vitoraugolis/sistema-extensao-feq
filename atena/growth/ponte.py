@@ -101,6 +101,9 @@ CURSO_IMAGEM = {
     "FEQ-0670": (f"{_UPLOADS}/2025/03/scientist-holding-a-molecular-model-"
                  "2022-12-16-22-03-15-utc-678x381-1.jpg"),
     "FEQ-0299": f"{_UPLOADS}/2025/05/microscopio-eletronico-766x1024-1.jpeg",
+    # foto real de plataforma offshore — diferente do offshore.webp do FEQ-0360
+    # (aquele é um render 3D); tema de petróleo/reservatório bate com o curso.
+    "FEQ-0295": f"{_UPLOADS}/2024/07/offshore.jpg",
 }
 
 CERTIFICADO_MODELO = {
