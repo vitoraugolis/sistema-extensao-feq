@@ -15,7 +15,14 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2]))
 # teste abaixo deixaria de ser dry-run e publicaria de verdade nas páginas em campanha.
 # O teste garante seu próprio pressuposto ("sem credenciais = dry-run"), independente
 # do ambiente de quem o invoca. (Incidente real: 09/08/2026, corrigido às pressas.)
-for _k in ("WP_URL", "WP_USER", "WP_APP_PASSWORD"):
+#
+# Mesmo motivo para o Meta Ads/CAPI: MetaAds.capi_token cai para META_ADS_TOKEN quando
+# META_CAPI_TOKEN não está setado (comportamento de produção, propositado — nem toda
+# conta provisiona um token de CAPI separado). Com `.env` real sourced, isso faz
+# ads.capi() abaixo (esperado em dry-run) chamar de verdade o Conversions API da Meta
+# com um telefone de teste fictício. (Incidente real: 28/08/2026, achado nesta sessão.)
+for _k in ("WP_URL", "WP_USER", "WP_APP_PASSWORD",
+          "META_ADS_TOKEN", "META_AD_ACCOUNT_ID", "META_PIXEL_ID", "META_CAPI_TOKEN"):
     os.environ.pop(_k, None)
 
 from atena.core.estado import Estado
