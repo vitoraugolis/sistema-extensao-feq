@@ -144,6 +144,21 @@ def test_whatsapp_receber_encaminha():
     assert out and "decisao" in out[0]
 
 
+def test_secret_nao_duplica_no_env():
+    """O .env de produção chegou a acumular SEIS ATENA_SECRET diferentes: cada
+    entrypoint que não carrega o .env acrescentava mais uma linha. Como o loader usa
+    a PRIMEIRA, todas as seguintes nasciam mortas — e quem editasse a última não via
+    efeito. Reaproveitar o que já está no arquivo mantém a sessão estável e o arquivo
+    limpo."""
+    import tempfile, pathlib as _pl
+    from atena.core import auth as _auth
+    env = _pl.Path(tempfile.mkdtemp()) / ".env"
+    env.write_text("ATENA_SECRET=primeiro\nATENA_SECRET=segundo\n", encoding="utf-8")
+    assert _auth._secret_do_arquivo(env) == "primeiro"
+    env.write_text("SEM_A_CHAVE=1\n", encoding="utf-8")
+    assert _auth._secret_do_arquivo(env) is None
+
+
 def test_auth_multiusuario():
     os.environ.pop("ATENA_USERS", None)
     auth._FALHAS.clear()

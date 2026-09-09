@@ -18,7 +18,14 @@ import pathlib
 from flask import session, request, jsonify
 
 PAPEIS = ("operador", "supervisor")
-LIVRE = {"/api/login", "/health"}
+# Rotas sem sessão da Central. A da coleta está aqui porque o coletor roda DENTRO
+# da aba da Extecamp (spec 20 §2) — outra origem, onde o cookie da Central não chega
+# e não deve chegar. Ela não fica desprotegida: autentica sozinha, pelo token de 12h
+# que `/api/coleta/sessao` (essa sim, com sessão) entrega ao operador, comparado com
+# hmac.compare_digest. Sem o token, 403 na própria rota.
+# Só o RECEPTOR é livre: "/api/coleta" (a fila de trabalho, que devolve PII de lead)
+# continua exigindo sessão — LIVRE casa por igualdade, não por prefixo.
+LIVRE = {"/api/login", "/health", "/api/coleta/pagina"}
 SUPERVISOR_APROVA = ("/api/injetor",)   # POST .../aprovar exige supervisor
 _FALHAS = {}                            # ip -> [timestamps]  (rate limit de login)
 
@@ -64,16 +71,36 @@ def _usuarios_env():
     return users
 
 
+def _secret_do_arquivo(env):
+    """ATENA_SECRET já gravado no .env, se houver. Devolve a PRIMEIRA ocorrência —
+    é a que o loader (`os.environ.setdefault`) usa, então é a que vale de verdade."""
+    try:
+        for ln in env.read_text(encoding="utf-8", errors="replace").splitlines():
+            t = ln.strip()
+            if t.startswith("ATENA_SECRET=") and t.split("=", 1)[1].strip():
+                return t.split("=", 1)[1].strip().strip('"').strip("'")
+    except Exception:
+        pass
+    return None
+
+
 def _garantir_secret(app):
     sec = os.environ.get("ATENA_SECRET")
     if not sec:
-        sec = secrets.token_hex(32)
         env = pathlib.Path(__file__).resolve().parents[2] / ".env"
-        try:
-            with env.open("a") as f:
-                f.write(f"\nATENA_SECRET={sec}\n")
-        except Exception:
-            pass  # sem .env gravável: sessão vale só até o restart
+        # O .env pode já ter a chave sem ela estar no ambiente: acontece em todo
+        # entrypoint que não passa pelo _load_env do app.py. Antes daqui saía uma
+        # linha NOVA a cada vez — o .env de produção acumulou SEIS ATENA_SECRET
+        # diferentes. Como o loader usa a PRIMEIRA ocorrência, cada linha nova
+        # nascia morta, e quem editasse a última não veria efeito nenhum.
+        sec = _secret_do_arquivo(env)
+        if not sec:
+            sec = secrets.token_hex(32)
+            try:
+                with env.open("a") as f:
+                    f.write(f"\nATENA_SECRET={sec}\n")
+            except Exception:
+                pass  # sem .env gravável: sessão vale só até o restart
         os.environ["ATENA_SECRET"] = sec
     app.secret_key = sec
     app.config.update(SESSION_COOKIE_HTTPONLY=True, SESSION_COOKIE_SAMESITE="Lax",
