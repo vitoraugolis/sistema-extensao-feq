@@ -714,7 +714,13 @@ check(lp_0670.count("André de Freitas Gonçalves") == 2
       f"{lp_0670.count('Luiz Guilherme Lomônaco')}x)")
 
 # --- bloco de cursos da HOME (gerado da ontologia) -------------------------------
-_home = ponte.home_cursos_html(g5, _ont_real)
+# Data FIXA, como em test_revisor.py: os selos saem da janela de inscrição de cada
+# curso contra HOJE, então "fora do prazo" e "antecipada" existem só enquanto algum
+# curso estiver nesses estados. Sem fixar, o teste passava em 31/08/2026 e passou a
+# falhar sozinho em 09/09, quando os cursos escorreram para aberta/encerrada — sem
+# ninguém ter mudado uma linha de código.
+_HOJE_HOME = datetime.date(2026, 8, 30)
+_home = ponte.home_cursos_html(g5, _ont_real, hoje=_HOJE_HOME)
 check(_home.count('class="feq-card"') == len(g5.cursos()) == 10,
       "home: um card por curso do catálogo")
 check(_home.startswith(ponte.HOME_MARCA) and "<style>" in _home,
