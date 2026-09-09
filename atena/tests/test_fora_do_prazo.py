@@ -63,12 +63,13 @@ _ENCERRADO = next(c for c in sorted(ONT.cursos())
 check(ONT.captavel(_ENCERRADO, D(2026, 8, 7))["status"] == "encerrada",
       f"{_ENCERRADO} (aulas no passado) segue encerrado")
 
-# Idem para "fora do prazo" NO CALENDÁRIO REAL (sem hoje= fixo) — as seções 3 e 4
-# usam Bibliotecario/brain_deterministico, que sempre olham a data de verdade.
-# FEQ-1000 era o exemplo até a prorrogação de 28/08/2026 fechar a janela de
-# recuperação dele para 1 dia só (04/09) — de novo, o teste não pode depender de
-# qual curso está nessa janela hoje.
-_FORA_DO_PRAZO = next(c for c in sorted(ONT.cursos()) if ONT.captavel(c)["status"] == "fora_do_prazo")
+# Idem para "fora do prazo", agora com DATA FIXA. Tornar só o curso dinâmico não
+# bastava: o teste continuava dependendo de existir, naquele dia, ALGUM curso nessa
+# janela — e em 09/09/2026 não existia mais nenhum, então a suíte quebrou sozinha,
+# sem ninguém mudar código. As seções 3 e 4 recebem a mesma data por parâmetro.
+_HOJE = D(2026, 8, 30)
+_FORA_DO_PRAZO = next(c for c in sorted(ONT.cursos())
+                      if ONT.captavel(c, _HOJE)["status"] == "fora_do_prazo")
 
 # ------------------------------------------------------- 2) política ancorada
 pol = ONT.politica("politicaForaDoPrazo")
@@ -78,10 +79,10 @@ check(ONT.politica("inexistente") is None, "política desconhecida devolve None"
 
 # ------------------------------------------------------- 3) instrução ao agente
 bib = Bibliotecario(ONT)
-ctx = bib.contexto(_FORA_DO_PRAZO, "Superior completo")
+ctx = bib.contexto(_FORA_DO_PRAZO, "Superior completo", hoje=_HOJE)
 check(ctx.get("politica_fora_do_prazo"),
       f"contexto carrega a política quando aplicável ({_FORA_DO_PRAZO})")
-check(bib.contexto("FEQ-0480", "Superior completo").get("politica_fora_do_prazo") is None,
+check(bib.contexto("FEQ-0480", "Superior completo", hoje=_HOJE).get("politica_fora_do_prazo") is None,
       "curso aberto não carrega a política (prompt não é depósito de regra)")
 
 b = _bloco_janela(ctx)
@@ -93,16 +94,16 @@ check("QUEM GERA O LINK É UMA PESSOA" in b and "não invente URL" in b,
       "proíbe o agente de fingir que gerou o link")
 check("NÃO ofereça lista de espera" in b, "proíbe a oferta errada (esperar) neste caso")
 
-b_enc = _bloco_janela(bib.contexto(_ENCERRADO, "Superior completo"))
+b_enc = _bloco_janela(bib.contexto(_ENCERRADO, "Superior completo", hoje=_HOJE))
 check("lista de espera" in b_enc and "vagas remanescentes" not in b_enc,
       "curso realmente encerrado mantém a lista de espera")
-check(_bloco_janela(bib.contexto("FEQ-0480", "Superior completo")) == "",
+check(_bloco_janela(bib.contexto("FEQ-0480", "Superior completo", hoje=_HOJE)) == "",
       "curso aberto não recebe bloco nenhum")
 
 # ------------------------------------------------------- 4) fallback determinístico
 d = brain_deterministico(ONT, {"card_id": "x", "curso": _FORA_DO_PRAZO, "nome": "Ana",
                                "escolaridade": "Superior completo"},
-                         "ainda dá para entrar?", [])
+                         "ainda dá para entrar?", [], hoje=_HOJE)
 check(d.proxima_acao == "escalar_humano", "sem LLM, escala para o humano gerar o link")
 check(d.mensagem_ao_lead and "vagas remanescentes" in d.mensagem_ao_lead,
       "mas JÁ responde ao lead — antes ele ficava mudo até alguém abrir a Central")

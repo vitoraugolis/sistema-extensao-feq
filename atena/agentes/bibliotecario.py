@@ -16,16 +16,19 @@ class Bibliotecario:
     def __init__(self, ont):
         self.ont = ont
 
-    def _citados(self, mensagem, vistos):
+    def _citados(self, mensagem, vistos, hoje=None):
         out = []
         for m in CODE_RE.findall(mensagem or ""):
             c = self.ont.curso(f"FEQ-{m}")
             if c and c["codigo"] not in vistos:
                 vistos.add(c["codigo"])
-                out.append({"curso": c, "captavel": self.ont.captavel(c["codigo"])})
+                out.append({"curso": c, "captavel": self.ont.captavel(c["codigo"], hoje)})
         return out
 
-    def contexto(self, curso, escolaridade=None, mensagem=None):
+    def contexto(self, curso, escolaridade=None, mensagem=None, hoje=None):
+        """hoje: injetável p/ teste, como em `ont.captavel` e `brain_deterministico`.
+        A situação do curso ("aberto", "fora do prazo", "encerrado") sai do calendário,
+        então teste que não fixa a data passa hoje e falha sozinho semana que vem."""
         info = self.ont.curso(curso)
         if not info:
             # SEM curso definido (ex.: lead que chegou pelo botão de WhatsApp da LP
@@ -35,10 +38,10 @@ class Bibliotecario:
             return {"curso": None, "existe": False, "descoberta": True,
                     "captavel": {}, "elegivel": None,
                     "portfolio": self.ont.portfolio(),
-                    "cursos_citados": self._citados(mensagem, set())}
-        cap = self.ont.captavel(curso)
+                    "cursos_citados": self._citados(mensagem, set(), hoje)}
+        cap = self.ont.captavel(curso, hoje)
         eleg = self.ont.elegivel(escolaridade, curso) if escolaridade else None
-        citados = self._citados(mensagem, {info["codigo"]})
+        citados = self._citados(mensagem, {info["codigo"]}, hoje)
 
         return {
             "existe": True,
