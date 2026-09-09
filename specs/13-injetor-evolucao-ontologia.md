@@ -10,6 +10,24 @@ isso exigiria editar `catalogo.jsonld` na mão e rezar. Precisa virar um **fluxo
 operador insere informação (texto livre, formulário ou documento) e o sistema **interpreta, propõe a
 mudança, calcula o impacto, valida e só aplica após aprovação** — com proveniência e rollback.
 
+## Onde o catálogo mora em produção (e o deploy que o apagava)
+
+O Injetor **escreve** em `atena/ontologia/catalogo.jsonld` e em `atena/ontologia/versoes/`
+(pre-imagens do rollback). Esses dois são **dado de produção**, não código — na mesma
+categoria de `atena/data/` e `.env`.
+
+Até 31/08/2026 o `deploy_vps.sh` não os excluía do rsync: toda mudança aprovada em
+produção — com diff explícito, SHACL conforme, versionada e com pre-imagem — era desfeita
+pelo deploy seguinte, **em silêncio**. Nada no processo mostrava a reversão: a proposta
+continuava marcada como aprovada, o histórico continuava lá, e só a ontologia voltava
+atrás. Foi descoberto ao prorrogar o FEQ-0580 e conferir o arquivo do VPS contra o local.
+
+Agora os dois são excluídos do rsync e **semeados só no bootstrap** (`--ignore-existing`),
+igual ao `.env`. Consequência de desenho, deliberada: **quem muda o catálogo é o Injetor**,
+não uma edição no repositório. O arquivo versionado em git é semente de instalação nova,
+não fonte da verdade — para trazer produção de volta ao repositório, copie o arquivo do
+VPS (foi o que se fez com a prorrogação do FEQ-0580).
+
 ## Pipeline (5 etapas)
 ```
 1. CAPTURA      operador submete update (texto livre | formulário | doc)        → /injetor

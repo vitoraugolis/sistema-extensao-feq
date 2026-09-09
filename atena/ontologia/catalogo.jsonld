@@ -445,12 +445,12 @@
       "janelaInscricao": {
         "@type": "feq:JanelaTemporal",
         "inicio": "2025-03-19",
-        "fim": "2026-07-22"
+        "fim": "2027-02-21"
       },
       "janelaOferecimento": {
         "@type": "feq:JanelaTemporal",
-        "inicio": "2026-08-22",
-        "fim": "2027-11-27"
+        "inicio": "2027-03-20",
+        "fim": "2028-07-29"
       },
       "planoPagamento": {
         "@type": "feq:PlanoPagamento",

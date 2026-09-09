@@ -47,6 +47,25 @@ def test_aprovar_aplica_e_torna_captavel():
     assert len(onto.ver.historico()) == 1
 
 
+def test_rota_de_prorrogacao_existe_e_exige_supervisor():
+    """A prorrogação tinha função e caminho de aprovação, mas nenhuma rota — então
+    era inalcançável pela Central. E, como ela republica a LP pública igual ao novo
+    oferecimento, precisa do mesmo gate: sem isso, qualquer operador republica a
+    página de um curso."""
+    from atena.api import app as A
+    rotas = {str(r.rule) for r in A.app.url_map.iter_rules()}
+    assert "/api/injetor/datas" in rotas
+
+    c = A.app.test_client()
+    with c.session_transaction() as ss:
+        ss["usuario"], ss["papel"] = "op", "operador"       # NÃO supervisor
+    r = c.post("/api/injetor/datas", json={"curso": "FEQ-0360", "insc_fim": "2027-01-06"})
+    assert r.status_code == 200 and r.get_json()["status"] == "proposta"
+    pid = r.get_json()["id"]
+    assert c.post(f"/api/injetor/{pid}/aprovar").status_code == 403
+    c.post(f"/api/injetor/{pid}/rejeitar")                  # não deixa proposta pendurada
+
+
 def test_rollback_restaura():
     est, onto, fechado = _setup()
     p = onto.propor(f"A inscrição do {fechado} reabriu até 30/08/2027.")

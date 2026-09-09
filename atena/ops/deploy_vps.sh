@@ -29,11 +29,25 @@ rsync -az -e "ssh -i $KEY" \
   --exclude '__pycache__' --exclude '.DS_Store' --exclude 'atena/backups' \
   --exclude 'atena/ops/logs' --exclude '.git' \
   --exclude 'atena/data' --exclude '.env' \
+  --exclude 'atena/ontologia/catalogo.jsonld' --exclude 'atena/ontologia/versoes' \
   "$DIR/" "$SSHUSER@$IP:~/atena-feq/"
 # atena/data e .env EXCLUÍDOS: banco vivo e segredos moram no VPS — o .env do Mac
 # pode estar parcial/desatualizado; sobrescrever apagaria tokens de produção.
-# .env só é semeado no BOOTSTRAP (se ainda não existir no VPS):
+#
+# catalogo.jsonld e versoes/ EXCLUÍDOS pelo mesmo motivo, e é o mais fácil de
+# esquecer: o Injetor GRAVA neles em produção (spec 13). Sem esta linha, toda
+# mudança aprovada — validada por SHACL, versionada, com pre-imagem para rollback —
+# era desfeita pelo deploy seguinte, em silêncio e sem aparecer em lugar nenhum.
+# Quem quiser mudar o catálogo usa o Injetor, que é o caminho governado; o arquivo
+# do repositório é semente de bootstrap, não fonte da verdade.
+#
+# .env, catálogo e versões só são semeados no BOOTSTRAP (se ainda não existirem):
 rsync -az --ignore-existing -e "ssh -i $KEY" "$DIR/.env" "$SSHUSER@$IP:~/atena-feq/.env" 2>/dev/null || true
+"${SSH[@]}" "mkdir -p ~/atena-feq/atena/ontologia/versoes"
+rsync -az --ignore-existing -e "ssh -i $KEY" "$DIR/atena/ontologia/catalogo.jsonld" \
+  "$SSHUSER@$IP:~/atena-feq/atena/ontologia/catalogo.jsonld" 2>/dev/null || true
+rsync -az --ignore-existing -e "ssh -i $KEY" "$DIR/atena/ontologia/versoes/" \
+  "$SSHUSER@$IP:~/atena-feq/atena/ontologia/versoes/" 2>/dev/null || true
 
 # 3) Prepara o VPS: python, deps, swap (instâncias pequenas), serviços
 echo "==> configurando o VPS"
