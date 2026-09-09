@@ -376,10 +376,21 @@ check(_base("http://localhost:8095") == "http://localhost:8095",
 # endpoint passa a devolver outra coisa — silenciosamente, com status 200.
 from urllib.parse import unquote                                # noqa: E402
 
+# ATENA_PUBLIC_URL fixado aqui de propósito: sem isso a base cai no url_root do
+# test client (http://localhost), que CORRETAMENTE continua http — e o teste passava
+# ou falhava conforme o .env de quem rodasse. Num clone limpo, falhava.
 _c = _A.app.test_client()
 with _c.session_transaction() as _ss:
     _ss["usuario"], _ss["papel"] = "teste", "supervisor"
-_r = _c.post("/api/coleta/sessao")
+_antes = _os.environ.get("ATENA_PUBLIC_URL")
+_os.environ["ATENA_PUBLIC_URL"] = "https://exemplo.test"
+try:
+    _r = _c.post("/api/coleta/sessao")
+finally:
+    if _antes is None:
+        _os.environ.pop("ATENA_PUBLIC_URL", None)
+    else:
+        _os.environ["ATENA_PUBLIC_URL"] = _antes
 _j = _r.get_json() or {}
 check(_r.status_code == 200 and _j.get("ok") and _j.get("token"),
       "/api/coleta/sessao devolve JSON com token (e não o retorno de outra função)")
