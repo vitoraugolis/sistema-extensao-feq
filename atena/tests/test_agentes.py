@@ -144,6 +144,23 @@ def test_whatsapp_receber_encaminha():
     assert out and "decisao" in out[0]
 
 
+def test_env_nao_carrega_comentario_como_valor():
+    """`cp config.example.env .env` é o passo 1 do README. O loader não cortava o
+    comentário inline, então WHATSAPP_TOKEN virava "# token permanente do System
+    User..." — não-vazio, e é valor não-vazio que DESLIGA o dry-run do transporte.
+    O time inteiro sairia tentando enviar WhatsApp de verdade com lixo por
+    credencial, e ATENA_USERS viraria uma lista de usuários falsos que derruba o
+    login de bootstrap."""
+    from atena.api.app import _valor_env as v
+    assert v("            # token permanente do System User") == ""
+    assert v("0          # 1 em produção") == "0"
+    assert v("vitor      # dono dos módulos restritos") == "vitor"
+    assert v("sk-ant-abc123") == "sk-ant-abc123"
+    # entre aspas o '#' faz parte do valor: senha pode ter cerquilha
+    assert v('"senha#com#cerquilha"') == "senha#com#cerquilha"
+    assert v("https://x.com/a#b") == "https://x.com/a#b"
+
+
 def test_secret_nao_duplica_no_env():
     """O .env de produção chegou a acumular SEIS ATENA_SECRET diferentes: cada
     entrypoint que não carrega o .env acrescentava mais uma linha. Como o loader usa

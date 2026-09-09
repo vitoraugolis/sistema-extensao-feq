@@ -23,6 +23,30 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2]))
 
 
 
+def _valor_env(v):
+    """Valor de uma linha do .env, SEM o comentário inline.
+
+    Sem isto, `WHATSAPP_TOKEN=   # token do System User` carregava a própria
+    explicação como valor. E valor não-vazio é o que decide o dry-run em todo o
+    sistema: quem copiasse o config.example.env para .env — o passo 1 do README —
+    saía com o transporte "configurado", tentando enviar WhatsApp de verdade com
+    um comentário no lugar do token. O mesmo valia para ATENA_USERS, que virava
+    uma lista de usuários falsos e derrubava o login de bootstrap.
+
+    Valor entre aspas mantém o '#': senha pode conter cerquilha.
+    """
+    v = v.strip()
+    if len(v) >= 2 and v[0] in "\"'" and v[-1] == v[0]:
+        return v[1:-1]
+    if v.startswith("#"):
+        return ""
+    for sep in (" #", "\t#"):
+        i = v.find(sep)
+        if i != -1:
+            v = v[:i]
+    return v.strip()
+
+
 def _load_env(p=pathlib.Path(__file__).resolve().parents[2] / ".env"):
     # ponytail: dotenv-lite stdlib — evita `source .env` frágil; não sobrescreve env já setado
     if not p.exists():
@@ -31,7 +55,7 @@ def _load_env(p=pathlib.Path(__file__).resolve().parents[2] / ".env"):
         ln = ln.strip()
         if ln and not ln.startswith("#") and "=" in ln:
             k, v = ln.split("=", 1)
-            os.environ.setdefault(k.strip(), v.strip().strip('"').strip("'"))
+            os.environ.setdefault(k.strip(), _valor_env(v))
 
 
 _load_env()  # antes dos imports que leem env no import (auth lê ATENA_USERS)
