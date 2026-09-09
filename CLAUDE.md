@@ -113,7 +113,9 @@ set -a && source .env && set +a
 
 # Sistema v2 (atena/) — PRODUÇÃO no VPS Lightsail (systemd atena+caddy)
 # https://feq.vitoraugolis.com.br (domínio definitivo) · https://3.218.159.36.sslip.io (fallback por IP)
-zsh atena/ops/deploy_vps.sh 3.218.159.36 ubuntu   # deploy (rsync; NÃO sobrescreve .env/data)
+zsh atena/ops/deploy_vps.sh 3.218.159.36 ubuntu   # deploy (rsync; NÃO sobrescreve
+#   .env, atena/data nem a ontologia — catalogo.jsonld/versoes são dado de produção,
+#   escritos pelo Injetor; sobrescrevê-los desfazia mudanças aprovadas em silêncio)
 # (launchd local br.unicamp.feq.atena foi desativado no cutover de 07/07/2026)
 python3 atena/api/app.py            # dev manual · http://localhost:8095 (bootstrap: operador/operador até criar usuários reais)
 for t in revisor orquestrador injetor agentes growth; do python3 atena/tests/test_$t.py; done
@@ -183,12 +185,30 @@ Reescrita **v2** (monólito modular `atena/`, ancoragem ontológica) implementad
   (`lp_sessoes`, `/api/lp/analytics`, ferramenta `analise_lp`), botão WhatsApp,
   cadência de 5 toques, conversão offline ao mover card na Central (CAPI), deploy
   WP em bloco `wp:html` com validação pós-publicação.
+- ✅ Coleta Extecamp (`specs/20`) **conferida contra o sistema real** (30/08/2026, 86 checks):
+  nos 9 oferecimentos operados, total lido = total declarado pela página, e o relatório de
+  contatos bate com a listagem. Corrigido bug que fazia a listagem *em andamento*
+  (`cursoand.asp`) devolver zero em silêncio. Painel mostra inscritos+matriculados da turma
+  corrente contra o mínimo de alunos.
 - ⏳ Fases 3 e 4 (inscrição/matrícula) (`specs/06`); envio WhatsApp e cérebro LLM reais dependem de chaves.
 - ⏳ Legado v1 (`feq_*.py`) mantido só como referência.
 
 ## 10. Riscos e pendências abertas
 
-- Confirmar disponibilidade do FEQ-0499 na Extecamp (pode estar encerrado).
+- ✅ FEQ-0499 confirmado em inscrição (turma **006**, até 06/02/2027) na coleta de
+  30/08/2026 — mas `cursos_metas` ainda diz turma `001`: corrigir o cadastro.
+- FEQ-0333 e FEQ-0655 não têm oferecimento em inscrição nem em andamento (coleta 30/08/2026).
 - Chave FARO atual enxerga vários pipelines — migrar para chave escopada só ao FEQ.
 - ✅ Persistência de conversa em SQLite (`atena/core/estado.py`); integração real com FARO (SoR externo) ainda pendente.
+- ✅ O VPS já tem as credenciais do WordPress (31/08/2026): aprovação do Injetor e tick de
+  deriva publicam de verdade. **Consequência a vigiar**: o tick horário (`app.py`,
+  `lp_auto.rodar`) republica sozinho toda LP cuja renderização mude. As baselines
+  (`config lp_hash_<curso>`) foram congeladas no estado atual para nada ir ao ar sem
+  revisão; os valores anteriores estão em `config lp_hash_backup_31ago`.
+- As LPs no ar ainda embutem o webhook em `3.218.159.36.sslip.io` (funciona: responde 204).
+  Republicá-las passa todas para `feq.vitoraugolis.com.br` — é publicação em página
+  pública, então só sob decisão explícita.
+- FEQ-0499: turma 006 aberta no ADM Cursos, aguardando abrir o link público de inscrição.
+  Quando sair: `POST /api/injetor/oferecimento` (turma + URL) — atualiza `cursos_metas` e
+  republica a LP num passo só.
 - Rotacionar quaisquer segredos que tenham circulado em texto.

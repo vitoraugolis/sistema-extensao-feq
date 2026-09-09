@@ -141,6 +141,63 @@ def stats():
                     "perdidos": f["Perdido"] + f.get("Cancelado", 0)})
 
 
+def _iso(br):
+    """'21/02/2027' -> '2027-02-21'. A Extecamp escreve em DD/MM/AAAA (CLAUDE.md §7)."""
+    p = (br or "").split("/")
+    return f"{p[2]}-{p[1]}-{p[0]}" if len(p) == 3 else None
+
+
+def divergencias_catalogo(curso, info, ofer):
+    """Onde a ontologia discorda da Extecamp sobre o oferecimento corrente.
+
+    Existe porque o desvio é SILENCIOSO e caro: o FEQ-0580 estava marcado como
+    encerrado na ontologia (inscrição até 22/07/2026) enquanto a Extecamp vendia
+    até 21/02/2027 com 13 inscritos dentro. "Encerrado" desliga o SDR — ou seja,
+    a única consequência visível era o agente não falar de um curso que estava
+    vendendo. Aqui isso vira um aviso na tela; a correção continua passando pelo
+    Injetor, que é o caminho governado (spec 13).
+    """
+    if not ofer:
+        return []
+    fora = []
+    fim, inicio = _iso(ofer.get("insc_fim")), _iso(ofer.get("ofer_inicio"))
+    if fim and str(info.get("inscricoes_fim") or "") != fim:
+        fora.append(f"inscrição termina {ofer['insc_fim']} na Extecamp, "
+                    f"{info.get('inscricoes_fim') or '—'} aqui")
+    if inicio and str(info.get("aulas_inicio") or "") != inicio:
+        fora.append(f"aulas começam {ofer['ofer_inicio']} na Extecamp, "
+                    f"{info.get('aulas_inicio') or '—'} aqui")
+    url, turma = info.get("url_inscricao") or "", ofer.get("turma")
+    if turma and url and not url.rstrip("/").endswith(f"/{turma}"):
+        fora.append(f"o link de inscrição aponta para outra turma (Extecamp: {turma})")
+    if turma and not url:
+        fora.append(f"turma {turma} está aberta e não há link de inscrição cadastrado")
+    return fora
+
+
+def totais_extecamp(curso):
+    """O que a Extecamp declara sobre a turma CORRENTE deste curso (spec 20).
+
+    Vem dos rótulos "Total de ..." da própria página, não da nossa contagem de
+    cards: é o número que a secretaria enxerga, e é ele que fecha com a
+    Extecamp quando alguém confere. Sem coleta ainda, devolve None — a tela
+    mostra "—" em vez de inventar zero, que leria como "ninguém se inscreveu".
+    """
+    t = json.loads(EST.get_config(f"coleta_totais:{curso}") or "{}")
+    tot = t.get("totais") or {}
+    insc, mat = tot.get("inscritos"), tot.get("matriculados")
+    if insc is None and mat is None:
+        return None
+    insc, mat = insc or 0, mat or 0
+    return {"turma": t.get("turma"), "inscritos_lista": insc, "matriculados": mat,
+            # CUMULATIVO, como em /api/stats: quem se matriculou É inscrito. A aba
+            # "Inscritos" da Extecamp esvazia conforme a turma se matricula — mostrar
+            # só ela faria o número DESPENCAR justamente quando o curso deu certo.
+            "inscritos": insc + mat,
+            "cancelados": tot.get("cancelados") or 0,
+            "vagas": t.get("vagas") or {}, "coletado_em": t.get("coletado_em")}
+
+
 @app.route("/api/captabilidade")
 def captabilidade():
     hoje = datetime.date.today()
@@ -148,7 +205,13 @@ def captabilidade():
     for c in _ont().cursos():
         cap = _ont().captavel(c, hoje)
         info = _ont().curso(c)
-        cursos.append({**cap, "nome": info["nome"], "alerta": info.get("alerta")})
+        try:
+            ofer = json.loads(EST.get_config(f"coleta_oferecimento:{c}") or "{}")
+        except ValueError:
+            ofer = {}
+        cursos.append({**cap, "nome": info["nome"], "alerta": info.get("alerta"),
+                       "extecamp": totais_extecamp(c),
+                       "divergencias": divergencias_catalogo(c, info, ofer)})
     return jsonify({"hoje": hoje.isoformat(), "cursos": cursos})
 
 
@@ -1594,6 +1657,22 @@ def injetor_propor_oferecimento():
         autor=session.get("usuario", "operador")))
 
 
+@app.route("/api/injetor/datas", methods=["POST"])
+def injetor_propor_datas():
+    """Prorrogar/corrigir as datas da turma ATUAL — o caso "a Extecamp empurrou o
+    curso". Estruturado como o de oferecimento e pelo mesmo motivo: são datas
+    atômicas, e adivinhá-las em prosa erraria calado.
+
+    Difere de /oferecimento por NÃO trocar turma nem URL — o slug da LP continua o
+    mesmo. `Ontologista.propor_datas` já existia e era testado; faltava a porta."""
+    b = request.get_json(silent=True) or {}
+    return jsonify(ONTO.propor_datas(
+        curso=(b.get("curso") or "").strip().upper(),
+        insc_fim=b.get("insc_fim"), of_inicio=b.get("of_inicio"),
+        of_fim=b.get("of_fim"), boleto=b.get("boleto"),
+        autor=session.get("usuario", "operador")))
+
+
 @app.route("/api/injetor/<pid>")
 def injetor_get(pid):
     p = EST.get_proposta(pid)
@@ -1604,9 +1683,12 @@ def injetor_get(pid):
 def injetor_aprovar(pid):
     p = EST.get_proposta(pid)
     oferecimento = bool(p) and p.get("tipo") == "novo_oferecimento"
-    # muda ontologia governada E publica página pública -> mesmo gate de lp_publicar
-    if oferecimento and session.get("papel") != "supervisor":
-        return jsonify({"erro": "aprovar novo oferecimento exige papel supervisor"}), 403
+    # muda ontologia governada E publica página pública -> mesmo gate de lp_publicar.
+    # Prorrogação republica a MESMA LP (ver abaixo), então corre o mesmo risco: ficou
+    # de fora do gate só porque entrou depois.
+    publica_lp = bool(p) and p.get("tipo") in ("novo_oferecimento", "prorrogacao")
+    if publica_lp and session.get("papel") != "supervisor":
+        return jsonify({"erro": "aprovar mudança que republica a LP exige papel supervisor"}), 403
     if oferecimento and p["status"] == "aprovada":
         r = {"ok": True, "retomado": True}   # reclique após crash: ontologia já escrita
     else:
@@ -1655,13 +1737,34 @@ def _coleta_token_valido(token):
         return False
 
 
+def _base_coleta():
+    """URL pública da Central, do jeito que o coletor precisa: HTTPS.
+
+    O coletor é injetado numa página https (a Extecamp), e o navegador BLOQUEIA
+    conteúdo ativo http vindo de página https — em silêncio, só uma linha no
+    console. O sintoma é o pior possível: clicar o atalho não faz absolutamente
+    nada, sem painel e sem erro. Foi o que aconteceu na primeira tentativa real,
+    porque `request.url_root` saiu http mesmo com o ProxyFix (o X-Forwarded-Proto
+    do Caddy não chegou como esperado).
+
+    Loopback continua http de propósito: em dev não há TLS, e ali o navegador
+    aceita conteúdo ativo de localhost.
+    """
+    base = (os.environ.get("ATENA_PUBLIC_URL") or request.url_root).rstrip("/")
+    if base.startswith("http://") and not base.startswith(("http://localhost",
+                                                             "http://127.0.0.1")):
+        base = "https://" + base[len("http://"):]
+    return base
+
+
 @app.route("/api/coleta/sessao", methods=["POST"])
 def coleta_sessao():
     """Abre uma sessão de coleta e devolve o bookmarklet já com o token dentro."""
     token = secrets.token_urlsafe(24)
     EST.set_config("coleta_token", f"{token}|{time.time()}")
+    EST.set_config("coleta_alvos", "{}")   # nova varredura, nova escolha de turmas
     EST.log_acao(session.get("usuario", "operador"), "abriu sessão de coleta da Extecamp")
-    base = (os.environ.get("ATENA_PUBLIC_URL") or request.url_root).rstrip("/")
+    base = _base_coleta()
     js = (f"(function(){{var s=document.createElement('script');"
           f"s.src='{base}/coleta/coletor.js?t={token}&_='+Date.now();"
           f"document.body.appendChild(s);}})()")
@@ -1677,10 +1780,51 @@ def coleta_coletor_js():
     público (não há sessão nossa naquela origem); quem manda dado precisa do
     token, que é o que realmente protege a escrita."""
     js = (WEB / "coletor-extecamp.js").read_text(encoding="utf-8")
-    base = (os.environ.get("ATENA_PUBLIC_URL") or request.url_root).rstrip("/")
+    base = _base_coleta()
     js = js.replace("{{BASE}}", base).replace("{{TOKEN}}", request.args.get("t", ""))
     return js, 200, {"Content-Type": "application/javascript; charset=utf-8",
                      "Access-Control-Allow-Origin": "*"}
+
+
+def _coleta_alvos(novo=None):
+    """Turma já enfileirada por curso NESTA passada de coleta. Zerada ao abrir a
+    sessão: é estado de uma varredura, não histórico."""
+    if novo is not None:
+        EST.set_config("coleta_alvos", json.dumps(novo, ensure_ascii=False))
+        return novo
+    try:
+        return json.loads(EST.get_config("coleta_alvos") or "{}")
+    except ValueError:
+        return {}
+
+
+def _guardar_totais(dados):
+    """Guarda os totais que a PRÓPRIA Extecamp declara, por curso (spec 20 §4).
+
+    Existe porque o Painel precisa de um número que feche com a secretaria, e a
+    contagem de cards não fecha: card só existe para quem a coleta conseguiu
+    reconciliar. Aqui é o rótulo da página.
+
+    Só a turma CORRENTE fica: a contagem que interessa é "desta turma", não a
+    soma de toda a história do curso. Turma menor que a guardada é ignorada.
+    """
+    curso, turma = dados.get("curso"), dados.get("turma") or ""
+    if not curso or not dados.get("totais"):
+        return
+    chave = f"coleta_totais:{curso}"
+    try:
+        ant = json.loads(EST.get_config(chave) or "{}")
+    except ValueError:
+        ant = {}
+    if (ant.get("turma") or "") > turma:
+        return
+    mesma = ant.get("turma") == turma
+    reg = {"turma": turma,
+           # cada aba declara os três totais; as vagas só aparecem na de inscritos
+           "totais": {**((ant.get("totais") or {}) if mesma else {}), **dados["totais"]},
+           "vagas": dados.get("vagas") or ((ant.get("vagas") or {}) if mesma else {}),
+           "coletado_em": datetime.datetime.now().isoformat(timespec="seconds")}
+    EST.set_config(chave, json.dumps(reg, ensure_ascii=False))
 
 
 @app.route("/api/coleta/pagina", methods=["POST", "OPTIONS"])
@@ -1697,6 +1841,12 @@ def coleta_pagina():
     if not _coleta_token_valido(b.get("token")):
         return jsonify({"erro": "sessão de coleta expirada — reabra pela aba Coleta"}), 403, _CORS_LP
     url, pagina = b.get("url") or "", b.get("html") or ""
+    if coleta_extecamp.deslogado(pagina):
+        # fatal: as próximas páginas viriam iguais, e cada uma reportaria "0 lidos"
+        return jsonify({"tipo": "deslogado", "url": url, "proximas": [], "resumo": None,
+                        "fatal": True,
+                        "erro": "sua sessão do ADM Cursos expirou — faça login de novo "
+                                "na Extecamp e clique o atalho outra vez"}), 200, _CORS_LP
     tipo = coleta_extecamp.classificar(url)
     resposta = {"tipo": tipo, "url": url, "proximas": [], "resumo": None}
     try:
@@ -1708,9 +1858,34 @@ def coleta_pagina():
             # Extecamp para trazer oferecimentos que não estão em campanha nenhuma.
             conhecidos = {m["curso"] for m in GRW.cursos()}
             todos = bool(b.get("todos"))
+            # Uma listagem traz TODAS as turmas do curso (a FEQ-0480 tem cinco na
+            # de "em andamento", desde 2024). Só a corrente é funil: as antigas
+            # trariam alunos de turmas encerradas para dentro do pipeline de
+            # captação e dobrariam as requisições ao servidor da Extecamp.
+            # Turma é string zero-padded ("018" > "017"), então max() é a corrente.
+            alvos = {}
             for c in coleta_extecamp.parse_lista_cursos(pagina):
                 if not (todos or c["curso"] in conhecidos):
                     continue
+                atual = alvos.get(c["curso"])
+                if not atual or (c["turma"] or "") > (atual["turma"] or ""):
+                    alvos[c["curso"]] = c
+            # As duas listagens (em inscrição, em andamento) chegam como páginas
+            # separadas e o mesmo curso aparece nas duas: a FEQ-1000 vende a 018 e
+            # ainda tem a 017 rodando. Sem esta trava, a turma anterior INTEIRA
+            # entraria no funil como "Matriculado" e inflaria a conversão com uma
+            # coorte que campanha nenhuma trouxe.
+            ja = _coleta_alvos()
+            alvos = {k: c for k, c in alvos.items()
+                     if (c["turma"] or "") > (ja.get(k) or "")}
+            if alvos:
+                _coleta_alvos({**ja, **{k: (c["turma"] or "") for k, c in alvos.items()}})
+            for c in alvos.values():
+                # a LISTAGEM é a única página que traz as datas do oferecimento;
+                # é com elas que se percebe que a ontologia ficou para trás
+                EST.set_config(f"coleta_oferecimento:{c['curso']}", json.dumps(
+                    {k: c.get(k) for k in ("turma", "insc_inicio", "insc_fim",
+                                           "ofer_inicio", "ofer_fim")}, ensure_ascii=False))
                 ctx = {"curso": c["curso"], "turma": c["turma"]}
                 # RELATÓRIOS PRIMEIRO. Eles trazem o telefone, e telefone é a chave
                 # de identidade do sistema: sabendo o contato ANTES de criar o card,
@@ -1740,6 +1915,7 @@ def coleta_pagina():
                      "matriculados": coleta_extecamp.parse_matriculados,
                      "cancelados": coleta_extecamp.parse_cancelados}[tipo]
             dados = parse(pagina)
+            _guardar_totais(dados)
             chave = f"coleta_contatos:{dados.get('curso')}/{dados.get('turma')}"
             contatos = json.loads(EST.get_config(chave) or "{}")
             r = coleta_sinc.sincronizar(EST, dados, contatos=contatos)

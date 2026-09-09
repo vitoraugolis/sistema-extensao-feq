@@ -137,19 +137,135 @@ Idempotência sem tabela de controle: o próprio id determinístico + comparaç�
 guardado (`leads.extecamp_json`) decidem se houve mudança. Recoletar sem novidade
 devolve tudo zerado — é assim que o operador sabe que não veio nada novo.
 
-## 5. Pendências
+## 5. Conferido contra o sistema real (30/08/2026)
 
-- **Layout real dos relatórios não conferido**: o parser é cego ao layout e foi
-  exercitado contra duas fixturas com estruturas diferentes + a trava do rodapé sobre
-  HTML real, mas ninguém viu a página verdadeira. Na primeira coleta de verdade, conferir
-  se o número de contatos bate com o total de inscritos do oferecimento — o retorno da
-  coleta já mostra os dois lado a lado.
+A pendência principal desta spec ("ninguém viu a página verdadeira") foi fechada: com um
+login humano no ADM Cursos, os nove oferecimentos que este sistema opera foram lidos e
+**em todos o parser leu exatamente o total que a própria página declara**, e o relatório
+de contatos devolveu exatamente o mesmo número de pessoas da listagem.
+
+O que a página real ensinou, e que a spec não sabia:
+
+- **A listagem "em andamento" liga por `cursoand.asp`, não `curso.asp`.** O parser aceitava
+  só o segundo, então devolvia zero oferecimento para todo curso já iniciado — em silêncio,
+  porque lista vazia é indistinguível de "nenhum curso nosso aqui". Corrigido
+  (`_RE_LINK_CURSO`) e coberto por teste. As colunas das duas listagens são idênticas.
+- **Uma listagem traz TODAS as turmas do curso** (a FEQ-0480 tem cinco em andamento, desde
+  2024), e o mesmo curso aparece nas duas listas. Só a **turma corrente** é funil: as
+  anteriores trariam coortes inteiras de 2024/2025 para dentro do pipeline de captação e
+  inflariam a conversão com gente que campanha nenhuma trouxe. A regra é *maior turma por
+  curso* (`"018" > "017"`, string zero-padded), com a trava `coleta_alvos` valendo entre as
+  duas listagens e zerada a cada sessão de coleta.
+- **As listagens não paginam** no volume real: 43 matriculados vieram numa página só, e a
+  aba de matriculados chega a declarar *"de 0 páginas"*. O `_paginas` devolve 1 e nada é
+  perdido — mas a suposição "20 em 20" da spec original não se confirmou.
+- **Os relatórios de contato não têm o `<div id="rodape">`** — são telas de impressão, sem
+  a moldura do site. A trava do rodapé fica inerte neles (nenhum telefone institucional
+  aparece na página). Mantida assim mesmo: é defesa barata e as *listagens* têm o rodapé.
+- O typo do próprio sistema (**"Tota de cancelados"**) existe mesmo, e os totais aparecem
+  com rótulos diferentes por aba ("Total de alunos: 43" na de matriculados) — casar por
+  radical estava certo.
+- O `id` da unidade é binário url-encoded de verdade (`%81g%C8%CA`), e a conta da
+  coordenação enxerga **uma** unidade só (a FEQ) — a lista de unidades com um item é o
+  escopo do login, não um filtro nosso.
+
+**Retrato de 30/08/2026** (baseline para conferir a próxima coleta):
+
+| Curso | Turma | Inscritos | Matriculados | Cancelados | Mín. | Máx. |
+|---|---|---|---|---|---|---|
+| FEQ-1000 | 018 | 14 | 43 | 27 | 46 | 90 |
+| FEQ-0480 | 009 | 21 | 0 | 1 | 45 | 60 |
+| FEQ-0580 | 001 | 13 | 0 | 8 | 20 | 60 |
+| FEQ-0670 | 001 | 11 | 0 | 1 | 20 | 60 |
+| FEQ-0360 | 007 | 8 | 0 | 0 | 20 | 60 |
+| FEQ-0331 | 004 | 7 | 0 | 1 | 15 | 60 |
+| FEQ-0299 | 001 | 0 | 1 | 1 | 1 | 300 |
+| FEQ-0295 | 001 | 0 | 0 | 0 | 20 | 60 |
+| FEQ-0499 | 006 | 0 | 0 | 0 | 20 | 40 |
+
+Divergências de cadastro que a coleta revelou:
+- **FEQ-0499 está em inscrição e é a turma 006**; `cursos_metas` diz `001`. (Fecha também o
+  risco aberto no CLAUDE.md §10 sobre a disponibilidade do curso.)
+- **FEQ-0333 e FEQ-0655 não aparecem em nenhuma das duas listagens** — não há oferecimento
+  em inscrição nem em andamento.
+
+### 5.1 Por que a primeira coleta real não funcionou
+
+Quatro falhas em série, todas **silenciosas** — nenhuma dava erro na cara do operador.
+Ficam registradas porque o modo de falha é o mesmo sempre que este desenho
+(código nosso rodando na origem de terceiro) encostar em algo novo.
+
+| # | O que estava errado | Como aparecia |
+|---|---|---|
+| 1 | **O atalho apontava para `http://`.** `request.url_root` saiu http mesmo com o `ProxyFix` — o `X-Forwarded-Proto` do Caddy não chegou como esperado. Script http em página https é conteúdo ativo misto. | O navegador bloqueia sem erro visível: **clicar o atalho não fazia absolutamente nada**. Nem painel, nem aviso. |
+| 2 | **`/api/coleta/pagina` exigia sessão da Central.** `LIVRE` só tinha `/api/login` e `/health`, e o guard barra tudo sob `/api` — mas o coletor vem da origem da Extecamp, onde o cookie não existe (é *por isso* que o token existe). | Preflight CORS → 401, o `fetch` nem saía. A rota nunca funcionou desde que foi escrita. |
+| 3 | **O erro acusava o sistema errado.** Falhar ao ler da Extecamp e falhar ao entregar na Central caíam no mesmo `catch`, rotulado com o nome do `.asp`. | `⚠ cursos-em-inscricao.asp: Failed to fetch` mandava procurar o problema na Extecamp, quando o problema era nosso. |
+| 4 | **Sessão vencida da Extecamp não dá 401.** Dá **200 com ~190 bytes** de `<meta refresh>` para `/admcursos/index_seg.htm`. | O parser acha zero linha em toda página e a coleta reporta *"0 inscritos"* em todos os cursos — que é bem diferente de "não estou vendo nada". |
+
+O que ficou no lugar: `_base_coleta()` promove o domínio público a https (loopback continua
+http, que é o correto em dev); `/api/coleta/pagina` está em `LIVRE` e se autentica pelo
+token (`/api/coleta`, que devolve PII de lead, **não** está); os dois lados do erro se
+identificam e um 401/403 **para** a coleta em vez de repetir o mesmo aviso 50 vezes;
+`deslogado()` reconhece o casco de redirecionamento e trata como fatal.
+
+Na Central, a aba Coleta ganhou o endereço do atalho em campo copiável (arrastar falha
+calado: o favorito vira link comum) e um botão **Testar**, que confirma se a sessão de
+coleta responde antes de o operador ir até a Extecamp descobrir que não.
+
+### 5.2 Primeira coleta real bem-sucedida (30/08/2026 18:34)
+
+58 páginas, **130 cards novos e 21 leads que já existiam reencontrados e movidos** de
+coluna — o casamento por telefone fazendo o trabalho que motivou ler os relatórios antes
+das listagens. Os nove oferecimentos bateram com a varredura manual, um a um. Recoletar
+em seguida: **0 criados, 0 movidos, 0 atualizados** (AC2 verificado em produção).
+
+## 6. O número de inscritos no Painel
+
+O Painel mostra, ao lado da captabilidade de cada curso, **inscritos + matriculados da
+turma corrente**, com o mínimo de alunos ao lado (`57 insc. / 46`).
+
+A soma não é enfeite: a aba "Inscritos" do ADM Cursos **esvazia** conforme a turma se
+matricula. Mostrar só ela faria o número despencar exatamente quando o curso deu certo —
+o FEQ-1000/018 leria "14" tendo 57 pessoas dentro. É a mesma regra cumulativa que
+`estado.alcancou` impõe ao funil.
+
+O número vem dos rótulos *"Total de ..."* da própria Extecamp (guardados em
+`config['coleta_totais:<curso>']` pelo `_guardar_totais`), **não** da contagem de cards:
+card só existe para quem a reconciliação alcançou, e o Painel precisa de um número que
+feche com a secretaria. Sem coleta ainda, a tela mostra `—`, nunca `0` — "ainda não
+olhamos" é uma afirmação diferente de "ninguém se inscreveu".
+
+## 7. Runbook: o que fazer quando o catálogo muda
+
+A coleta se ajusta sozinha na maior parte dos casos, porque lê a listagem em vez de uma
+lista fixa. O que exige ação:
+
+| Aconteceu | O que a coleta faz | O que você faz |
+|---|---|---|
+| **Nova turma** do mesmo curso | passa a coletar a turma maior e o Painel troca de número sozinho | nada |
+| Curso sai de **inscrição** e entra em **andamento** | continua sendo coletado pela outra listagem; se não houver turma nova, é ele mesmo | nada |
+| Curso ganha turma nova **e** mantém a anterior rodando | coleta só a nova (trava `coleta_alvos`) | nada |
+| **Curso novo** no catálogo | é ignorado: a coleta só varre o que está em `cursos_metas` | cadastrar o curso (Injetor / `set_oferecimento`) — sem isso ele não aparece |
+| Curso **sem oferecimento** (FEQ-0333, FEQ-0655) | nada a coletar; Painel mostra `—` | confirmar com a coordenação se sai do catálogo |
+| Turma do `cursos_metas` **diverge** da Extecamp (FEQ-0499) | a coleta usa a da Extecamp, que é a verdade | corrigir o cadastro para o Growth não pautar a turma errada |
+| Curso **adiado** — mesma turma, datas novas (FEQ-0580) | o Painel acusa a divergência de datas | `POST /api/injetor/datas` (prorrogação): mesma turma, mesma URL, só as datas. Ao aprovar, a LP é republicada |
+| Turma existe no ADM Cursos mas o **link público ainda não abriu** (FEQ-0499/006) | acusa "turma aberta e sem link de inscrição cadastrado" | esperar o link; quando sair, `POST /api/injetor/oferecimento` (turma + URL), que também atualiza `cursos_metas` e republica a LP |
+| A Extecamp **muda o HTML** | a página cai no `except` e as demais seguem (AC5) | rodar `atena/tests/test_coleta_extecamp.py`; a divergência aparece como total declarado ≠ lido |
+
+**Conferência de cada coleta** (o retorno já mostra os dois lado a lado): para cada
+oferecimento, `vistos` tem de bater com `totais_extecamp`, e o relatório de contatos tem
+de trazer o mesmo número de pessoas da listagem. Divergiu, o parser errou — não a Extecamp.
+
+## 8. Pendências
+
 - Homônimo no mesmo oferecimento **sem telefone no relatório** ainda colapsa em um card
   só; com telefone, não.
 - Coleta é **manual** (o operador dispara). Automatizar depende de a sessão da Extecamp
   durar, o que não controlamos.
+- A coleta não enxerga turmas **encerradas** (só "em inscrição" e "em andamento"). Histórico
+  de coortes antigas, se um dia interessar, sai de `cursos-concluidos.asp`.
 
-## 6. Critérios de aceitação
+## 9. Critérios de aceitação
 
 - AC1 Nenhuma credencial da Extecamp trafega ou é guardada pela Atena.
 - AC2 Coletar duas vezes seguidas não cria card duplicado nem move ninguém.

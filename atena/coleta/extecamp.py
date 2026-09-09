@@ -275,17 +275,25 @@ def parse_cancelados(pagina):
             "totais": _totais(linhas), "paginas": _paginas(pagina)}
 
 
+_RE_LINK_CURSO = re.compile(r"\bcurso(and)?\.asp\?", re.I)
+
+
 def parse_lista_cursos(pagina):
     """Lista de oferecimentos (em inscrição ou em andamento) -> alvos da coleta.
 
     É daqui que saem os tokens `sigla`/`of` opacos: sem esta página não há como
     montar as URLs das abas, porque eles não derivam da sigla legível.
+
+    As duas listagens têm colunas idênticas mas link diferente: em inscrição é
+    `curso.asp`, em andamento é `cursoand.asp`. Aceitar só o primeiro fazia a
+    coleta devolver ZERO oferecimento para todo curso já iniciado — em silêncio,
+    porque uma lista vazia é indistinguível de "nenhum curso nosso aqui".
     """
     pagina = decodificar(pagina)
     out, vistos = [], set()
     for ln in _linhas(pagina):
         cels = ln["celulas"]
-        hrefs = [h for c in cels for h in c["links"] if "curso.asp" in h]
+        hrefs = [h for c in cels for h in c["links"] if _RE_LINK_CURSO.search(h)]
         if not hrefs:
             continue
         k = chaves(hrefs[0])
@@ -322,6 +330,20 @@ BASE = "https://www.extecamp.unicamp.br/admcursos/"
 ENTRADAS = {"inscricao": BASE + "cursos-em-inscricao.asp",
             "andamento": BASE + "admcursosand_ext_pre.asp"}
 ABAS = ("inscritos", "matriculados", "cancelados")
+
+
+# Sessão vencida no ADM Cursos NÃO devolve 401: devolve 200 com uma página de ~190
+# bytes que só faz `<meta refresh>` para a tela de login. Sem reconhecer isso, a
+# coleta entrega esse casco ao parser, encontra zero linha em toda página e reporta
+# "0 lidos" em tudo — parecendo que os cursos estão vazios, e não que ninguém está
+# logado. É a diferença entre "não há inscritos" e "não estou vendo nada".
+_RE_DESLOGADO = re.compile(r"index_seg\.htm|Fa[çc]a seu login", re.I)
+
+
+def deslogado(pagina):
+    """A página é o redirecionamento para o login, e não conteúdo?"""
+    p = decodificar(pagina)
+    return bool(_RE_DESLOGADO.search(p[:2000])) and len(p) < 4000
 
 
 def classificar(url):

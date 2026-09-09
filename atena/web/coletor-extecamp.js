@@ -81,7 +81,20 @@
     return fetch(BASE + "/api/coleta/pagina", {
       method: "POST", headers: {"Content-Type": "application/json"},
       body: JSON.stringify({token: TOKEN, url: item.url, ctx: item.ctx, html: corpo})
-    }).then(function (r) { return r.json(); });
+    }).then(function (r) {
+      /* Um 401/403 aqui não é "essa página falhou": é a coleta inteira que não vai
+       * andar (sessão expirada, ou a rota exigindo cookie que esta origem não tem).
+       * Sem ler o status, o `.json()` estoura num erro genérico e o operador vê
+       * dezenas de avisos idênticos sem saber que só precisa reabrir a sessão. */
+      if (!r.ok) {
+        return r.json().catch(function () { return {}; }).then(function (j) {
+          var e = new Error(j.erro || ("a Central respondeu " + r.status));
+          e.fatal = (r.status === 401 || r.status === 403);
+          throw e;
+        });
+      }
+      return r.json();
+    });
   }
 
   function passo() {
@@ -92,13 +105,29 @@
       return;
     }
     var item = fila.shift(), url = item.url;
-    baixar(url).then(function (corpo) {
-      return entregar(item, corpo);
+    /* Os dois lados falham por motivos completamente diferentes — a Extecamp por
+     * sessão vencida ou página que mudou, a Central por token vencido ou rota
+     * fechada. Um `catch` só, rotulado com o nome do arquivo .asp, mandava o
+     * operador procurar no sistema errado. Agora cada lado diz quem é. */
+    baixar(url).catch(function (e) {
+      throw new Error("não consegui LER esta página da Extecamp — " + e.message +
+                      " (a sessão do ADM Cursos ainda está aberta nesta aba?)");
+    }).then(function (corpo) {
+      return entregar(item, corpo).catch(function (e) {
+        var novo = new Error("li a página, mas não consegui ENTREGAR à Central — " + e.message);
+        novo.fatal = e.fatal;
+        throw novo;
+      });
     }).then(function (r) {
       soma.paginas++;
       (r.proximas || []).forEach(enfileira);
       if (r.erro) {
         anota("⚠ " + r.erro);
+        if (r.fatal) {        // sessão da Extecamp caiu: o resto da fila viria vazio
+          parado = true;
+          pinta();
+          return;
+        }
       } else if (r.resumo && r.resumo.ok) {
         var s = r.resumo;
         soma.criados += (s.criados || []).length;
@@ -110,7 +139,13 @@
       }
       setTimeout(passo, PAUSA);
     }).catch(function (e) {
-      anota("⚠ " + url.split("/").pop() + ": " + e.message);
+      anota("⚠ " + url.split("/").pop().split("?")[0] + ": " + e.message);
+      if (e.fatal) {          // insistir 50 vezes no mesmo 403 não ajuda ninguém
+        parado = true;
+        anota("Coleta interrompida: reabra a sessão na aba Coleta de Dados da Central.");
+        pinta();
+        return;
+      }
       setTimeout(passo, PAUSA);
     });
   }

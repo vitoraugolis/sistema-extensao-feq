@@ -424,6 +424,7 @@ try{ const t = localStorage.getItem('tema'); if(t) document.documentElement.data
         <div class="cards" id="cards"></div>
         <div class="g sec">
           <h2>Captabilidade hoje <span class="muted" id="hoje"></span></h2>
+          <p class="muted" style="margin:-4px 0 10px;">O número de inscritos vem do ADM Cursos da Extecamp (inscritos + matriculados da turma corrente, contra o mínimo de alunos). Passe o mouse para o detalhe.</p>
           <div id="capt"></div>
           <p class="muted" style="margin:10px 2px 0;">Status calculado pela ontologia (janela de inscrição vs. hoje). Curso encerrado não é engajado pelo SDR.</p>
         </div>
@@ -863,6 +864,26 @@ document.querySelectorAll('.navi').forEach(b=>b.onclick=()=>{
   setTimeout(ajustarAltura, 0);      // a seção acabou de ficar visível: agora dá p/ medir
 });
 
+/* Inscritos do curso, do jeito que a Extecamp conta (spec 20).
+ * SOMA inscritos + matriculados de propósito: a aba "Inscritos" do ADM Cursos
+ * esvazia conforme a turma se matricula, então mostrar só ela faria o número
+ * despencar exatamente quando o curso deu certo. É a mesma regra cumulativa do
+ * funil em /api/stats.
+ * Sem coleta ainda -> nada na tela. Um "0" aqui leria como "ninguém se
+ * inscreveu", que é uma afirmação bem diferente de "ainda não olhamos". */
+function chipInscritos(e){
+  if(!e) return '<span class="chip" title="Nenhuma coleta da Extecamp ainda — use a aba Coleta de Dados." style="opacity:.5;">— insc.</span>';
+  const min = e.vagas && e.vagas.min, max = e.vagas && e.vagas.max;
+  const cls = (min && e.inscritos >= min) ? 't-ok' : (min ? 't-warn' : '');
+  const quando = (e.coletado_em||'').replace('T',' ').slice(0,16);
+  const t = [`turma ${e.turma||'—'}`,
+             `${e.inscritos_lista} na lista de inscritos + ${e.matriculados} matriculado(s)`,
+             e.cancelados ? `${e.cancelados} cancelado(s)` : null,
+             (min||max) ? `vagas: mínimo ${min||'?'}, máximo ${max||'?'}` : null,
+             quando ? `coletado em ${quando}` : null].filter(Boolean).join(' · ');
+  return `<span class="chip ${cls}" title="${t}"><i class="ti ti-users"></i>${e.inscritos} insc.${min?` / ${min}`:''}</span>`;
+}
+
 async function carregar(){
   const st = await api('/api/stats');
   $('#cards').innerHTML = st.funil.map(f=>`
@@ -874,7 +895,12 @@ async function carregar(){
   $('#capt').innerHTML = cap.cursos.map(c=>{
     const cls = c.status==='aberta'?'t-ok':(c.status==='encerrada'?'t-bad':'t-warn');
     const al = c.alerta?` <i class="ti ti-alert-triangle" title="${c.alerta}" style="color:var(--warn);"></i>`:'';
-    return `<div class="row"><strong>${c.curso}</strong>${al}<span style="color:var(--text-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${c.nome}</span><span class="tag ${cls}">${c.status}</span></div>`;
+    /* A Extecamp discorda do nosso catálogo. Fica ao lado do código do curso porque
+     * é sobre o curso, não sobre a coleta — e porque foi assim que apareceu que o
+     * FEQ-0580 estava "encerrado" aqui enquanto vendia lá. */
+    const dv = (c.divergencias||[]).length
+      ? ` <i class="ti ti-alert-octagon" title="Diverge da Extecamp: ${c.divergencias.join(' · ')}" style="color:var(--bad);"></i>`:'';
+    return `<div class="row"><strong>${c.curso}</strong>${al}${dv}<span style="color:var(--text-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${c.nome}</span>${chipInscritos(c.extecamp)}<span class="tag ${cls}">${c.status}</span></div>`;
   }).join('');
 
   if(!$('#rcurso').options.length) $('#rcurso').innerHTML = cap.cursos.map(c=>`<option value="${c.curso}">${c.curso}</option>`).join('');
@@ -1886,16 +1912,58 @@ async function coletaSessao(){
   cx.classList.remove('hidden');
   // O atalho é um link para ARRASTAR até a barra de favoritos: um bookmarklet é a
   // única forma de rodar nosso código na origem da Extecamp sem instalar extensão.
+  // Duas formas de instalar o atalho de propósito: arrastar é o caminho curto, mas
+  // falha calado (o favorito vira um link normal e clicar nele não faz nada, sem
+  // erro nenhum). Copiar e colar no gerenciador de favoritos sempre funciona, e é
+  // o que se usa quando "o botão não fez nada".
+  window.COLETA_TOKEN = r.token;
   cx.innerHTML = `
     <div style="border:1px solid var(--border);border-radius:9px;padding:12px;background:var(--guara-bg);">
-      <p style="font-weight:800;margin:0 0 6px;">3. Arraste este botão para a barra de favoritos</p>
-      <p class="muted" style="margin:0 0 9px;">Depois, já dentro do ADM Cursos, clique nele. A coleta
-        aparece num painel no canto da tela. Validade: ${r.validade_horas}h.</p>
+      <p style="font-weight:800;margin:0 0 6px;">3. Instale o atalho na barra de favoritos</p>
+      <p class="muted" style="margin:0 0 9px;">Ele roda a coleta dentro da aba já logada do ADM Cursos.
+        Validade: ${r.validade_horas}h.</p>
+      <p style="margin:0 0 6px;"><strong>Jeito rápido:</strong> arraste o botão abaixo para a barra de favoritos.</p>
       <a href="${r.bookmarklet}" onclick="alert('Não clique aqui: ARRASTE este botão para a barra de favoritos e clique nele já dentro do ADM Cursos.');return false;"
          style="display:inline-block;background:var(--guara);color:#fff;font-weight:800;text-decoration:none;
                 border:1px solid var(--border);border-radius:9px;padding:8px 14px;box-shadow:var(--shadow);cursor:grab;">
         ⬇ Coletar Extecamp</a>
+      <p style="margin:12px 0 6px;"><strong>Se arrastar não funcionar:</strong> copie o endereço abaixo e crie
+        o favorito à mão (Favoritos → Gerenciar → Adicionar, e cole no campo de URL).</p>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <input id="coletaHref" readonly value="${r.bookmarklet}"
+               style="flex:1;min-width:0;font-family:ui-monospace,monospace;font-size:11px;">
+        <button class="btn btn-g" onclick="coletaCopiar()"><i class="ti ti-copy"></i> Copiar</button>
+        <button class="btn btn-g" onclick="coletaTestar()" title="Confere se a sessão de coleta está de pé">
+          <i class="ti ti-plug-connected"></i> Testar</button>
+      </div>
+      <p class="muted" id="coletaDiag" style="margin:8px 0 0;"></p>
     </div>`;
+}
+
+function coletaCopiar(){
+  const el = $('#coletaHref');
+  el.select();
+  navigator.clipboard.writeText(el.value)
+    .then(()=>$('#coletaDiag').textContent = 'Endereço copiado. Cole no campo URL de um favorito novo.')
+    .catch(()=>$('#coletaDiag').textContent = 'Não consegui copiar — selecione o texto e use Ctrl/Cmd+C.');
+}
+
+/* Diz se a sessão de coleta responde, ANTES de o operador ir até a Extecamp
+ * descobrir que não. É o mesmo endpoint que o coletor usa, com a mesma
+ * autenticação por token — só que com uma URL que não está no roteiro, então a
+ * resposta esperada é uma recusa educada, não uma coleta. */
+async function coletaTestar(){
+  const d = $('#coletaDiag');
+  d.textContent = 'testando…';
+  try{
+    const r = await fetch('/api/coleta/pagina', {method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({token: window.COLETA_TOKEN, url:'https://exemplo/ping.asp', html:''})});
+    const j = await r.json();
+    d.textContent = r.ok
+      ? 'Sessão de coleta ativa — o atalho vai conseguir escrever aqui. ✅'
+      : `A Central recusou (${r.status}): ${j.erro||'sem detalhe'} — gere a sessão de novo.`;
+  }catch(e){ d.textContent = 'Não consegui falar com a Central: ' + e.message; }
 }
 
 function coletaChip(taxa){
