@@ -223,7 +223,8 @@ def test_bibliotecario_portfolio_e_citados():
     from atena.agentes.bibliotecario import Bibliotecario
     ctx = Bibliotecario(ONT).contexto("FEQ-0480", "Superior Completo",
                                       mensagem="qual a ementa do FEQ-0580?")
-    assert len(ctx["portfolio"]) == 10                      # conhece o catálogo inteiro
+    assert len(ctx["portfolio"]) == len(ONT.cursos())        # conhece o catálogo inteiro
+    assert "FEQ-0480" in ONT.cursos() and "FEQ-0580" in ONT.cursos()
     assert ctx["cursos_citados"][0]["curso"]["codigo"] == "FEQ-0580"
     assert ctx["curso"]["insight_venda"]                    # registro enriquecido
     assert ctx["curso"]["aulas_inicio"]                     # sabe quando começa
