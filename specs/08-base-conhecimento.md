@@ -11,9 +11,41 @@ requisito, horário, modalidade) que **resolvam a uma âncora** no grafo e satis
 Campo ausente = "não sei" → o agente diz que vai confirmar; **nunca** inventa (fail-closed).
 
 ## Regra de qualificação (agora como dado, não prompt)
-Os 8 cursos exigem **ensino superior completo** → no grafo, `requisito/nivelMinimo =
-feq:superiorCompleto`. A elegibilidade é a comparação ordinal `≥` (ver `11`). Ensino médio não
-qualifica para nenhum curso atual. Trocar o gate de um curso futuro é editar o dado.
+Os cursos de especialização/extensão da FEQ exigem **ensino superior completo** → no grafo,
+`requisito/nivelMinimo = feq:superiorCompleto`. A elegibilidade é a comparação ordinal `≥`
+(ver `11`). Trocar o gate de um curso é editar o dado — não é uma regra fixa no prompt, e por
+isso o catálogo já tem exceções reais: **ECO-1100** (§ "Cursos fora da FEQ") declara
+`nivelMinimo = feq:nenhum` porque a landing page do curso é explícita ("não há pré-requisito").
+
+## Cursos fora da FEQ
+O catálogo não é exclusivo da Extensão FEQ: **ECO-1100** ("Desvendando a Economia Global") é do
+**Instituto de Economia (IE/CERI)** — outro instituto da Unicamp, com sua própria landing page
+(`eco-1100-landing.vercel.app`) e sem pré-requisito acadêmico. É tratado pelos mesmos agentes
+(ontologia, Revisor, orquestrador) que os cursos da FEQ, mas com três diferenças deliberadas:
+- **Não entra na página `cursos-extensao.feq.unicamp.br`** — tem landing page própria, fora do
+  WordPress da FEQ. Nunca é adicionado a `cursos_metas` (`atena/growth/db.py`), o que já basta
+  para excluí-lo do deploy de bridge pages (`wp_deploy_bridge.py`, que só publica turmas do
+  `cursos_metas`) e do Growth Engine (pacing/CAPI/recuperação de checkout).
+- **Fora da varredura da coleta Extecamp (spec 20)** — sem acesso ao Instituto de Economia no
+  ADM Cursos por ora. A varredura já só processa códigos presentes no `cursos_metas`
+  (`app.py::coleta_pagina`, tipo `"lista"`), então a mesma ausência acima já exclui o ECO-1100
+  sem precisar de nenhuma trava adicional.
+- **`requisito/nivelMinimo = feq:nenhum`** — sem gate acadêmico; o orquestrador não pergunta
+  "você concluiu o ensino superior?" para este curso (mesmo mecanismo do teste
+  `test_lead_com_medio_e_elegivel_no_curso_de_medio`).
+
+**Identidade institucional**: o agente se apresenta como "Vinícius, atendente do Instituto de
+Economia" (não da FEQ) quando o curso do lead é ECO-1100 — `atena.ontologia.servico
+.instituicao_do_codigo(codigo)` deriva isso do prefixo e alimenta o system prompt do cérebro
+(`cerebro.py::_system_prompt`) e as respostas fixas do orquestrador (pergunta "é robô?"). O
+cartão de contato do WhatsApp também varia: chave `secretaria_ie` em `atena/core/contatos.py`
+tem telefone/e-mail reais da secretaria do IE (confirmado por Vitor em 16/09/2026), distintos
+da secretaria da FEQ. Pendência conhecida: o Guia do Curso em PDF (`atena/growth/pdf_guia.py`)
+ainda não segue essa regra — o branding (logo, contato) é 100% FEQ hardcoded; ver CLAUDE.md §10.
+
+Prefixo de código novo (`ECO` vs `FEQ`) precisa estar em `atena.ontologia.servico.CODE_RE` —
+é a única fonte do regex de código de curso; ingestão, orquestrador, Bibliotecário, Ontologista
+e Revisor importam de lá. O mesmo módulo também é a única fonte de `instituicao_do_codigo`.
 
 ## Esquema de cada curso (catalogo.jsonld)
 `codigo, nome, @type(Especializacao|Extensao), modalidade, horarioAula, professorResponsavel,

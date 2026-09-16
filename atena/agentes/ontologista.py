@@ -16,12 +16,11 @@ import pathlib
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2]))
 
-from atena.ontologia.servico import Ontologia
+from atena.ontologia.servico import Ontologia, CODE_RE, normalizar_codigo
 from atena.ontologia import validacao
 from atena.ontologia.versionamento import Versionamento
 
 ONT_DIR = pathlib.Path(__file__).resolve().parents[1] / "ontologia"
-CODE_RE = re.compile(r"FEQ[-\s]?(\d{3,4})", re.I)
 DATE_RE = re.compile(r"(\d{2})/(\d{2})/(\d{4})")
 
 
@@ -66,7 +65,7 @@ class Ontologista:
         m = CODE_RE.search(texto or "")
         if not m:
             return None, [], "indefinido"
-        code = f"FEQ-{m.group(1)}"
+        code = normalizar_codigo(m.group(1), m.group(2))
         diffs, tipos = [], []
         t = (texto or "").lower()
         # Trabalha SEM o código do curso: seus dígitos (ex.: 0333) contaminavam os

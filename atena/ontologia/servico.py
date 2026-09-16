@@ -23,6 +23,31 @@ from rdflib.namespace import RDF
 AQUI = Path(__file__).parent
 FEQ = Namespace("https://feq.unicamp.br/ontologia#")
 
+# Prefixos de instituto no catálogo — FEQ (Extensão FEQ) e ECO (Instituto de
+# Economia, ver ECO-1100). Única fonte do padrão: ingestão, orquestrador,
+# Bibliotecário, Ontologista e Revisor importam daqui em vez de cada um
+# hardcodar o próprio regex — foi assim que ECO ficou invisível a todos eles
+# de uma vez até este módulo existir. Novo instituto: acrescente o prefixo aqui.
+CODE_RE = re.compile(r"(FEQ|ECO)[-_\s]?(\d{3,4})", re.I)
+
+
+def normalizar_codigo(prefixo, numero):
+    """'feq', '331' -> 'FEQ-0331' — catálogo usa 4 dígitos, prefixo maiúsculo."""
+    return f"{prefixo.upper()}-{numero.zfill(4)}"
+
+
+# Identidade institucional por prefixo — o agente se apresenta como "da Extensão FEQ
+# Unicamp" só quando o curso é mesmo da FEQ. Sem isso, um lead do ECO-1100 (Instituto
+# de Economia) recebia identidade e contato errados (ver specs/08 § "Cursos fora da FEQ").
+# Com a preposição já embutida (concordância: "da FEQ" vs "do Instituto de Economia").
+_INSTITUICOES = {"FEQ": "da Extensão FEQ Unicamp", "ECO": "do Instituto de Economia (IE) Unicamp"}
+
+
+def instituicao_do_codigo(codigo):
+    """Prefixo do código -> 'da/do <instituto>' (com preposição), p/ compor a frase
+    "atendente {instituicao_do_codigo(cod)}" direto, sem repetir a concordância."""
+    return _INSTITUICOES.get((codigo or "").split("-")[0].upper(), _INSTITUICOES["FEQ"])
+
 
 def _dig(x):
     return re.sub(r"\D", "", str(x)) if x is not None else ""

@@ -2543,18 +2543,22 @@ async function enviarTemplate(id){
   await aposAcao();
 }
 
-// Espelha atena/core/contatos.py::CONTATOS_OFICIAIS — só 2 itens fixos e
-// institucionais; não vale um round-trip ao servidor para uma lista que não muda
-// por lead. Se a lista lá mudar de chave/rótulo, atualizar aqui também.
-const CONTATOS_UI = [{chave:'secretaria', rotulo:'Secretaria da Extensão FEQ', sub:'(19) 3521-3911'},
-                     {chave:'whatsapp', rotulo:'WhatsApp da Extensão FEQ', sub:'(19) 98262-0072'}];
+// Espelha atena/core/contatos.py::CONTATOS_OFICIAIS — não vale um round-trip ao
+// servidor para uma lista que quase não muda. Se a lista lá mudar de chave/rótulo,
+// atualizar aqui também. Filtrado por instituto: um lead do ECO-1100 (Instituto de
+// Economia) não pode receber o contato da secretaria da FEQ, e vice-versa.
+const CONTATOS_UI_FEQ = [{chave:'secretaria', rotulo:'Secretaria da Extensão FEQ', sub:'(19) 3521-3911'},
+                        {chave:'whatsapp', rotulo:'WhatsApp da Extensão FEQ', sub:'(19) 98262-0072'}];
+const CONTATOS_UI_IE = [{chave:'secretaria_ie', rotulo:'Secretaria do Instituto de Economia', sub:'(19) 3521-5728'}];
 
 function toggleContato(id){
   const box = $('#convContato'); if(!box) return;
   if(!box.classList.contains('hidden')){ box.classList.add('hidden'); box.innerHTML=''; return; }
+  const curso = ($('#convCurso')?.textContent || '').trim();
+  const opcoes = curso.startsWith('ECO') ? CONTATOS_UI_IE : CONTATOS_UI_FEQ;
   box.innerHTML = `<div class="conv-tpl-top"><strong>Compartilhar contato</strong>
       <button class="conv-tpl-x" onclick="toggleContato('${id}')" title="Fechar">✕</button></div>
-    ${CONTATOS_UI.map(c=>`<div class="row" style="cursor:pointer;" onclick="enviarContato('${id}','${c.chave}')">
+    ${opcoes.map(c=>`<div class="row" style="cursor:pointer;" onclick="enviarContato('${id}','${c.chave}')">
       <i class="ti ti-id-badge-2"></i><span><strong>${c.rotulo}</strong><br><span class="muted">${c.sub}</span></span></div>`).join('')}`;
   box.classList.remove('hidden');
 }

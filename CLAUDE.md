@@ -32,7 +32,7 @@ ela lê/escreve no FARO via API e conversa pelo WhatsApp Business Cloud.
 | WhatsApp | **API oficial WhatsApp Business Cloud**. |
 | System of record | **FARO CRM**, pipeline `[FEQ] CRM`. Não criamos banco próprio. |
 | Infra inicial | Máquina local; deploy gradual depois (VPS a definir). |
-| Gate acadêmico | **Todos os 8 cursos exigem ensino superior completo.** |
+| Gate acadêmico | **Os cursos da FEQ exigem ensino superior completo** (dado por curso, não regra fixa — ver `specs/08`). ECO-1100 (Instituto de Economia, fora da FEQ) não exige. |
 
 ## 3. Arquitetura em uma tela
 
@@ -192,12 +192,30 @@ Reescrita **v2** (monólito modular `atena/`, ancoragem ontológica) implementad
   corrente contra o mínimo de alunos.
 - ⏳ Fases 3 e 4 (inscrição/matrícula) (`specs/06`); envio WhatsApp e cérebro LLM reais dependem de chaves.
 - ⏳ Legado v1 (`feq_*.py`) mantido só como referência.
+- ✅ Catálogo multi-instituto (16/09/2026, `specs/08` § "Cursos fora da FEQ"): **ECO-1100**
+  (Instituto de Economia, não-FEQ) inserido na ontologia — sem gate acadêmico, landing page
+  externa (`eco-1100-landing.vercel.app`), fora de `cursos_metas` (logo fora do deploy WP, do
+  Growth Engine e da varredura da coleta Extecamp, que já são todos escopados a `cursos_metas`).
+  `atena.ontologia.servico.CODE_RE` virou a fonte única do regex de código de curso (antes
+  hardcoded `FEQ[-\s]?(\d{3,4})` em 5 arquivos — nenhum deles reconheceria "ECO-1100").
 
 ## 10. Riscos e pendências abertas
 
 - ✅ FEQ-0499 confirmado em inscrição (turma **006**, até 06/02/2027) na coleta de
   30/08/2026 — mas `cursos_metas` ainda diz turma `001`: corrigir o cadastro.
 - FEQ-0333 e FEQ-0655 não têm oferecimento em inscrição nem em andamento (coleta 30/08/2026).
+- ✅ Identidade institucional do agente por curso (16/09/2026, `atena/ontologia/servico.py::
+  instituicao_do_codigo`): system prompt do cérebro, respostas fixas do orquestrador e cartão de
+  contato do WhatsApp (`atena/core/contatos.py`, chave `secretaria_ie` — Rafaela Sanches/Solange
+  Gonçalves, (19) 3521-5728 e (19) 3521-0119, iecoext@unicamp.br, 14h-22h, confirmado por Vitor)
+  agora variam por instituto (FEQ vs Instituto de Economia). Sem confirmação de WhatsApp nos
+  números do IE — `whatsapp: False` até alguém testar (mesma trava que evita repetir o bug de
+  10/08/2026 na secretaria FEQ).
+- **Guia do curso em PDF ainda é 100% branding FEQ** (`atena/growth/pdf_guia.py`): logo, título de
+  seção ("Por que estudar na Extensão FEQ") e contato do rodapé são hardcoded FEQ — não
+  adaptado para ECO-1100 nesta rodada (faltaria pelo menos o logo do IE, que não tenho). Se o PDF
+  for pedido por um lead do ECO-1100, hoje sai com identidade da FEQ; o guia por WhatsApp/texto
+  já está correto.
 - Chave FARO atual enxerga vários pipelines — migrar para chave escopada só ao FEQ.
 - ✅ Persistência de conversa em SQLite (`atena/core/estado.py`); integração real com FARO (SoR externo) ainda pendente.
 - ✅ O VPS já tem as credenciais do WordPress (31/08/2026): aprovação do Injetor e tick de

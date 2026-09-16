@@ -25,6 +25,13 @@ def test_mensagem_correta_aprovada():
     assert _ok("FEQ-0480", "O FEQ-0480 são 19x de R$ 866,09, ou R$ 16.455,75 à vista.")
 
 
+def test_curso_fora_da_feq_grounding_ok():
+    # ECO-1100 (Instituto de Economia) usa o mesmo Revisor — âncora tem de resolver
+    # pelo prefixo ECO, não só FEQ (regex hardcoded escondia isso antes).
+    assert _ok("ECO-1100", "O ECO-1100 são 3x de R$ 143,54, ou R$ 430,63 à vista.")
+    assert not _ok("ECO-1100", "O ECO-1100 são 3x de R$ 999,00.")
+
+
 def test_carga_real_aprovada():
     assert _ok("FEQ-0480", "São 368 horas de curso.")
 

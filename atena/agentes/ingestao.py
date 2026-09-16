@@ -14,8 +14,7 @@ import pathlib
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2]))
 
-
-FORM_CODE_RE = re.compile(r"FEQ[-_ ]?(\d{3,4})", re.I)
+from atena.ontologia.servico import CODE_RE, normalizar_codigo
 
 
 def _digits(p):
@@ -27,9 +26,9 @@ def curso_de_texto(*textos):
     Padrão acordado: nome do formulário = curso + versão (ex.: 'FEQ-0333 v1').
     Normaliza para 4 dígitos: 'FEQ 331' -> 'FEQ-0331' (catálogo usa 4 dígitos)."""
     for t in textos:
-        m = FORM_CODE_RE.search(t or "")
+        m = CODE_RE.search(t or "")
         if m:
-            return f"FEQ-{m.group(1).zfill(4)}"
+            return normalizar_codigo(m.group(1), m.group(2))
     return ""
 
 

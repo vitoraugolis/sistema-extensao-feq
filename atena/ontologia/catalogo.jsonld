@@ -738,6 +738,58 @@
       "empresasJson": "[\"EMS\", \"Solvay\", \"3M\", \"Petrobras\", \"Eaton\", \"Buckman\", \"Boehringer\", \"Braskem\"]",
       "fichaInscricao": "basica",
       "captacaoAntecipada": "true"
+    },
+    {
+      "@id": "feq:ECO-1100",
+      "@type": "feq:Difusao",
+      "codigo": "ECO-1100",
+      "nome": "Desvendando a Economia Global: Perspectivas sobre um Mundo em Transformação",
+      "modalidade": "A distância (100% online, assíncrono)",
+      "formatoAulasResumo": "100% assíncrono — aulas gravadas no Moodle",
+      "formatoAulasDetalhe": "Aulas gravadas de cerca de 30 minutos cada, liberadas no Moodle. Sem aula ao vivo nem horário fixo: o aluno organiza o próprio ritmo de estudo dentro do período de oferecimento.",
+      "professorResponsavel": "Roberto Alexandre Zanchetta Borghi",
+      "professoresAdicionais": [
+        "Adriana Nunes Ferreira",
+        "Alex Wilhans Antonio Palludeto",
+        "Ana Rosa Ribeiro de Mendonça Sarti",
+        "Fernanda Oliveira Ultremare",
+        "Giuliano Contento de Oliveira",
+        "Paulo Sergio Fracalanza",
+        "Simone Silva de Deos"
+      ],
+      "publicoAlvo": "Profissionais e estudantes de diversas áreas interessados na compreensão da economia internacional. Não há pré-requisito nem formação prévia em economia.",
+      "certificacao": "Declaração de frequência emitida pela Unicamp através da Extecamp (Escola de Extensão).",
+      "requisito": {
+        "@type": "feq:RequisitoAcademico",
+        "nivelMinimo": "feq:nenhum"
+      },
+      "cargaHoraria": {
+        "@type": "feq:Duracao",
+        "horas": 20
+      },
+      "vagasMax": 50,
+      "janelaInscricao": {
+        "@type": "feq:JanelaTemporal",
+        "fim": "2026-10-20"
+      },
+      "janelaOferecimento": {
+        "@type": "feq:JanelaTemporal",
+        "inicio": "2026-10-26",
+        "fim": "2027-01-31"
+      },
+      "planoPagamento": {
+        "@type": "feq:PlanoPagamento",
+        "taxaInscricao": "24.00",
+        "numParcelas": 3,
+        "valorParcela": "143.54",
+        "aVista": "430.63"
+      },
+      "urlExtecamp": "https://ins.extecamp.unicamp.br/curso/dados/ECO-1100/001",
+      "objetivo": "Apresentar os principais elementos que estruturam a dinâmica econômica internacional contemporânea. Por meio do exame de transformações nas dimensões monetário-financeira, produtivo-tecnológico-comercial e ambiental, fornecer subsídios analíticos e empíricos para uma compreensão crítica das relações econômicas globais na atualidade.",
+      "conteudoProgramatico": "20 horas organizadas em 4 eixos temáticos (Dinheiro e poder, Produção, Clima, Geopolítica) cobrindo 10 temas, da dominância financeira às cadeias globais de valor e à nova geopolítica internacional.",
+      "insightVenda": "Primeiro curso do portfólio fora da FEQ — é do Instituto de Economia (CERI), não da Extensão FEQ Unicamp. Sem pré-requisito de escolaridade, 100% assíncrono, ticket de entrada baixo (R$ 430,63). Bom produto de entrada; a landing page própria é externa (eco-1100-landing.vercel.app) e este curso NÃO entra na página cursos-extensao.feq.unicamp.br nem nas varreduras da coleta Extecamp (sem acesso a cursos ECO no ADM Cursos por ora).",
+      "wasDerivedFrom": "feq:fonteEco1100",
+      "plataformaAula": "Moodle"
     }
   ]
 }

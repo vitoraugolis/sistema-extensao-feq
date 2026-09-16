@@ -14,6 +14,7 @@ direta do usuário (divergia do sextfeq@unicamp.br do Guia).
 
 CONTATOS_OFICIAIS = {
     "secretaria": {
+        "org": "Extensão FEQ Unicamp",
         "rotulo": "Secretaria da Extensão FEQ",
         "telefone": "+551935213911",
         "telefone_exibicao": "(19) 3521-3911",
@@ -24,11 +25,28 @@ CONTATOS_OFICIAIS = {
         "whatsapp": True,
     },
     "whatsapp": {
+        "org": "Extensão FEQ Unicamp",
         "rotulo": "WhatsApp da Extensão FEQ",
         "telefone": "+5519982620072",
         "telefone_exibicao": "(19) 98262-0072",
         "email": None,
         "whatsapp": True,
+    },
+    "secretaria_ie": {
+        "org": "Instituto de Economia (IE) Unicamp",
+        "rotulo": "Secretaria do Instituto de Economia",
+        "telefone": "+551935215728",
+        "telefone_exibicao": "(19) 3521-5728",
+        "telefone2_exibicao": "(19) 3521-0119",
+        "email": "iecoext@unicamp.br",
+        # Confirmado por Vitor em 16/09/2026 (atendentes Rafaela Sanches e Solange
+        # Gonçalves, atendimento das 14h às 22h) — para o curso ECO-1100. Diferente da
+        # secretaria/WhatsApp da FEQ acima: NÃO reteste os números por conta própria,
+        # e não marque "whatsapp": True sem confirmação — foi assim que o número da
+        # secretaria FEQ causou "este número não está no WhatsApp" no app do lead
+        # (10/08/2026, ver `whatsapp` acima).
+        "whatsapp": False,
+        "horario_atendimento": "14h às 22h",
     },
 }
 
@@ -48,12 +66,19 @@ def payload_contato(chave):
         # para um número sem WhatsApp faz o app do lead tentar resolver aquele ID e
         # mostrar "este número não está no WhatsApp" (bug real, 10/08/2026).
         fone["wa_id"] = c["telefone"].lstrip("+")
+    fones = [fone]
+    if c.get("telefone2_exibicao"):
+        fones.append({"phone": c["telefone2_exibicao"], "type": "WORK"})
     contato = {
         "name": {"formatted_name": c["rotulo"], "first_name": c["rotulo"]},
-        "org": {"company": "Extensão FEQ Unicamp"},
-        "phones": [fone],
-        "urls": [{"url": SITE, "type": "WORK"}],
+        "org": {"company": c.get("org", "Extensão FEQ Unicamp")},
+        "phones": fones,
     }
+    # site institucional: só o da FEQ está confirmado (SITE). Sem um do IE/CERI, omite
+    # em vez de linkar a instituição errada — mesma regra fail-closed do Revisor.
+    site = c.get("url", SITE if chave in ("secretaria", "whatsapp") else None)
+    if site:
+        contato["urls"] = [{"url": site, "type": "WORK"}]
     if c["email"]:
         contato["emails"] = [{"email": c["email"], "type": "WORK"}]
     return contato

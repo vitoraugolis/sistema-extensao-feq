@@ -17,6 +17,12 @@ Decisões de design (ver specs/11):
 """
 import os
 import re
+import sys
+import pathlib
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2]))
+
+from atena.ontologia.servico import CODE_RE, normalizar_codigo
 
 MONEY_RE = re.compile(r"R?\$?\s*\d{1,3}(?:[.\s]\d{3})*,\d{2}")
 PARC_RE = re.compile(r"(\d{1,3})\s*x\s*(?:de\s*)?R?\$?\s*(\d{1,3}(?:[.\s]\d{3})*,\d{2})", re.I)
@@ -26,7 +32,6 @@ DATE_RE = re.compile(r"\b(\d{2})/(\d{2})/(\d{4})\b")
 # antigas, e nesse formato escapavam do DATE_RE e chegavam ao lead.
 DATE_CURTA_RE = re.compile(r"\b(\d{2})/(\d{2})\b(?!\s*/)")
 HOUR_RE = re.compile(r"(\d{1,4})\s*(?:h\b|horas\b)", re.I)
-CODE_RE = re.compile(r"FEQ[-\s]?(\d{3,4})", re.I)
 # Link da Extecamp. Precisou existir quando 6 leads do FEQ-0480 receberam a turma
 # ERRADA (/001 em vez de /009): o Revisor barrava preço e data inventados, mas deixava
 # passar qualquer URL — e link quebrado mata a conversão tão bem quanto preço errado.
@@ -45,7 +50,7 @@ def _url_norm(u):
 def _ancoras_escopo(codigo, texto, ont):
     """União das âncoras do curso do card + cursos CITADOS na mensagem.
     Sem isso, um fato verdadeiro de outro curso do portfólio seria bloqueado."""
-    codigos, vistos, ancs = [codigo] + [f"FEQ-{m}" for m in CODE_RE.findall(texto or "")], set(), []
+    codigos, vistos, ancs = [codigo] + [normalizar_codigo(p, n) for p, n in CODE_RE.findall(texto or "")], set(), []
     for c in codigos:
         a = ont.ancoras(c)
         if a and a["codigo"] not in vistos:

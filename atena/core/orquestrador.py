@@ -13,7 +13,7 @@ import threading
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2]))
 
-from atena.ontologia.servico import Ontologia
+from atena.ontologia.servico import Ontologia, CODE_RE, normalizar_codigo, instituicao_do_codigo
 from atena.revisor.ontologico import revisar
 from atena.core.estado import Estado
 from atena.core.faro import Faro
@@ -83,8 +83,8 @@ def brain_deterministico(ont, lead, mensagem_lead, historico=None, hoje=None):
     # Curso descoberto na mensagem (lead sem curso no card) tem de PERSISTIR, senão
     # a próxima mensagem volta à estaca zero.
     if dec.dados.get("curso") is None and not lead.get("curso"):
-        cod = next((f"FEQ-{m}" for m in re.findall(r"FEQ[-\s]?(\d{3,4})", mensagem_lead or "", re.I)
-                    if ont.curso(f"FEQ-{m}")), None)
+        cod = next((c for c in (normalizar_codigo(p, n) for p, n in CODE_RE.findall(mensagem_lead or ""))
+                    if ont.curso(c)), None)
         if cod:
             dec.dados["curso"] = cod
     return dec
@@ -98,8 +98,8 @@ def _brain_deterministico(ont, lead, mensagem_lead, historico=None, hoje=None):
     # transparência: perguntou se é robô -> assume que é IA e oferece uma pessoa
     if G.pergunta_se_e_robo(mensagem_lead) and not G.quer_humano(mensagem_lead):
         return C.DecisaoAgente(C.CONTINUAR, "lead perguntou se é robô — resposta transparente",
-                               mensagem_ao_lead="Sou sim — um agente de inteligência artificial da "
-                                                "Extensão FEQ Unicamp. Consigo te ajudar com "
+                               mensagem_ao_lead=f"Sou sim — um agente de inteligência artificial "
+                                                f"{instituicao_do_codigo(cod)}. Consigo te ajudar com "
                                                 "informações dos cursos e com a inscrição. Se preferir "
                                                 "falar com uma pessoa do time, é só me dizer que eu repasso.")
     if G.quer_humano(mensagem_lead):
@@ -114,12 +114,16 @@ def _brain_deterministico(ont, lead, mensagem_lead, historico=None, hoje=None):
     # DESCOBERTA — pergunta qual curso em vez de escalar. Se a mensagem citar um
     # código válido, adota-o e segue o fluxo normal.
     if not cod or not ont.curso(cod):
-        citado = next((f"FEQ-{m}" for m in re.findall(r"FEQ[-\s]?(\d{3,4})", mensagem_lead or "", re.I)
-                       if ont.curso(f"FEQ-{m}")), None)
+        citado = next((c for c in (normalizar_codigo(p, n) for p, n in CODE_RE.findall(mensagem_lead or ""))
+                       if ont.curso(c)), None)
         if citado:
             cod = citado
         else:
-            abertos = [c for c in ont.portfolio() if c.get("inscricao") == "aberta"][:3]
+            # Só cursos da FEQ aqui: quem chega SEM origem conhecida (sem citar curso, sem
+            # campanha) é o funil padrão da FEQ — o ECO-1100 (Instituto de Economia) tem
+            # entrada própria pela landing page dele, já com o curso identificado.
+            abertos = [c for c in ont.portfolio()
+                       if c.get("inscricao") == "aberta" and c["codigo"].startswith("FEQ")][:3]
             lista = "; ".join(f"{c['codigo']} ({c['nome']})" for c in abertos)
             msg = ("Oi! Sou o Vinícius, da Extensão FEQ Unicamp. "
                    "Sobre qual curso você quer informações? "

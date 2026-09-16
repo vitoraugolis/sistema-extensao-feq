@@ -121,6 +121,9 @@ def test_curso_do_nome_do_formulario():
     assert curso_de_texto("Lead Magnet FEQ 530") == "FEQ-0530"
     # form vazio -> cai no fallback de campanha
     assert curso_de_texto("", "Leads FEQ-0499 verão") == "FEQ-0499"
+    # instituto fora da FEQ (ECO-1100, Instituto de Economia) — mesmo padrão de prefixo
+    assert curso_de_texto("ECO-1100 v1") == "ECO-1100"
+    assert curso_de_texto("Lead Magnet ECO 1100") == "ECO-1100"
 
 
 def test_normalizar_meta_so_nome_tel_email():

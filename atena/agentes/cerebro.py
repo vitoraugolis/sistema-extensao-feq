@@ -21,6 +21,7 @@ from atena.core import contratos as C
 from atena.core import guardrails as G
 from atena.agentes.bibliotecario import Bibliotecario
 from atena.core.orquestrador import brain_deterministico
+from atena.ontologia.servico import instituicao_do_codigo
 
 import time as _time
 import collections
@@ -336,15 +337,19 @@ def _bloco_curso(ctx):
 
 def _system_prompt(ctx, lead_nome=None, precedentes=""):
     nome = (lead_nome or "").strip()
+    # Instituto do curso DESTE lead — ECO-1100 é do Instituto de Economia, não da FEQ
+    # (specs/08 § "Cursos fora da FEQ"); sem curso ainda (descoberta), assume FEQ (a
+    # maioria do portfólio) até o lead dizer qual curso quer.
+    instituicao = instituicao_do_codigo((ctx.get("curso") or {}).get("codigo"))
     citados = "\n".join(
         f"CURSO CITADO PELO LEAD ({x['curso']['codigo']}, inscrição {x['captavel']['status']}):\n"
         f"{json.dumps(x['curso'], ensure_ascii=False)}"
         for x in ctx.get("cursos_citados", []))
     return (
-        "Você é o Vinícius, atendente da Extensão FEQ Unicamp, qualificando um lead por WhatsApp. "
+        f"Você é o Vinícius, atendente {instituicao}, qualificando um lead por WhatsApp. "
         "Apresente-se como Vinícius. "
         "SE O LEAD PERGUNTAR se você é robô/IA/bot/pessoa de verdade, seja HONESTO e direto: "
-        "confirme que sim, é um agente de inteligência artificial da Extensão FEQ, e complete "
+        f"confirme que sim, é um agente de inteligência artificial {instituicao}, e complete "
         "que se ele preferir falar com uma pessoa do time é só dizer que você repassa na hora. "
         "Não minta nem desconverse sobre isso. Se ele pedir atendimento humano, use "
         "proxima_acao='escalar_humano' e avise que está repassando. "
@@ -362,7 +367,9 @@ def _system_prompt(ctx, lead_nome=None, precedentes=""):
         "item em sua PRÓPRIA linha, separando com quebra de linha real (\\n) — nunca emende tudo "
         "num parágrafo corrido. Deixe uma linha em branco entre blocos para arejar a leitura.\n"
         + _bloco_curso(ctx)
-        + f"PORTFÓLIO COMPLETO DA FEQ (você conhece todos; use p/ orientar e redirecionar):\n"
+        + f"PORTFÓLIO COMPLETO (você conhece todos; a maioria é da FEQ, mas repare no "
+        f"código — ECO-1100 é do Instituto de Economia, não da FEQ; use p/ orientar e "
+        f"redirecionar sem misturar a identidade institucional):\n"
         f"{json.dumps(ctx.get('portfolio', []), ensure_ascii=False)}\n"
         + (citados + "\n" if citados else "")
         + (precedentes or "") +

@@ -7,9 +7,7 @@ v2 (revisão de conhecimento): além do curso do card, injeta a VISÃO DE PORTF�
 curso que o lead CITAR na mensagem — o agente conhece o catálogo inteiro,
 mas continua só podendo afirmar o que está no grafo.
 """
-import re
-
-CODE_RE = re.compile(r"FEQ[-\s]?(\d{3,4})", re.I)
+from atena.ontologia.servico import CODE_RE, normalizar_codigo
 
 
 class Bibliotecario:
@@ -18,8 +16,8 @@ class Bibliotecario:
 
     def _citados(self, mensagem, vistos, hoje=None):
         out = []
-        for m in CODE_RE.findall(mensagem or ""):
-            c = self.ont.curso(f"FEQ-{m}")
+        for p, n in CODE_RE.findall(mensagem or ""):
+            c = self.ont.curso(normalizar_codigo(p, n))
             if c and c["codigo"] not in vistos:
                 vistos.add(c["codigo"])
                 out.append({"curso": c, "captavel": self.ont.captavel(c["codigo"], hoje)})

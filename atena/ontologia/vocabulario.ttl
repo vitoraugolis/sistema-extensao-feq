@@ -61,3 +61,7 @@ feq:pos                a feq:NivelEscolaridade ; feq:ordem 4 ; rdfs:label "Pós-
 feq:fonteNotion a prov:Entity ;
     rdfs:label "Notion — [FEQ] Mapeamento Completo do Sistema" ;
     feq:extraidoEm "2026-06-04"^^xsd:date .
+
+feq:fonteEco1100 a prov:Entity ;
+    rdfs:label "eco-1100-landing.vercel.app + extecamp.unicamp.br (curso ECO-1100, Instituto de Economia)" ;
+    feq:extraidoEm "2026-09-16"^^xsd:date .
