@@ -225,6 +225,7 @@ def totais_extecamp(curso):
 @app.route("/api/captabilidade")
 def captabilidade():
     hoje = datetime.date.today()
+    metas = {m["curso"]: m for m in GRW.cursos()}
     cursos = []
     for c in _ont().cursos():
         cap = _ont().captavel(c, hoje)
@@ -233,9 +234,19 @@ def captabilidade():
             ofer = json.loads(EST.get_config(f"coleta_oferecimento:{c}") or "{}")
         except ValueError:
             ofer = {}
+        m = metas.get(c) or {}
         cursos.append({**cap, "nome": info["nome"], "alerta": info.get("alerta"),
                        "extecamp": totais_extecamp(c),
-                       "divergencias": divergencias_catalogo(c, info, ofer)})
+                       "divergencias": divergencias_catalogo(c, info, ofer),
+                       # detalhe p/ reporte: catálogo (ontologia) + meta (Growth, spec 15).
+                       # Curso fora de cursos_metas (ex.: ECO-1100) não tem meta — fica None.
+                       "detalhe": {
+                           "turma": m.get("turma"), "meta": m.get("meta_real"),
+                           "meta_seg": m.get("meta_seg"), "vagas": info["vagas"],
+                           "aulas_fim": info["aulas_fim"], "boleto_data": info["boleto_data"],
+                           "modalidade": info["modalidade"], "horario": info["horario"],
+                           "carga_horas": info["carga_horas"], "a_vista": info["plano"]["a_vista"],
+                           "professor": info["professor"], "url_inscricao": info["url_inscricao"]}})
     return jsonify({"hoje": hoje.isoformat(), "cursos": cursos})
 
 

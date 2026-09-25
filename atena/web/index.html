@@ -423,8 +423,9 @@ try{ const t = localStorage.getItem('tema'); if(t) document.documentElement.data
       <section id="painel">
         <div class="cards" id="cards"></div>
         <div class="g sec">
-          <h2>Captabilidade hoje <span class="muted" id="hoje"></span></h2>
-          <p class="muted" style="margin:-4px 0 10px;">O número de inscritos vem do ADM Cursos da Extecamp (inscritos + matriculados da turma corrente, contra o mínimo de alunos). Passe o mouse para o detalhe.</p>
+          <h2 style="display:flex;align-items:center;gap:8px;">Captabilidade hoje <span class="muted" id="hoje"></span>
+            <button class="btn btn-g" style="margin-left:auto;" onclick="copiarRelatorioCap(this)" title="Copia o painel em texto, pronto para colar num e-mail ou WhatsApp"><i class="ti ti-copy"></i> Copiar relatório</button></h2>
+          <p class="muted" style="margin:-4px 0 10px;">O número de inscritos vem do ADM Cursos da Extecamp (inscritos + matriculados da turma corrente, contra o mínimo de alunos). Passe o mouse no chip de inscritos para o detalhe da coleta.</p>
           <div id="capt"></div>
           <p class="muted" style="margin:10px 2px 0;">Status calculado pela ontologia (janela de inscrição vs. hoje). Curso encerrado não é engajado pelo SDR.</p>
         </div>
@@ -884,6 +885,38 @@ function chipInscritos(e){
   return `<span class="chip ${cls}" title="${t}"><i class="ti ti-users"></i>${e.inscritos} insc.${min?` / ${min}`:''}</span>`;
 }
 
+/* Linha de detalhe do painel de captabilidade — a MESMA lista vira o texto do
+ * "Copiar relatório", para o que se reporta ser exatamente o que se vê. */
+const _br = d => d ? d.split('-').reverse().join('/') : '?';
+function capDetalhe(c, hoje){
+  const d = c.detalhe||{}, e = c.extecamp, v = d.vagas||{};
+  const dias = c.fim ? Math.round((new Date(c.fim) - new Date(hoje))/864e5) : null;
+  const insc = e ? e.inscritos : null;
+  return [
+    d.turma ? `turma ${d.turma}` : null,
+    (c.inicio||c.fim) ? `inscrições ${c.inicio ? _br(c.inicio)+' a ' : 'até '}${_br(c.fim)}${dias!==null && dias>=0 ? ` (fecha em ${dias} d)` : ''}` : null,
+    d.boleto_data ? `boleto até ${_br(d.boleto_data)}` : null,
+    (c.aulas_inicio||d.aulas_fim) ? `aulas ${_br(c.aulas_inicio)} a ${_br(d.aulas_fim)}` : null,
+    insc!==null ? `${insc} inscritos${e.cancelados ? ` (${e.cancelados} cancel.)` : ''}` : 'sem coleta Extecamp',
+    d.meta ? `meta ${d.meta}${insc!==null ? ` (${Math.round(100*insc/d.meta)}%)` : ''} · meta segura ${d.meta_seg}` : null,
+    (v.min||v.max) ? `vagas ${v.min||'?'}–${v.max||'?'}` : null,
+    d.modalidade||null, d.horario||null,
+    d.carga_horas ? `${d.carga_horas} h` : null,
+    d.a_vista ? `${isNaN(+d.a_vista) ? d.a_vista : (+d.a_vista).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})} à vista` : null,
+    d.professor ? `prof. ${d.professor}` : null,
+  ].filter(Boolean);
+}
+function copiarRelatorioCap(btn){
+  const cap = window.CAP; if(!cap) return;
+  const txt = `Captabilidade — ${_br(cap.hoje)}\n\n` + cap.cursos.map(c =>
+    `${c.curso} — ${c.nome} [${c.status}]\n  ${capDetalhe(c, cap.hoje).join(' · ')}` +
+    (c.detalhe && c.detalhe.url_inscricao ? `\n  ${c.detalhe.url_inscricao}` : '')).join('\n\n');
+  navigator.clipboard.writeText(txt).then(()=>{      // innerHTML: preserva o ícone
+    const antes = btn.innerHTML; btn.textContent = 'copiado';
+    setTimeout(()=>{ btn.innerHTML = antes; }, 900);
+  });
+}
+
 async function carregar(){
   const st = await api('/api/stats');
   $('#cards').innerHTML = st.funil.map(f=>`
@@ -900,8 +933,10 @@ async function carregar(){
      * FEQ-0580 estava "encerrado" aqui enquanto vendia lá. */
     const dv = (c.divergencias||[]).length
       ? ` <i class="ti ti-alert-octagon" title="Diverge da Extecamp: ${c.divergencias.join(' · ')}" style="color:var(--bad);"></i>`:'';
-    return `<div class="row"><strong>${c.curso}</strong>${al}${dv}<span style="color:var(--text-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${c.nome}</span>${chipInscritos(c.extecamp)}<span class="tag ${cls}">${c.status}</span></div>`;
+    return `<div style="margin-bottom:16px;"><div class="row"><strong>${c.curso}</strong>${al}${dv}<span style="color:var(--text-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${c.nome}</span>${chipInscritos(c.extecamp)}<span class="tag ${cls}">${c.status}</span></div>
+      <div class="muted" style="font-size:12px;padding:4px 12px 0;line-height:1.6;">${capDetalhe(c, cap.hoje).join(' · ')}</div></div>`;
   }).join('');
+  window.CAP = cap;
 
   if(!$('#rcurso').options.length) $('#rcurso').innerHTML = cap.cursos.map(c=>`<option value="${c.curso}">${c.curso}</option>`).join('');
   const kf=$('#kbFiltro'); if(kf && kf.options.length<=1) kf.innerHTML = '<option value="">Todos os cursos</option>' + cap.cursos.map(c=>`<option value="${c.curso}">${c.curso}</option>`).join('');

@@ -24,6 +24,10 @@ humana** quando necessário, **estatísticas** do funil e a porta do **Injetor**
    fundamentaram (preço/data/requisito → tripla do grafo).
 6. **Notificações** (11/08/2026) — caixa de entrada única do agente comercial.
 7. **Inscrições** (11/08/2026) — fila de fichas da etapa 2, prontas para transcrever.
+8. **Captabilidade** (25/09/2026, painel inicial) — por curso: status, inscritos Extecamp, turma,
+   janela de inscrição (com dias até fechar), boleto, aulas, meta/meta segura (`cursos_metas`,
+   com % atingido), vagas, modalidade, horário, carga, preço à vista, professor. Botão
+   **Copiar relatório** gera o mesmo conteúdo em texto (+ link de inscrição) para reporte.
 8. **Otimização** (dentro de Medição, 11/08/2026) — objetivo de controle, bandit e gate.
 
 ### 6/7. Notificações e Inscrições — o que mudou e por quê (11/08/2026)

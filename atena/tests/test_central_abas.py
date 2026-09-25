@@ -163,6 +163,16 @@ def test_rotulo_antigo_nao_contamina_o_treino():
             assert e["ts"] >= corte, (e["ts"], corte)
 
 
+def test_captabilidade_traz_meta_e_datas_para_reporte():
+    """O painel serve para reportar: cada curso traz meta (Growth) e datas (ontologia).
+    Curso fora de cursos_metas (ECO-1100) aparece sem meta, em vez de sumir."""
+    cur = {c["curso"]: c for c in _cliente().get("/api/captabilidade").get_json()["cursos"]}
+    d = cur["FEQ-0480"]["detalhe"]
+    assert d["meta"] == 50 and d["meta_seg"] == 65 and d["turma"], d
+    assert "aulas_fim" in d and "url_inscricao" in d, d
+    assert cur["ECO-1100"]["detalhe"]["meta"] is None
+
+
 if __name__ == "__main__":
     casos = [v for k, v in sorted(globals().items()) if k.startswith("test_") and callable(v)]
     falhas = 0
