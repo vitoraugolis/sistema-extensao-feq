@@ -111,6 +111,22 @@ body{margin:0;min-height:100vh;color:var(--text);
  border:1px solid var(--border);margin-bottom:8px;font-size:13px;}
 .tag{font-size:11px;font-weight:700;padding:4px 10px;border-radius:var(--r-pill);margin-left:auto;white-space:nowrap;
  color:var(--text);}
+/* Painel de captabilidade: um cartão por curso, campos rotulados em grade. */
+.capg-h{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text-muted);margin:16px 2px 8px;}
+.capg-h:first-child{margin-top:4px;}
+.capc{border:1px solid var(--border);background:var(--surface-2);border-radius:var(--r-m);padding:12px 14px;margin-bottom:10px;}
+.capc-top{display:flex;align-items:center;gap:8px;font-size:13.5px;}
+.capc-top .nm{color:var(--text-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.capc-body{display:grid;grid-template-columns:minmax(170px,220px) 1fr;gap:18px;margin-top:10px;align-items:start;}
+.capc-num{font-size:26px;font-weight:800;line-height:1;}
+.capc-num small{font-size:13px;font-weight:600;color:var(--text-muted);}
+.capc-bar{height:6px;border-radius:var(--r-pill);background:var(--border);margin:8px 0 5px;overflow:hidden;}
+.capc-bar i{display:block;height:100%;border-radius:inherit;}
+.capc-kv{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px 16px;font-size:12.5px;}
+.capc-kv span{display:block;font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);}
+.capc-enc summary{cursor:pointer;list-style:none;}
+.capc-enc .row{font-size:12.5px;}
+@media(max-width:700px){.capc-body{grid-template-columns:1fr;}}
 .t-ok{background:var(--ok-bg);color:var(--ok);}
 .t-bad{background:var(--bad-bg);color:var(--bad);}
 .t-acc{background:var(--info-bg);color:var(--info);}
@@ -425,7 +441,7 @@ try{ const t = localStorage.getItem('tema'); if(t) document.documentElement.data
         <div class="g sec">
           <h2 style="display:flex;align-items:center;gap:8px;">Captabilidade hoje <span class="muted" id="hoje"></span>
             <button class="btn btn-g" style="margin-left:auto;" onclick="copiarRelatorioCap(this)" title="Copia o painel em texto, pronto para colar num e-mail ou WhatsApp"><i class="ti ti-copy"></i> Copiar relatório</button></h2>
-          <p class="muted" style="margin:-4px 0 10px;">O número de inscritos vem do ADM Cursos da Extecamp (inscritos + matriculados da turma corrente, contra o mínimo de alunos). Passe o mouse no chip de inscritos para o detalhe da coleta.</p>
+          <p class="muted" style="margin:-4px 0 10px;">Inscritos = inscritos + matriculados da turma corrente no ADM Cursos da Extecamp, contra a meta do curso.</p>
           <div id="capt"></div>
           <p class="muted" style="margin:10px 2px 0;">Status calculado pela ontologia (janela de inscrição vs. hoje). Curso encerrado não é engajado pelo SDR.</p>
         </div>
@@ -865,26 +881,6 @@ document.querySelectorAll('.navi').forEach(b=>b.onclick=()=>{
   setTimeout(ajustarAltura, 0);      // a seção acabou de ficar visível: agora dá p/ medir
 });
 
-/* Inscritos do curso, do jeito que a Extecamp conta (spec 20).
- * SOMA inscritos + matriculados de propósito: a aba "Inscritos" do ADM Cursos
- * esvazia conforme a turma se matricula, então mostrar só ela faria o número
- * despencar exatamente quando o curso deu certo. É a mesma regra cumulativa do
- * funil em /api/stats.
- * Sem coleta ainda -> nada na tela. Um "0" aqui leria como "ninguém se
- * inscreveu", que é uma afirmação bem diferente de "ainda não olhamos". */
-function chipInscritos(e){
-  if(!e) return '<span class="chip" title="Nenhuma coleta da Extecamp ainda — use a aba Coleta de Dados." style="opacity:.5;">— insc.</span>';
-  const min = e.vagas && e.vagas.min, max = e.vagas && e.vagas.max;
-  const cls = (min && e.inscritos >= min) ? 't-ok' : (min ? 't-warn' : '');
-  const quando = (e.coletado_em||'').replace('T',' ').slice(0,16);
-  const t = [`turma ${e.turma||'—'}`,
-             `${e.inscritos_lista} na lista de inscritos + ${e.matriculados} matriculado(s)`,
-             e.cancelados ? `${e.cancelados} cancelado(s)` : null,
-             (min||max) ? `vagas: mínimo ${min||'?'}, máximo ${max||'?'}` : null,
-             quando ? `coletado em ${quando}` : null].filter(Boolean).join(' · ');
-  return `<span class="chip ${cls}" title="${t}"><i class="ti ti-users"></i>${e.inscritos} insc.${min?` / ${min}`:''}</span>`;
-}
-
 /* Linha de detalhe do painel de captabilidade — a MESMA lista vira o texto do
  * "Copiar relatório", para o que se reporta ser exatamente o que se vê. */
 const _br = d => d ? d.split('-').reverse().join('/') : '?';
@@ -917,6 +913,76 @@ function copiarRelatorioCap(btn){
   });
 }
 
+const CAP_ROT = {aberta:'aberta', antecipada:'captação antecipada', fora_do_prazo:'fora do prazo',
+                 futura:'em breve', encerrada:'encerrada'};
+const CAP_GRUPOS = [['Captando agora',['aberta','antecipada']],
+                    ['Fora do prazo — ainda recuperável',['fora_do_prazo']],
+                    ['Em breve',['futura']]];
+let CAP_ENC_ABERTO = false;     // o polling de 5s recria o HTML: guarda se o operador abriu
+
+function capIcones(c){
+  const al = c.alerta?` <i class="ti ti-alert-triangle" title="${c.alerta}" style="color:var(--warn);"></i>`:'';
+  /* A Extecamp discorda do nosso catálogo. Fica ao lado do código do curso porque
+   * é sobre o curso, não sobre a coleta — e porque foi assim que apareceu que o
+   * FEQ-0580 estava "encerrado" aqui enquanto vendia lá. */
+  const dv = (c.divergencias||[]).length
+    ? ` <i class="ti ti-alert-octagon" title="Diverge da Extecamp: ${c.divergencias.join(' · ')}" style="color:var(--bad);"></i>`:'';
+  return al + dv;
+}
+
+function capCartao(c, hoje){
+  const d = c.detalhe||{}, e = c.extecamp, v = d.vagas||{};
+  const cls = {aberta:'t-ok', antecipada:'t-acc', fora_do_prazo:'t-warn', futura:'t-warn'}[c.status]||'t-bad';
+  const dias = c.fim ? Math.round((new Date(c.fim) - new Date(hoje))/864e5) : null;
+  // Progresso: contra a meta (Growth); sem meta, contra o mínimo de vagas da Extecamp.
+  // `inscritos` já é inscritos + matriculados (spec 20): a aba "Inscritos" da Extecamp
+  // esvazia conforme a turma se matricula. Sem coleta -> "—", nunca "0".
+  const alvo = d.meta || v.min, n = e ? e.inscritos : null;
+  const pct = (alvo && n!==null) ? Math.min(100, Math.round(100*n/alvo)) : 0;
+  const cor = pct>=100 ? 'var(--ok)' : pct>=50 ? 'var(--warn)' : 'var(--bad)';
+  const quando = e ? (e.coletado_em||'').replace('T',' ').slice(0,16) : '';
+  const kv = [
+    ['Turma', d.turma],
+    ['Inscrições', (c.inicio||c.fim) ? `${c.inicio ? _br(c.inicio)+' – ' : 'até '}${_br(c.fim)}` : null],
+    ['Fecha em', dias!==null && dias>=0 ? `<strong style="color:${dias<=7?'var(--bad)':'var(--text)'}">${dias} dia${dias===1?'':'s'}</strong>` : null],
+    ['Boleto até', d.boleto_data && _br(d.boleto_data)],
+    ['Aulas', (c.aulas_inicio||d.aulas_fim) ? `${_br(c.aulas_inicio)} – ${_br(d.aulas_fim)}` : null],
+    ['Vagas', [v.min && `mín. ${v.min}`, v.max && `máx. ${v.max}`].filter(Boolean).join(' · ')],
+    ['Modalidade', d.modalidade], ['Horário', d.horario],
+    ['Carga', d.carga_horas && `${d.carga_horas} h`],
+    ['À vista', d.a_vista && (isNaN(+d.a_vista) ? d.a_vista : (+d.a_vista).toLocaleString('pt-BR',{style:'currency',currency:'BRL'}))],
+    ['Professor', d.professor],
+  ].filter(([,x])=>x).map(([k,x])=>`<div><span>${k}</span>${x}</div>`).join('');
+  return `<div class="capc">
+    <div class="capc-top"><strong>${c.curso}</strong>${capIcones(c)}<span class="nm">${c.nome}</span><span class="tag ${cls}">${CAP_ROT[c.status]||c.status}</span></div>
+    <div class="capc-body">
+      <div>
+        <div class="capc-num">${n!==null ? n : '—'} <small>${alvo ? `/ ${alvo} ${d.meta?'meta':'mín.'}` : 'inscritos'}</small></div>
+        <div class="capc-bar"><i style="width:${pct}%;background:${cor};"></i></div>
+        <div class="muted" style="font-size:11.5px;">${
+          n===null ? 'sem coleta da Extecamp ainda'
+          : `${pct}%${d.meta_seg ? ` · meta segura ${d.meta_seg}` : ''}${e.cancelados ? ` · ${e.cancelados} cancel.` : ''}`}</div>
+        ${quando ? `<div class="muted" style="font-size:11px;margin-top:2px;">coleta ${quando}</div>` : ''}
+      </div>
+      <div class="capc-kv">${kv}</div>
+    </div></div>`;
+}
+
+function renderCap(cap){
+  let h = CAP_GRUPOS.map(([tit, sts])=>{
+    const cs = cap.cursos.filter(c=>sts.includes(c.status));
+    return cs.length ? `<div class="capg-h">${tit} · ${cs.length}</div>` + cs.map(c=>capCartao(c, cap.hoje)).join('') : '';
+  }).join('');
+  // Encerrados só ocupam espaço quando alguém pede: não há o que fazer por eles hoje.
+  const enc = cap.cursos.filter(c=>!CAP_GRUPOS.some(([,sts])=>sts.includes(c.status)));
+  if(enc.length) h += `<details class="capc-enc" ${CAP_ENC_ABERTO?'open':''} ontoggle="CAP_ENC_ABERTO=this.open">
+    <summary class="capg-h"><i class="ti ti-chevron-right"></i> Encerrados · ${enc.length}</summary>
+    ${enc.map(c=>`<div class="row"><strong>${c.curso}</strong>${capIcones(c)}<span class="nm" style="color:var(--text-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${c.nome}</span>
+      <span class="muted" style="margin-left:auto;white-space:nowrap;">${c.fim ? 'inscrições até '+_br(c.fim) : ''}</span></div>`).join('')}
+  </details>`;
+  return h;
+}
+
 async function carregar(){
   const st = await api('/api/stats');
   $('#cards').innerHTML = st.funil.map(f=>`
@@ -925,17 +991,7 @@ async function carregar(){
 
   const cap = await api('/api/captabilidade');
   $('#hoje').textContent = '· ' + cap.hoje.split('-').reverse().join('/');
-  $('#capt').innerHTML = cap.cursos.map(c=>{
-    const cls = c.status==='aberta'?'t-ok':(c.status==='encerrada'?'t-bad':'t-warn');
-    const al = c.alerta?` <i class="ti ti-alert-triangle" title="${c.alerta}" style="color:var(--warn);"></i>`:'';
-    /* A Extecamp discorda do nosso catálogo. Fica ao lado do código do curso porque
-     * é sobre o curso, não sobre a coleta — e porque foi assim que apareceu que o
-     * FEQ-0580 estava "encerrado" aqui enquanto vendia lá. */
-    const dv = (c.divergencias||[]).length
-      ? ` <i class="ti ti-alert-octagon" title="Diverge da Extecamp: ${c.divergencias.join(' · ')}" style="color:var(--bad);"></i>`:'';
-    return `<div style="margin-bottom:16px;"><div class="row"><strong>${c.curso}</strong>${al}${dv}<span style="color:var(--text-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${c.nome}</span>${chipInscritos(c.extecamp)}<span class="tag ${cls}">${c.status}</span></div>
-      <div class="muted" style="font-size:12px;padding:4px 12px 0;line-height:1.6;">${capDetalhe(c, cap.hoje).join(' · ')}</div></div>`;
-  }).join('');
+  $('#capt').innerHTML = renderCap(cap);
   window.CAP = cap;
 
   if(!$('#rcurso').options.length) $('#rcurso').innerHTML = cap.cursos.map(c=>`<option value="${c.curso}">${c.curso}</option>`).join('');
