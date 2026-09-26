@@ -35,8 +35,39 @@ from atena.core.contatos import CONTATOS_OFICIAIS, SITE, INSTAGRAM
 
 WEB = pathlib.Path(__file__).resolve().parents[1] / "web"
 TEMPLATE_PATH = WEB / "pdf-guia-template.html"
-LOGO_PATH = WEB / "assets" / "feq.png"
 CACHE_DIR = pathlib.Path(__file__).resolve().parents[1] / "data" / "guias"
+
+# Identidade institucional do guia, por prefixo do código. Incidente real (26/09/2026):
+# o template era 100% FEQ e um lead do ECO-1100 (Instituto de Economia) recebeu o
+# guia com logo, textos e contatos da FEQ. Fail-closed: prefixo fora daqui -> SEM
+# guia (obter devolve None) em vez de cair na identidade da FEQ.
+# `motivos`: a página "3 motivos" e os selos "Turmas reduzidas"/"Conhecimento
+# atualizado" são afirmações da FEQ (aulas ao vivo, interação em tempo real) — falsas
+# para o ECO-1100 (assíncrono, 50 vagas); só entram onde foram confirmadas.
+INSTITUTOS = {
+    "FEQ": {
+        "nome": "Extensão FEQ Unicamp", "curto": "a Extensão FEQ", "a": "à", "de": "da", "sigla": "FEQ Unicamp",
+        "logo": WEB / "assets" / "feq.png", "contato": "secretaria", "whatsapp": "whatsapp",
+        "site": SITE, "instagram": INSTAGRAM, "motivos": True,
+        "boas_vindas": " Os cursos de extensão da FEQ combinam metodologia, qualidade de "
+                       "ensino e geração de networking profissional — sem exigência de "
+                       "monografia para conclusão: todo o conhecimento é voltado à aplicação "
+                       "prática desde o primeiro dia.",
+    },
+    "ECO": {
+        "nome": "Instituto de Economia (IE) Unicamp", "curto": "o Instituto de Economia", "a": "ao", "de": "do",
+        "sigla": "Instituto de Economia Unicamp",
+        "logo": WEB / "assets" / "ie.png", "contato": "secretaria_ie", "whatsapp": None,
+        # site/Instagram do IE não confirmados: omite em vez de linkar a FEQ
+        "site": None, "instagram": None, "motivos": False, "boas_vindas": "",
+    },
+}
+
+
+def instituto(codigo):
+    """Config do instituto do curso, ou None se não houver guia para ele."""
+    return INSTITUTOS.get((codigo or "").split("-")[0].upper())
+
 
 AMBAR = "#fbbf24"
 TEAL = "#2dd4bf"
@@ -46,16 +77,16 @@ def _datauri(dados, mime):
     return f"data:{mime};base64," + base64.b64encode(dados).decode()
 
 
-@functools.lru_cache(maxsize=1)
-def _logo_branco():
-    """Logo da FEQ recolorido para branco, embutido como data URI.
+@functools.lru_cache(maxsize=None)
+def _logo_branco(logo_path):
+    """Logo do instituto recolorido para branco, embutido como data URI.
 
     WeasyPrint IGNORA `filter: brightness(0) invert(1)` (testado: "Ignored `filter`,
     unknown property") — era exatamente por isso que o logo azul-escuro sumia contra
     a capa navy. Pillow não é dependência nova: o próprio WeasyPrint já a exige.
     Preserva o canal alfa, então as bordas suaves do logo continuam suaves."""
     from PIL import Image
-    img = Image.open(LOGO_PATH).convert("RGBA")
+    img = Image.open(logo_path).convert("RGBA")
     branco = Image.new("RGBA", img.size, (255, 255, 255, 255))
     branco.putalpha(img.getchannel("A"))
     buf = BytesIO()
@@ -126,8 +157,15 @@ def _capa_chips(c):
         chips.append(f"<b>{c['carga_horas']}h</b> de carga horária")
     if _data_br(c.get("aulas_inicio")):
         chips.append(f"Início em <b>{_data_br(c['aulas_inicio'])}</b>")
-    chips.append("Certificado <b>Unicamp</b>")   # vale para todo o catálogo (spec 08)
+    chips.append(f"{_certificado(c)} <b>Unicamp</b>")
     return "\n".join(f'<div class="capa-chip">{ch}</div>' for ch in chips)
+
+
+def _certificado(c):
+    """ECO-1100 emite DECLARAÇÃO de frequência, não certificado (ontologia,
+    `certificacao`) — o guia prometia "Certificado Unicamp" para todo o catálogo."""
+    return ("Declaração de frequência" if (c.get("certificacao") or "").startswith("Declaração")
+            else "Certificado")
 
 
 def _ficha_html(c):
@@ -150,7 +188,9 @@ def _ficha_html(c):
 def _sumario_html(c):
     """Sumário montado a partir do que REALMENTE vai existir no documento — listar
     uma seção que foi omitida por falta de dado seria mentir sobre o próprio guia."""
-    secoes = ["Por que estudar na Extensão FEQ", "Objetivos do curso", "Metodologia"]
+    inst = instituto(c["codigo"])
+    secoes = (["Por que estudar na Extensão FEQ"] if inst["motivos"] else []) \
+        + ["Objetivos do curso", "Metodologia"]
     if c.get("habilidades"):
         secoes.append("O que você vai dominar")
     secoes.append("Diferenciais")
@@ -172,7 +212,7 @@ def _selo(titulo, texto):
 def _selos_html(c):
     selos = []
     if c.get("carga_horas"):
-        selos.append(_selo(f"{c['carga_horas']}h de carga horária", "Certificado da Unicamp ao concluir."))
+        selos.append(_selo(f"{c['carga_horas']}h de carga horária", f"{_certificado(c)} da Unicamp ao concluir."))
     if c.get("horario"):
         selos.append(_selo("Horário das aulas", c["horario"]))
     if c.get("formato_aulas_detalhe") or c.get("formato_aulas_resumo"):
@@ -192,7 +232,7 @@ def _avaliacao_html(c):
 def _objetivos_html(c):
     obj = c.get("objetivos") or []
     if not obj:
-        return f'<p>{_esc(c.get("objetivo") or "Consulte a Extensão FEQ para o detalhamento dos objetivos.")}</p>'
+        return f'<p>{_esc(c.get("objetivo") or f"Consulte {instituto(c['codigo'])['curto']} para o detalhamento dos objetivos.")}</p>'
     return "\n".join(
         f'<div class="item-num"><div class="bola">{i+1}</div><div>'
         f'<b>{_esc(o.get("t",""))}</b><span>{_esc(o.get("d",""))}</span></div></div>'
@@ -246,7 +286,7 @@ def _publico_alvo_html(c):
     real pego na inspeção visual: a 1ª geração vazou o enum cru na tela).
     Só repete a frase de requisito numa 2ª linha quando publico_alvo é um texto
     DIFERENTE (poucos cursos têm os dois) — senão a página dizia a mesma frase 2x."""
-    requisito = _esc(_REQUISITO_TEXTO.get(c.get("requisito"), "Consulte a Extensão FEQ."))
+    requisito = _esc(_REQUISITO_TEXTO.get(c.get("requisito"), f"Consulte {instituto(c['codigo'])['curto']}."))
     alvo = c.get("publico_alvo")
     if alvo:
         return f'<p>{_esc(alvo)}</p><p style="color:#64748b;font-size:9.5pt;">Requisito: {requisito}</p>'
@@ -299,15 +339,63 @@ def _modulos_html(c):
     return "\n".join(out)
 
 
+def _contatos_html(inst):
+    """Só os canais confirmados DO INSTITUTO do curso — canal sem dado some."""
+    sec = CONTATOS_OFICIAIS[inst["contato"]]
+    linhas = [sec["telefone_exibicao"], sec.get("telefone2_exibicao")]
+    if inst["whatsapp"]:
+        linhas.append("WhatsApp: " + CONTATOS_OFICIAIS[inst["whatsapp"]]["telefone_exibicao"])
+    if inst["instagram"]:
+        linhas.append("Instagram: " + inst["instagram"])
+    linhas.append(sec.get("email"))
+    if sec.get("horario_atendimento"):
+        linhas.append("Atendimento: " + sec["horario_atendimento"])
+    html = "".join(f'<p class="contato-linha">{_esc(l)}</p>' for l in linhas if l)
+    if inst["site"]:
+        html += f'<p class="contato-linha"><a href="{_esc(inst["site"])}">{_esc(inst["site"])}</a></p>'
+    return html
+
+
+def _bloco_motivos(inst):
+    if not inst["motivos"]:
+        return ""
+    return ('<div class="divisor"><div class="divisor-fundo"></div>'
+            '<div class="divisor-motivo"><img src="{{MOTIVO_DIVISOR}}" alt=""></div>'
+            f'<div class="divisor-conteudo"><p class="tag">Por que estudar na</p><h1>{_esc(inst["nome"])}</h1>'
+            '<div class="divisor-regua"></div></div></div>'
+            '<div class="pagina"><h2 class="titulo">3 motivos essenciais</h2>'
+            '<div class="item-num"><div class="bola">1</div><div><b>Disponibilidade</b><span>Aulas 100% online, ao vivo e gravadas, para assistir de onde e quando quiser.</span></div></div>'
+            '<div class="item-num"><div class="bola">2</div><div><b>Networking</b><span>Corpo docente dividido entre pesquisadores da Unicamp e profissionais referência no mercado. Alunos de todo o Brasil.</span></div></div>'
+            '<div class="item-num"><div class="bola">3</div><div><b>Formação profissional</b><span>Sem exigência de monografia — todo o conhecimento é aplicado à sua carreira desde o primeiro dia.</span></div></div>'
+            '</div>')
+
+
+def _selos_institucionais(inst):
+    if not inst["motivos"]:
+        return ""
+    return (_selo("Turmas reduzidas", "Atendimento individual e interação em tempo real entre aluno e professor.")
+            + _selo("Conhecimento atualizado", "Domine ferramentas e conhecimentos revolucionários antes deles chegarem ao seu dia a dia."))
+
+
 def _tokens(c):
-    sec = CONTATOS_OFICIAIS["secretaria"]
-    wa = CONTATOS_OFICIAIS["whatsapp"]
+    inst = instituto(c["codigo"])
+    # BLOCO_MOTIVOS primeiro: ele contém {{MOTIVO_DIVISOR}}, resolvido depois
     return {
+        "BLOCO_MOTIVOS": _bloco_motivos(inst),
+        "INST_NOME": _esc(inst["nome"]),
+        "INST_CURTO": _esc(inst["curto"]),
+        "INST_A": inst["a"],
+        "INST_DE": inst["de"],
+        "INST_SIGLA": _esc(inst["sigla"]),
+        "BOAS_VINDAS_INST": _esc(inst["boas_vindas"]),
+        "SELOS_INSTITUCIONAIS": _selos_institucionais(inst),
+        "CERTIFICADO": _esc(_certificado(c)),
+        "EMITIDO": "emitida" if _certificado(c).startswith("Declaração") else "emitido",
         "NOME_CURSO": _esc(c.get("nome") or c["codigo"]),
         "CODIGO_CURSO": _esc(c["codigo"]),
         "TIPO_CURSO": _esc(c.get("tipo") or "Curso"),
         "MODALIDADE": _esc(c.get("modalidade") or ""),
-        "LOGO_BRANCO": _logo_branco(),
+        "LOGO_BRANCO": _logo_branco(inst["logo"]),
         "MOTIVO_CAPA": _motivo_svg(c["codigo"], variante=0),
         "MOTIVO_DIVISOR": _motivo_svg(c["codigo"], variante=1),
         "CAPA_CHIPS": _capa_chips(c),
@@ -324,11 +412,7 @@ def _tokens(c):
         "PAGINA_DEPOIMENTOS": _pagina_depoimentos(c),
         "PROFESSORES_HTML": _professores_html(c),
         "MODULOS_HTML": _modulos_html(c),
-        "CONTATO_TELEFONE": _esc(sec["telefone_exibicao"]),
-        "CONTATO_WHATSAPP": _esc(wa["telefone_exibicao"]),
-        "CONTATO_INSTAGRAM": _esc(INSTAGRAM),
-        "CONTATO_EMAIL": _esc(sec["email"]),
-        "CONTATO_SITE": _esc(SITE),
+        "CONTATOS_HTML": _contatos_html(inst),
     }
 
 
@@ -348,7 +432,7 @@ def obter(ont, codigo, forcar=False):
     quando o HTML mudaria (a ontologia mudou) — mesmo princípio do lp_auto.py:
     comparar o que SERIA gerado agora, não confiar em nenhum timestamp externo."""
     c = ont.curso(codigo)
-    if not c:
+    if not c or not instituto(codigo):   # instituto sem identidade própria: sem guia
         return None
     html_atual = _render_html(c)
     h = _hash(html_atual)

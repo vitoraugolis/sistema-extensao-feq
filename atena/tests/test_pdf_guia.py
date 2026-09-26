@@ -55,6 +55,25 @@ check("None" not in sem_dado and "null" not in sem_dado,
 check(G._card_professor(None) == "" and G._card_professor("") == "",
       "nome vazio não produz card fantasma")
 
+# ------------------------------------------------------- 2b) identidade por instituto
+# incidente 26/09/2026: lead do ECO-1100 recebeu o guia com marca e contatos da FEQ
+import re
+_sem_css = lambda h: re.sub(r"<style.*?</style>", "", h, flags=re.S)
+eco = _sem_css(G._render_html(ONT.curso("ECO-1100")))
+check(not re.search(r"FEQ|extfeq|3521-3911|98262|extensaofequnicamp", eco.replace("ECO-1100", "")),
+      "guia do ECO-1100 não carrega NADA da FEQ (marca, e-mail, telefones, Instagram)")
+check("iecoext@unicamp.br" in eco and "3521-5728" in eco, "guia do ECO-1100 traz os contatos do IE")
+check("Declaração de frequência" in eco and "Certificado" not in eco,
+      "ECO-1100 emite declaração de frequência — o guia não promete certificado")
+check("Turmas reduzidas" not in eco and "3 motivos" not in eco,
+      "afirmações institucionais da FEQ (turmas reduzidas, aulas ao vivo) ficam fora do ECO")
+check(G._logo_branco(G.INSTITUTOS["ECO"]["logo"]) != G._logo_branco(G.INSTITUTOS["FEQ"]["logo"]),
+      "logo do IE é diferente do da FEQ")
+feq = _sem_css(G._render_html(ONT.curso("FEQ-0480")))
+check("Extensão FEQ Unicamp" in feq and "Turmas reduzidas" in feq and "extfeq@unicamp.br" in feq,
+      "guia da FEQ continua com a identidade da FEQ")
+check(G.instituto("XYZ-0001") is None, "instituto desconhecido: sem guia (fail-closed, não cai na FEQ)")
+
 # ------------------------------------------------------- 3) seção sem dado SOME
 c_esparso = ONT.curso("FEQ-0655")   # o mais esparso do catálogo (auditoria: quase sem *Json)
 check(c_esparso is not None, "FEQ-0655 existe no catálogo (pré-condição do teste)")

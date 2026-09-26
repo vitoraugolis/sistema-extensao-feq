@@ -184,7 +184,7 @@
   <div class="capa-fundo"></div>
   <div class="capa-motivo"><img src="{{MOTIVO_CAPA}}" alt=""></div>
   <div class="capa-conteudo">
-    <img class="capa-logo" src="{{LOGO_BRANCO}}" alt="FEQ Unicamp">
+    <img class="capa-logo" src="{{LOGO_BRANCO}}" alt="{{INST_SIGLA}}">
     <div class="capa-baixo">
       <div class="capa-regua"></div>
       <p class="capa-eyebrow">Guia do Curso</p>
@@ -197,11 +197,9 @@
 </div>
 
 <div class="pagina">
-  <h2 class="titulo">Bem-vindo(a) à Extensão FEQ Unicamp</h2>
+  <h2 class="titulo">Bem-vindo(a) {{INST_A}} {{INST_NOME}}</h2>
   <p>A Unicamp é uma das melhores universidades da América Latina e uma referência em inovação no
-  Brasil. Os cursos de extensão da FEQ combinam metodologia, qualidade de ensino e geração de
-  networking profissional — sem exigência de monografia para conclusão: todo o conhecimento é
-  voltado à aplicação prática desde o primeiro dia.</p>
+  Brasil.{{BOAS_VINDAS_INST}}</p>
   <p>Este guia apresenta o curso <strong>{{NOME_CURSO}}</strong> ({{CODIGO_CURSO}}) em detalhe:
   objetivos, metodologia, corpo docente e conteúdo programático completo.</p>
 
@@ -216,22 +214,7 @@
   </div>
 </div>
 
-<div class="divisor">
-  <div class="divisor-fundo"></div>
-  <div class="divisor-motivo"><img src="{{MOTIVO_DIVISOR}}" alt=""></div>
-  <div class="divisor-conteudo">
-    <p class="tag">Por que estudar na</p>
-    <h1>Extensão FEQ Unicamp</h1>
-    <div class="divisor-regua"></div>
-  </div>
-</div>
-
-<div class="pagina">
-  <h2 class="titulo">3 motivos essenciais</h2>
-  <div class="item-num"><div class="bola">1</div><div><b>Disponibilidade</b><span>Aulas 100% online, ao vivo e gravadas, para assistir de onde e quando quiser.</span></div></div>
-  <div class="item-num"><div class="bola">2</div><div><b>Networking</b><span>Corpo docente dividido entre pesquisadores da Unicamp e profissionais referência no mercado. Alunos de todo o Brasil.</span></div></div>
-  <div class="item-num"><div class="bola">3</div><div><b>Formação profissional</b><span>Sem exigência de monografia — todo o conhecimento é aplicado à sua carreira desde o primeiro dia.</span></div></div>
-</div>
+{{BLOCO_MOTIVOS}}
 
 <div class="divisor">
   <div class="divisor-fundo"></div>
@@ -261,8 +244,8 @@
   <div class="divisor-fundo"></div>
   <div class="divisor-motivo"><img src="{{MOTIVO_DIVISOR}}" alt=""></div>
   <div class="divisor-conteudo">
-    <p class="tag">Os diferenciais da</p>
-    <h1>Extensão FEQ Unicamp</h1>
+    <p class="tag">Os diferenciais {{INST_DE}}</p>
+    <h1>{{INST_NOME}}</h1>
     <div class="divisor-regua"></div>
   </div>
 </div>
@@ -270,9 +253,8 @@
 <div class="pagina">
   <h2 class="titulo">Diferenciais</h2>
   <div class="selo-grid">
-    <div class="selo"><b>Certificado emitido pela Unicamp</b><span>Certificado de {{TIPO_CURSO}} emitido diretamente pela Unicamp.</span></div>
-    <div class="selo"><b>Turmas reduzidas</b><span>Atendimento individual e interação em tempo real entre aluno e professor.</span></div>
-    <div class="selo"><b>Conhecimento atualizado</b><span>Domine ferramentas e conhecimentos revolucionários antes deles chegarem ao seu dia a dia.</span></div>
+    <div class="selo"><b>{{CERTIFICADO}} {{EMITIDO}} pela Unicamp</b><span>{{CERTIFICADO}} de {{TIPO_CURSO}} {{EMITIDO}} diretamente pela Unicamp.</span></div>
+    {{SELOS_INSTITUCIONAIS}}
     {{GARANTIA_SELO}}
   </div>
   {{EMPRESAS_PAGINA}}
@@ -318,16 +300,12 @@
 <div class="contato-pagina">
   <div class="contato-fundo"></div>
   <div class="contato-conteudo">
-    <img class="contato-logo" src="{{LOGO_BRANCO}}" alt="FEQ Unicamp">
+    <img class="contato-logo" src="{{LOGO_BRANCO}}" alt="{{INST_SIGLA}}">
     <h2>Nossos contatos</h2>
-    <p class="contato-linha">{{CONTATO_TELEFONE}}</p>
-    <p class="contato-linha">WhatsApp: {{CONTATO_WHATSAPP}}</p>
-    <p class="contato-linha">Instagram: {{CONTATO_INSTAGRAM}}</p>
-    <p class="contato-linha">{{CONTATO_EMAIL}}</p>
-    <p class="contato-linha"><a href="{{CONTATO_SITE}}">{{CONTATO_SITE}}</a></p>
+    {{CONTATOS_HTML}}
     <div class="contato-regua"></div>
-    <p class="contato-nota">Ficou com alguma dúvida sobre o {{CODIGO_CURSO}}? Fale com a
-    Extensão FEQ pelos canais acima — a equipe confirma prazos, valores e condições
+    <p class="contato-nota">Ficou com alguma dúvida sobre o {{CODIGO_CURSO}}? Fale com
+    {{INST_CURTO}} pelos canais acima — a equipe confirma prazos, valores e condições
     de inscrição vigentes.</p>
   </div>
 </div>
