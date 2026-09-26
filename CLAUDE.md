@@ -211,11 +211,11 @@ Reescrita **v2** (monólito modular `atena/`, ancoragem ontológica) implementad
   agora variam por instituto (FEQ vs Instituto de Economia). Sem confirmação de WhatsApp nos
   números do IE — `whatsapp: False` até alguém testar (mesma trava que evita repetir o bug de
   10/08/2026 na secretaria FEQ).
-- **Guia do curso em PDF ainda é 100% branding FEQ** (`atena/growth/pdf_guia.py`): logo, título de
-  seção ("Por que estudar na Extensão FEQ") e contato do rodapé são hardcoded FEQ — não
-  adaptado para ECO-1100 nesta rodada (faltaria pelo menos o logo do IE, que não tenho). Se o PDF
-  for pedido por um lead do ECO-1100, hoje sai com identidade da FEQ; o guia por WhatsApp/texto
-  já está correto.
+- ✅ **Guia em PDF por instituto** (26/09/2026, `atena/growth/pdf_guia.py::INSTITUTOS`): incidente —
+  o lead Giuliana (ECO-1100, `wa-5511940463127`) recebeu às 13:07 o guia com marca e contatos da
+  FEQ. Agora logo (`web/assets/ie.png`), textos, contatos e selos vêm do instituto; ECO-1100 sai
+  com "Declaração de frequência" (não certificado) e sem os selos da FEQ (aulas ao vivo, turmas
+  reduzidas). Prefixo sem entrada em `INSTITUTOS` não gera guia (fail-closed).
 - Chave FARO atual enxerga vários pipelines — migrar para chave escopada só ao FEQ.
 - ✅ Persistência de conversa em SQLite (`atena/core/estado.py`); integração real com FARO (SoR externo) ainda pendente.
 - ✅ O VPS já tem as credenciais do WordPress (31/08/2026): aprovação do Injetor e tick de
