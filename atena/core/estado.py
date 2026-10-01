@@ -216,7 +216,10 @@ class Estado:
                     # SEPARADA de `status` de propósito: clique não é um estágio de
                     # entrega (leads_sem_entrega() filtra status IN ('entregue','lido') —
                     # se clique sobrescrevesse status, essa query perderia o rastro).
-                    "ALTER TABLE conversas ADD COLUMN clicado_ts TEXT"):
+                    "ALTER TABLE conversas ADD COLUMN clicado_ts TEXT",
+                    # Senha definida por OUTRA pessoa (supervisor criou a conta): o
+                    # dono troca no 1º login antes de ver qualquer dado (auth.guard).
+                    "ALTER TABLE usuarios ADD COLUMN trocar_senha INTEGER DEFAULT 0"):
             try:
                 self.conn.execute(mig)
             except sqlite3.OperationalError:
@@ -336,11 +339,18 @@ class Estado:
         return None
 
     # -------------------------------------------------------------- usuarios
-    def add_usuario(self, usuario, senha_hash, papel):
+    def add_usuario(self, usuario, senha_hash, papel, trocar_senha=0):
         with self._lock:
             self.conn.execute(
-                "INSERT INTO usuarios(usuario,senha_hash,papel,criado) VALUES(?,?,?,?)",
-                (usuario, senha_hash, papel, _agora()))
+                "INSERT INTO usuarios(usuario,senha_hash,papel,criado,trocar_senha)"
+                " VALUES(?,?,?,?,?)", (usuario, senha_hash, papel, _agora(), int(trocar_senha)))
+            self.conn.commit()
+
+    def set_senha(self, usuario, senha_hash):
+        """Troca feita pelo PRÓPRIO usuário — por isso zera a obrigação de trocar."""
+        with self._lock:
+            self.conn.execute("UPDATE usuarios SET senha_hash=?, trocar_senha=0 WHERE usuario=?",
+                              (senha_hash, usuario))
             self.conn.commit()
 
     def get_usuario(self, usuario):

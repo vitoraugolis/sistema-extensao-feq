@@ -7,6 +7,8 @@ Atena · Auth multiusuário + RBAC + auditoria (a Central expõe PII).
   no banco, o bootstrap DESLIGA sozinho.
 - ATENA_USERS="nome:senha:papel,..." (env) continua honrado (ex.: contas de emergência).
 - Rate limit de login: 5 falhas/60s por IP -> 429.
+- Conta criada por supervisor nasce com `trocar_senha`: até o dono trocar
+  (POST /api/senha), a sessão só enxerga /api/me, /api/senha e /api/logout.
 - ATENA_SECRET: gerado e persistido no .env na 1ª execução (sessões sobrevivem a restart).
 """
 import os
@@ -27,6 +29,7 @@ PAPEIS = ("operador", "supervisor")
 # continua exigindo sessão — LIVRE casa por igualdade, não por prefixo.
 LIVRE = {"/api/login", "/health", "/api/coleta/pagina"}
 SUPERVISOR_APROVA = ("/api/injetor",)   # POST .../aprovar exige supervisor
+SO_TROCA_SENHA = {"/api/me", "/api/senha", "/api/logout"}   # sessão com senha provisória
 _FALHAS = {}                            # ip -> [timestamps]  (rate limit de login)
 
 # Módulos restritos: prefixo de rota -> nome do módulo. Acesso NÃO vem de papel —
@@ -134,6 +137,8 @@ def init_app(app, estado):
         if papel:
             _FALHAS.pop(ip, None)
             session["usuario"], session["papel"] = b["usuario"], papel
+            u = estado.get_usuario(b["usuario"])
+            session["trocar_senha"] = bool(u and u.get("trocar_senha"))
             estado.log_acao(b["usuario"], "login")
             return jsonify({"ok": True, "papel": papel})
         _FALHAS[ip].append(agora)
@@ -151,8 +156,27 @@ def init_app(app, estado):
         # quem manda é o guard abaixo, que bloqueia a rota mesmo se alguém forjar o menu.
         return jsonify({"usuario": u, "papel": session.get("papel"),
                         "master": eh_master(u),
+                        "trocar_senha": bool(session.get("trocar_senha")),
                         "modulos": sorted({m for m in MODULOS_RESTRITOS.values()
                                            if pode_modulo(estado, u, m)})})
+
+    @app.post("/api/senha")
+    def senha_trocar():
+        """O próprio usuário troca a senha (obrigatório no 1º login de conta criada
+        por supervisor). Pede a atual: sessão esquecida aberta não basta para trocar."""
+        b = request.get_json(silent=True) or {}
+        atual, nova = b.get("atual") or "", b.get("nova") or ""
+        u = estado.get_usuario(session["usuario"])
+        if not u:   # conta de env/bootstrap não mora no banco — senha é do .env
+            return jsonify({"erro": "esta conta não tem senha editável"}), 400
+        if not verificar_senha(atual, u["senha_hash"]):
+            return jsonify({"erro": "senha atual incorreta"}), 401
+        if len(nova) < 6 or nova == atual:
+            return jsonify({"erro": "nova senha: mínimo de 6 caracteres e diferente da atual"}), 400
+        estado.set_senha(u["usuario"], hash_senha(nova))
+        session.pop("trocar_senha", None)
+        estado.log_acao(u["usuario"], "trocou a própria senha")
+        return jsonify({"ok": True})
 
     # -------------------------------------------------- gestão de usuários
     @app.get("/api/usuarios")
@@ -173,7 +197,7 @@ def init_app(app, estado):
             return jsonify({"erro": f"papel deve ser um de {PAPEIS}"}), 400
         if estado.get_usuario(u):
             return jsonify({"erro": "usuário já existe"}), 409
-        estado.add_usuario(u, hash_senha(s), p)
+        estado.add_usuario(u, hash_senha(s), p, trocar_senha=1)   # senha é do supervisor
         estado.log_acao(session["usuario"], f"criou usuário {u} ({p})")
         return jsonify({"ok": True, "usuario": u, "papel": p})
 
@@ -196,6 +220,9 @@ def init_app(app, estado):
             return None
         if not session.get("usuario"):
             return jsonify({"erro": "não autenticado"}), 401
+        if session.get("trocar_senha") and path not in SO_TROCA_SENHA:
+            return jsonify({"erro": "troque a senha provisória antes de continuar",
+                            "trocar_senha": True}), 403
         # Módulo restrito: barra AQUI, não em cada rota. Uma rota nova sob o prefixo
         # nasce protegida por padrão — esquecer o decorador não vira vazamento.
         for prefixo, modulo in MODULOS_RESTRITOS.items():

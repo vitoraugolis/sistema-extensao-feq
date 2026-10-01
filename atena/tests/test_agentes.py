@@ -203,6 +203,31 @@ def test_auth_multiusuario():
     auth._FALHAS.clear()
 
 
+def test_troca_de_senha_obrigatoria_no_primeiro_login():
+    os.environ.pop("ATENA_USERS", None)
+    auth._FALHAS.clear()
+    est = Estado(":memory:")
+    app = Flask(__name__)
+    auth.init_app(app, est)
+    sup = app.test_client()
+    sup.post("/api/login", json={"usuario": "operador", "senha": "operador"})
+    assert sup.post("/api/usuarios", json={"usuario": "bia", "senha": "guara123"}).status_code == 200
+    c = app.test_client()
+    assert c.post("/api/login", json={"usuario": "bia", "senha": "guara123"}).status_code == 200
+    assert c.get("/api/me").get_json()["trocar_senha"] is True
+    r = c.get("/api/config")                       # qualquer outra rota: barrada
+    assert r.status_code == 403 and r.get_json()["trocar_senha"]
+    assert c.post("/api/senha", json={"atual": "errada", "nova": "nova123"}).status_code == 401
+    assert c.post("/api/senha", json={"atual": "guara123", "nova": "guara123"}).status_code == 400
+    assert c.post("/api/senha", json={"atual": "guara123", "nova": "nova123"}).status_code == 200
+    assert c.get("/api/me").get_json()["trocar_senha"] is False
+    c2 = app.test_client()                         # senha nova vale, provisória morre
+    assert c2.post("/api/login", json={"usuario": "bia", "senha": "guara123"}).status_code == 401
+    assert c2.post("/api/login", json={"usuario": "bia", "senha": "nova123"}).status_code == 200
+    assert c2.get("/api/me").get_json()["trocar_senha"] is False
+    auth._FALHAS.clear()
+
+
 def test_enviar_respeita_24h_e_optout():
     os.environ.pop("WHATSAPP_TOKEN", None)
     est = Estado(":memory:")

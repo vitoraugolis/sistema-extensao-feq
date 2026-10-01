@@ -390,6 +390,17 @@ try{ const t = localStorage.getItem('tema'); if(t) document.documentElement.data
     <div id="lerr" class="muted" style="color:var(--bad);margin-top:8px;"></div>
   </div>
 </div>
+<div id="trocaSenha" style="display:none;position:fixed;inset:0;background:var(--overlay);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);align-items:center;justify-content:center;z-index:50;">
+  <div class="g" style="padding:24px;width:320px;box-shadow:var(--shadow-lg);text-align:center;">
+    <div style="font-weight:700;font-size:16px;margin-bottom:6px;">Defina sua senha</div>
+    <div class="muted" style="margin-bottom:14px;">Primeiro acesso: troque a senha provisória.</div>
+    <input id="tsAtual" type="password" placeholder="senha atual (provisória)" style="margin-bottom:8px;">
+    <input id="tsNova" type="password" placeholder="nova senha (mín. 6)" style="margin-bottom:8px;">
+    <input id="tsConf" type="password" placeholder="confirme a nova senha" style="margin-bottom:12px;">
+    <button class="btn btn-p" style="width:100%;" onclick="trocarSenha()">Salvar e entrar</button>
+    <div id="tsErr" class="muted" style="color:var(--bad);margin-top:8px;"></div>
+  </div>
+</div>
 <div class="wrap">
   <div class="top">
     <div class="brand">
@@ -2799,6 +2810,9 @@ async function boot(){
   const me = await api('/api/me');
   if(!me.usuario){ document.getElementById('login').style.display='flex'; return; }
   document.getElementById('login').style.display='none';
+  // senha provisória: o servidor recusa todo o resto até a troca (auth.guard)
+  if(me.trocar_senha){ document.getElementById('trocaSenha').style.display='flex'; return; }
+  document.getElementById('trocaSenha').style.display='none';
   PAPEL = me.papel||'';
   // Módulos restritos: o menu só aparece para quem o servidor reconhece. Se um
   // acesso for revogado, o item some no próximo login/refresh — e a rota já estava
@@ -2825,6 +2839,12 @@ async function login(){
   const r = await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({usuario:$('#lu').value,senha:$('#lp').value})});
   if(r.ok){ boot(); } else { $('#lerr').textContent='credenciais inválidas'; }
+}
+async function trocarSenha(){
+  if($('#tsNova').value !== $('#tsConf').value){ $('#tsErr').textContent='as senhas não conferem'; return; }
+  const r = await api('/api/senha',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({atual:$('#tsAtual').value,nova:$('#tsNova').value})});
+  if(r.ok){ boot(); } else { $('#tsErr').textContent=r.erro||'erro'; }
 }
 boot();
 </script>
