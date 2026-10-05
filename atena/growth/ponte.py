@@ -104,8 +104,8 @@ CURSO_IMAGEM = {
     # foto real de plataforma offshore — diferente do offshore.webp do FEQ-0360
     # (aquele é um render 3D); tema de petróleo/reservatório bate com o curso.
     "FEQ-0295": f"{_UPLOADS}/2024/07/offshore.jpg",
-    # biblioteca de mídia da FEQ ("automação de processos") — escolha minha, trocável
-    "FEQ-1150": f"{_UPLOADS}/2026/03/automacao-ia-processos-engenharia-500.webp",
+    # diagrama de blocos de um controlador PID (biblioteca de mídia da FEQ)
+    "FEQ-1150": f"{_UPLOADS}/2024/07/controller.jpeg",
 }
 
 CERTIFICADO_MODELO = {
