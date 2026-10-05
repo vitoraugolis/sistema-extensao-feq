@@ -199,6 +199,12 @@ Reescrita **v2** (monólito modular `atena/`, ancoragem ontológica) implementad
   `atena.ontologia.servico.CODE_RE` virou a fonte única do regex de código de curso (antes
   hardcoded `FEQ[-\s]?(\d{3,4})` em 5 arquivos — nenhum deles reconheceria "ECO-1100").
 
+- ✅ **FEQ-1150 e FEQ-0295 com LP e card na home** (05/10/2026, `specs/08` § "Difusão de
+  oferecimento contínuo"): FEQ-1150 ("Processos sob Controle: do PID ao MPC") é difusão de
+  oferecimento contínuo — declaração de frequência (não certificado), à vista, sem turma a
+  formar; LP e guia derivam isso da ontologia (`continuo`, `certificacao`). FEQ-0295 ganhou a
+  taxa de inscrição (R$ 24) e o link de inscrição em `cursos_metas`. `test_continuo.py` (20 checks).
+
 ## 10. Riscos e pendências abertas
 
 - ✅ FEQ-0499 confirmado em inscrição (turma **006**, até 06/02/2027) na coleta de

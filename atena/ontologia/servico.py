@@ -235,6 +235,10 @@ class Ontologia:
             "ficha_inscricao": str(self.g.value(u, FEQ.fichaInscricao) or "") or "completa",
             "captacao_antecipada": str(self.g.value(u, FEQ.captacaoAntecipada) or "") == "true",
             "plataforma": str(self.g.value(u, FEQ.plataformaAula) or "") or None,
+            # Oferecimento CONTÍNUO (FEQ-1150): não há turma a formar nem data de início
+            # — a Extecamp publica "Disponível na plataforma de X até Y" no lugar do
+            # período de oferecimento. Quem escreve "as aulas começam em" precisa olhar isto.
+            "continuo": str(self.g.value(u, FEQ.oferecimentoContinuo) or "") == "true",
             "promocao": self.promocao(codigo),
         }
 

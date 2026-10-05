@@ -1,5 +1,10 @@
 # Spec 17 — Fluxo consolidado: LP inteligente no domínio FEQ
 
+> **05/10/2026** — a LP passou a variar por três dados da ontologia, sem mudar nada nas páginas
+> existentes: documento emitido (certificado × declaração de frequência), plano de 1 parcela
+> exibido como à vista, e oferecimento contínuo (passos e período próprios). Ver spec 08
+> § "Difusão de oferecimento contínuo" e `atena/tests/test_continuo.py`.
+
 > **Esta spec consolida o funil definitivo** (refinamento de 15/07/2026) e prevalece
 > onde conflitar com as specs 15/16. O operador cria campanhas de geração de leads
 > com sinal de conversão offline; o sistema tem visibilidade total via Marketing API,

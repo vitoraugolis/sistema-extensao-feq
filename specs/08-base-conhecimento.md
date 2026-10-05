@@ -47,6 +47,27 @@ Prefixo de código novo (`ECO` vs `FEQ`) precisa estar em `atena.ontologia.servi
 é a única fonte do regex de código de curso; ingestão, orquestrador, Bibliotecário, Ontologista
 e Revisor importam de lá. O mesmo módulo também é a única fonte de `instituicao_do_codigo`.
 
+## Difusão de oferecimento contínuo (FEQ-1150)
+**FEQ-1150** ("Processos sob Controle: do PID ao MPC", inserido em 05/10/2026 a partir da
+página oficial `ins.extecamp.unicamp.br/curso/dados/FEQ-1150/001`) é o primeiro curso **da
+FEQ** do tipo Difusão e de **oferecimento contínuo** (`oferecimentoContinuo = "true"` →
+`curso()["continuo"]`): inscrição de 16/07/2026 a 01/07/2031, horário livre, sem turma a
+formar. Entra em `cursos_metas`, tem LP (`/inscricao-feq-1150/`) e card na home. Quatro
+consequências, todas derivadas do dado e não do código do curso:
+- **Documento emitido**: `certificacao` começa com "Declaração" → LP (`ponte._documento`) e
+  guia (`pdf_guia._certificado`) dizem "Declaração de frequência", nunca "Certificado".
+- **Plano de 1 parcela = à vista**: `numParcelas = 1` continua no grafo (SHACL e Revisor
+  dependem dele); `ponte._plano_exibicao` só impede a página de escrever "1x de"/"em até 1 parcelas".
+- **`janelaOferecimento` é disponibilidade na plataforma**, não início/fim de aulas: a LP
+  troca o FAQ de período e os 5 passos (que mandam "aguardar a abertura da turma ao
+  encerramento das inscrições") por 3 passos; o guia omite "Início das aulas".
+- **Sem os "3 motivos"/selos da FEQ no guia** (aulas ao vivo, turmas reduzidas): `pdf_guia._inst`.
+- **Sem gate acadêmico** (`feq:nenhum`), como o ECO-1100.
+
+Pendências do FEQ-1150: `fichaInscricao` não declarada (cai na ficha completa — confirmar com
+a coordenação se a básica basta); meta 20/26 em `cursos_metas` é placeholder (a Extecamp não
+publica mínimo de alunos); pacing contra um prazo de 2031 não informa nada.
+
 ## Esquema de cada curso (catalogo.jsonld)
 `codigo, nome, @type(Especializacao|Extensao), modalidade, horarioAula, professorResponsavel,
 requisito{nivelMinimo}, cargaHoraria{horas}?, vagasMin?, vagasMax?, publicoAlvo?, certificacao?,

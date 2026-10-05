@@ -101,7 +101,8 @@
       "@type": "xsd:date"
     },
     "fichaInscricao": "feq:fichaInscricao",
-    "captacaoAntecipada": "feq:captacaoAntecipada"
+    "captacaoAntecipada": "feq:captacaoAntecipada",
+    "oferecimentoContinuo": "feq:oferecimentoContinuo"
   },
   "@graph": [
     {
@@ -726,6 +727,7 @@
       "dataBoleto": "2027-02-03",
       "planoPagamento": {
         "@type": "feq:PlanoPagamento",
+        "taxaInscricao": "24.00",
         "numParcelas": 4,
         "valorParcela": "752.91",
         "aVista": "3011.64"
@@ -738,6 +740,50 @@
       "empresasJson": "[\"EMS\", \"Solvay\", \"3M\", \"Petrobras\", \"Eaton\", \"Buckman\", \"Boehringer\", \"Braskem\"]",
       "fichaInscricao": "basica",
       "captacaoAntecipada": "true"
+    },
+    {
+      "@id": "feq:FEQ-1150",
+      "@type": "feq:Difusao",
+      "codigo": "FEQ-1150",
+      "nome": "Processos sob Controle: do PID ao MPC",
+      "modalidade": "A distância (Online)",
+      "horarioAula": "Livre, conforme disponibilidade do aluno",
+      "formatoAulasResumo": "Horário livre, no seu ritmo",
+      "formatoAulasDetalhe": "Curso 100% a distância, com horário livre, conforme a disponibilidade do aluno. Realizado no Google Classroom e na FEQ Academia.",
+      "professorResponsavel": "Flavio Vasconcelos da Silva",
+      "requisito": {
+        "@type": "feq:RequisitoAcademico",
+        "nivelMinimo": "feq:nenhum"
+      },
+      "cargaHoraria": {
+        "@type": "feq:Duracao",
+        "horas": 108
+      },
+      "janelaInscricao": {
+        "@type": "feq:JanelaTemporal",
+        "inicio": "2026-07-16",
+        "fim": "2031-07-01"
+      },
+      "janelaOferecimento": {
+        "@type": "feq:JanelaTemporal",
+        "inicio": "2026-10-02",
+        "fim": "2031-10-06"
+      },
+      "planoPagamento": {
+        "@type": "feq:PlanoPagamento",
+        "taxaInscricao": "24.00",
+        "numParcelas": 1,
+        "valorParcela": "499.16",
+        "aVista": "499.16"
+      },
+      "objetivo": "A proposta central é apresentar o controle de processos como uma competência estratégica para engenheiros que desejam transformar dados, modelos e instrumentação em estabilidade operacional, eficiência industrial e decisões automatizadas de maior qualidade.",
+      "publicoAlvo": "Engenheiros de processos, engenheiros químicos, de alimentos, mecânicos, mecatrônicos, engenheiros de automação, instrumentistas, analistas de processo e profissionais de áreas afins.",
+      "certificacao": "Declaração de frequência emitida pela Unicamp através da Extecamp (Escola de Extensão).",
+      "conteudoProgramatico": "(1) Fundamentos e aplicações de controle de processos industriais; (2) Importância do controle para estabilidade operacional, segurança, qualidade, produtividade, eficiência energética e sustentabilidade; (3) Sistemas dinâmicos em malha aberta e malha fechada; (4) Modelagem matemática de processos por balanços fenomenológicos e modelos empíricos; (5) Linearização, transformada de Laplace, funções de transferência e diagramas de blocos; (6) Análise de resposta transitória e estacionária; (7) Identificação de processos e obtenção de modelos dinâmicos; (8) Projeto, análise e sintonia de malhas de controle por realimentação; (9) Controladores P, PI, PD e PID; (10) Estabilidade, robustez e desempenho de sistemas de controle; (11) Estratégias avançadas de controle, incluindo cascata, antecipativo, razão, seletor e controle multivariável; (12) Introdução ao controle preditivo baseado em modelo e à otimização em tempo real; (13) Estudos de caso e projeto integrador aplicado a processos industriais.",
+      "urlExtecamp": "https://ins.extecamp.unicamp.br/curso/inscricao/FEQ-1150/001",
+      "plataformaAula": "Google Classroom e FEQ Academia",
+      "oferecimentoContinuo": "true",
+      "insightVenda": "Difusão de oferecimento contínuo: inscrição aberta até 01/07/2031, horário livre, sem pré-requisito de escolaridade e ticket baixo (R$ 499,16 à vista, boleto ou cartão). Emite declaração de frequência, não certificado."
     },
     {
       "@id": "feq:ECO-1100",

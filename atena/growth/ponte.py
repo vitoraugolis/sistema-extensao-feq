@@ -104,6 +104,8 @@ CURSO_IMAGEM = {
     # foto real de plataforma offshore — diferente do offshore.webp do FEQ-0360
     # (aquele é um render 3D); tema de petróleo/reservatório bate com o curso.
     "FEQ-0295": f"{_UPLOADS}/2024/07/offshore.jpg",
+    # biblioteca de mídia da FEQ ("automação de processos") — escolha minha, trocável
+    "FEQ-1150": f"{_UPLOADS}/2026/03/automacao-ia-processos-engenharia-500.webp",
 }
 
 CERTIFICADO_MODELO = {
@@ -424,7 +426,7 @@ def _secao_curriculo(c):
         '<p class="fraco mt-2">Conteúdo da declaração emitida pela Escola de Extensão da '
         'Unicamp ao concluir o curso.</p>')
     cert_html = ('<aside class="cv-cert">'
-                 '<p class="kicker">O certificado que você anexa</p>'
+                 f'<p class="kicker">{"A declaração" if _documento(c) != "Certificado" else "O certificado"} que você anexa</p>'
                  f'{corpo_cert}</aside>')
     # decorativa: o enquadramento (zoom/posição) mora no CSS, junto do resto do sistema
     foto = '<div class="cv-foto" aria-hidden="true"></div>'
@@ -488,6 +490,24 @@ _E2_PAGAMENTO_EXTRA = """          <div class="e2-largo"><label class="lbl" for=
             <select id="comprovante_em" name="comprovante_em" class="inp">
               <option>Aluno</option><option>Empresa</option></select></div>
 """
+
+
+def _documento(c):
+    """Difusão a distância emite DECLARAÇÃO de frequência, não certificado (ontologia,
+    `certificacao`) — mesma regra de pdf_guia._certificado, para a LP não prometer um
+    documento que a Extecamp não emite."""
+    return ("Declaração de frequência"
+            if ((c or {}).get("certificacao") or "").startswith("Declaração") else "Certificado")
+
+
+def _plano_exibicao(c):
+    """Plano de 1 parcela É pagamento à vista: sem isto a página dizia "em até 1
+    parcelas" e "1x de R$ 499,16". O grafo mantém numParcelas=1 (SHACL e Revisor
+    dependem dele); só a exibição deixa de tratá-lo como parcelamento."""
+    p = (c or {}).get("plano") or {}
+    if p.get("n") != 1:
+        return c
+    return {**c, "plano": {**p, "n": None}}
 
 
 def _etapa2_blocos(c):
@@ -660,6 +680,9 @@ def _hero_preco(c, aberto):
     if p.get("n") and p.get("valor_parcela"):
         return (f'<div class="hero-preco"><p class="hero-preco-num">'
                 f'{p["n"]}x de <strong>{_moeda(p["valor_parcela"])}</strong></p></div>')
+    if p.get("a_vista"):
+        return (f'<div class="hero-preco"><p class="hero-preco-num">'
+                f'<strong>{_moeda(p["a_vista"])}</strong> à vista</p></div>')
     return ""
 
 
@@ -670,7 +693,7 @@ def _hero_selos(c):
     selos = []
     if c.get("carga_horas"):
         selos.append(f"{c['carga_horas']}h de curso")
-    selos.append("Certificado Unicamp")
+    selos.append(f"{_documento(c)} Unicamp")
     if c.get("formato_aulas_resumo") or c.get("modalidade"):
         selos.append(c.get("formato_aulas_resumo") or c["modalidade"])
     vagas = (c.get("vagas") or {}).get("max")
@@ -899,6 +922,14 @@ def _periodo_html(c, aberto=True):
     ini, fim = _ddmm(c.get("aulas_inicio")), _ddmm(c.get("aulas_fim"))
     if not (ini and fim):
         return ""
+    if c.get("continuo"):
+        # não há "início das aulas": a Extecamp publica a disponibilidade do conteúdo
+        return (
+            '<details class="qa" data-secao="periodo">\n'
+            '    <summary>Quando posso começar?</summary>\n'
+            '    <p>Não há turma com data de início: o oferecimento é contínuo e o horário '
+            f'é livre. O conteúdo fica disponível na plataforma de <strong>{ini}</strong> '
+            f'a <strong>{fim}</strong>.</p>\n  </details>')
     rotulo = "Período do curso" if aberto else "Período da última turma"
     return (
         '<details class="qa" data-secao="periodo">\n'
@@ -929,6 +960,21 @@ def _passos_html(c, antecipada=False, abre_em=""):
             f"Pague o boleto da taxa de inscrição ({taxa}).{quando}",
             "Com a turma confirmada, a secretaria entra em contato por e-mail para o pagamento "
             "e a efetivação da matrícula. Pronto — você é aluno da Extensão Unicamp!"]
+        return "\n    ".join(
+            f'<li class="passo"><span class="passo-n">{i + 1}</span><span>{p}</span></li>'
+            for i, p in enumerate(passos))
+    if c.get("continuo"):
+        # Oferecimento contínuo: os passos 4-5 abaixo mandam "aguardar a abertura da
+        # turma ao encerramento das inscrições" — aqui isso seria esperar até 2031.
+        p = c.get("plano") or {}
+        plat = f" ({_esc(c['plataforma'])})" if c.get("plataforma") else ""
+        passos = [
+            "Preencha o formulário de inscrição no sistema oficial da Unicamp (Extecamp) e "
+            "aguarde o e-mail com as instruções de acesso ao portal do aluno.",
+            f"Pague o curso ({_moeda(p.get('a_vista'))} à vista) por boleto bancário ou cartão "
+            f"de crédito. A taxa de inscrição ({taxa}) é somada a esse valor.",
+            f"Estude no seu horário: o oferecimento é contínuo, sem turma a esperar, e o "
+            f"conteúdo fica disponível na plataforma{plat} até {_ddmm(c.get('aulas_fim'))}."]
         return "\n    ".join(
             f'<li class="passo"><span class="passo-n">{i + 1}</span><span>{p}</span></li>'
             for i, p in enumerate(passos))
@@ -1037,7 +1083,7 @@ def render_tokens(meta_row, c, aberto=True, recuperavel=False,
     aberto=False: a página vira LISTA DE ESPERA — mesmos fatos do curso, mas os
     CTAs/modal captam contato ("avise-me quando reabrir") em vez de prometer uma
     inscrição que não existe hoje."""
-    c = c or {}
+    c = _plano_exibicao(c or {})
     horario = c.get("horario") or ""
     plano = c.get("plano") or {}
     n, vp, taxa = plano.get("n"), plano.get("valor_parcela"), plano.get("taxa")
@@ -1059,6 +1105,11 @@ def render_tokens(meta_row, c, aberto=True, recuperavel=False,
             plano_det += f" Valor de tabela: {n}x de {_moeda(vp)}."
     elif n:
         plano_det = f"Pagamento em até {n} parcelas" + (f" de {_moeda(vp)}" if vp else "")
+        if taxa:
+            plano_det += f" + taxa de inscrição de {_moeda(taxa)}"
+        plano_det += "."
+    elif plano.get("a_vista"):
+        plano_det = f"Pagamento à vista de {_moeda(plano['a_vista'])}"
         if taxa:
             plano_det += f" + taxa de inscrição de {_moeda(taxa)}"
         plano_det += "."
@@ -1113,6 +1164,9 @@ def render_tokens(meta_row, c, aberto=True, recuperavel=False,
         "HERO_SELOS": _hero_selos(c),
         "OBJETIVO_CURTO": _objetivo_curto(c),
         "HERO_REFORCO": _hero_reforco(c, aberto),
+        "DOCUMENTO": _documento(c),
+        "DOCUMENTO_GENERO": "Emitida" if _documento(c) != "Certificado" else "Emitido",
+        "DOCUMENTO_NO": "na declaração" if _documento(c) != "Certificado" else "no certificado",
         "PROFESSORES_BIO_HTML": _professores_bio_html(c),
         "GARANTIA_HTML": _garantia_html(c),
         "SALARIO_HTML": _salario_html(c),
@@ -1233,7 +1287,7 @@ def render(g, ont, curso, webhook_url="/webhook/ponte", hoje=None):
     if not alvo:
         return None
     try:
-        c = ont.curso(curso)
+        c = _plano_exibicao(ont.curso(curso))
     except Exception:
         c = None
     recuperavel = antecipada = False
@@ -1345,6 +1399,7 @@ def _card_home(m, c, cap):
     """Um card do bloco de cursos da home. Três estados, todos ancorados:
     aberto (prazo real), fora do prazo (a turma não começou — pedido de vaga
     remanescente) e sem turma (lista de espera). Nada de preço/prazo inventado."""
+    c = _plano_exibicao(c)
     nome = (c or {}).get("nome") or m["curso"]
     tipo = (c or {}).get("tipo") or "Curso"
     aberto, recuperavel = bool(cap.get("captavel")), bool(cap.get("recuperavel"))
@@ -1373,6 +1428,8 @@ def _card_home(m, c, cap):
             preco = f'<p class="feq-preco">{o["n"]}x de <strong>{_moeda(o["valor_parcela"])}</strong></p>'
         elif p.get("n") and p.get("valor_parcela"):
             preco = f'<p class="feq-preco">{p["n"]}x de <strong>{_moeda(p["valor_parcela"])}</strong></p>'
+        elif p.get("a_vista"):
+            preco = f'<p class="feq-preco"><strong>{_moeda(p["a_vista"])}</strong> à vista</p>'
     img = CURSO_IMAGEM.get(m["curso"])
     capa = (f'<span class="feq-capa"><img src="{img}" alt="" aria-hidden="true" '
             f'loading="lazy"></span>') if img else ""

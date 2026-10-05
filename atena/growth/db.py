@@ -73,10 +73,12 @@ METAS = [
     ("FEQ-0670", "001", 15, 20, "https://ins.extecamp.unicamp.br/curso/inscricao/FEQ-0670/001"),
     # FEQ-0499 sem turma aberta: url vazia — a LP coleta lead (lista de espera).
     ("FEQ-0499", "001", 15, 20, ""),
-    # FEQ-0295 (12/08/2026): curso novo (proposta Extecamp), inscrições só abrem em
-    # 01/09/2026 — sem URL ainda (Extecamp não publicou o link de inscrição desta
-    # turma); meta_real = vagasMin da proposta (20). Mesmo modo lista de espera do 0499.
-    ("FEQ-0295", "001", 20, 26, ""),
+    # FEQ-0295 (12/08/2026): curso novo (proposta Extecamp); meta_real = vagasMin da
+    # proposta (20). Link de inscrição publicado pela Extecamp e conferido em 05/10/2026.
+    ("FEQ-0295", "001", 20, 26, "https://ins.extecamp.unicamp.br/curso/inscricao/FEQ-0295/001"),
+    # FEQ-1150 (05/10/2026): difusão de oferecimento contínuo (inscrição até 2031),
+    # sem vagasMin na Extecamp — meta 20/26 é a mesma régua do FEQ-0295, não dado oficial.
+    ("FEQ-1150", "001", 20, 26, "https://ins.extecamp.unicamp.br/curso/inscricao/FEQ-1150/001"),
 ]
 
 

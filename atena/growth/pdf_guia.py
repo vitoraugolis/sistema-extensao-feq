@@ -69,6 +69,14 @@ def instituto(codigo):
     return INSTITUTOS.get((codigo or "").split("-")[0].upper())
 
 
+def _inst(c):
+    """Instituto do curso, já ajustado ao curso: os "3 motivos" e os selos da FEQ
+    afirmam aulas ao vivo e turmas reduzidas — falsos num curso de oferecimento
+    contínuo e horário livre (FEQ-1150), mesmo sendo da FEQ."""
+    inst = instituto(c["codigo"])
+    return {**inst, "motivos": False} if c.get("continuo") else inst
+
+
 AMBAR = "#fbbf24"
 TEAL = "#2dd4bf"
 
@@ -155,7 +163,7 @@ def _capa_chips(c):
     chips = []
     if c.get("carga_horas"):
         chips.append(f"<b>{c['carga_horas']}h</b> de carga horária")
-    if _data_br(c.get("aulas_inicio")):
+    if _data_br(c.get("aulas_inicio")) and not c.get("continuo"):
         chips.append(f"Início em <b>{_data_br(c['aulas_inicio'])}</b>")
     chips.append(f"{_certificado(c)} <b>Unicamp</b>")
     return "\n".join(f'<div class="capa-chip">{ch}</div>' for ch in chips)
@@ -174,7 +182,7 @@ def _ficha_html(c):
         ("Modalidade", c.get("modalidade")),
         ("Carga horária", f"{c['carga_horas']} horas" if c.get("carga_horas") else None),
         ("Tipo", c.get("tipo")),
-        ("Início das aulas", _data_br(c.get("aulas_inicio"))),
+        ("Início das aulas", None if c.get("continuo") else _data_br(c.get("aulas_inicio"))),
         ("Horário", c.get("horario")),
         ("Plataforma", c.get("plataforma")),
     ]
@@ -188,7 +196,7 @@ def _ficha_html(c):
 def _sumario_html(c):
     """Sumário montado a partir do que REALMENTE vai existir no documento — listar
     uma seção que foi omitida por falta de dado seria mentir sobre o próprio guia."""
-    inst = instituto(c["codigo"])
+    inst = _inst(c)
     secoes = (["Por que estudar na Extensão FEQ"] if inst["motivos"] else []) \
         + ["Objetivos do curso", "Metodologia"]
     if c.get("habilidades"):
@@ -378,7 +386,7 @@ def _selos_institucionais(inst):
 
 
 def _tokens(c):
-    inst = instituto(c["codigo"])
+    inst = _inst(c)
     # BLOCO_MOTIVOS primeiro: ele contém {{MOTIVO_DIVISOR}}, resolvido depois
     return {
         "BLOCO_MOTIVOS": _bloco_motivos(inst),

@@ -81,8 +81,8 @@ check(pacing.calcular(91, 10, None, 1, HOJE)["status"] == "sem_prazo", "sem praz
 g = Growth(":memory:")
 check({c["curso"] for c in g.cursos()} == {"FEQ-0480", "FEQ-0580", "FEQ-0333", "FEQ-1000",
                                            "FEQ-0360", "FEQ-0331", "FEQ-0299", "FEQ-0670",
-                                           "FEQ-0499", "FEQ-0295"},
-      "seed cobre os 10 cursos com LP (4 turmas-alvo + demais do portfólio)")
+                                           "FEQ-0499", "FEQ-0295", "FEQ-1150"},
+      "seed cobre os 11 cursos com LP (4 turmas-alvo + demais do portfólio)")
 check([c for c in g.cursos() if c["curso"] == "FEQ-1000"][0]["meta_seg"] == 91,
       "meta de segurança = meta real +30% (FEQ-1000: 91)")
 
@@ -308,8 +308,8 @@ check(r["ok"] and r["card_id"],
 
 # --- deploy WP: renderiza todas e, sem credenciais, não publica ------------------
 pgs = wpd.renderizar(g5, FakeOnt(), g5.cursos(), tempfile.mkdtemp())
-check(len(pgs) == 10 and all(pathlib.Path(p["arquivo"]).exists() for p in pgs),
-      "deploy renderiza as 10 LPs do portfólio em disco")
+check(len(pgs) == 11 and all(pathlib.Path(p["arquivo"]).exists() for p in pgs),
+      "deploy renderiza as 11 LPs do portfólio em disco")
 check(all(x["status"] == "dry_run" for x in wpd.publicar(pgs)),
       "sem credenciais WP o deploy é dry-run (não publica nada)")
 
@@ -721,7 +721,7 @@ check(lp_0670.count("André de Freitas Gonçalves") == 2
 # ninguém ter mudado uma linha de código.
 _HOJE_HOME = datetime.date(2026, 8, 30)
 _home = ponte.home_cursos_html(g5, _ont_real, hoje=_HOJE_HOME)
-check(_home.count('class="feq-card"') == len(g5.cursos()) == 10,
+check(_home.count('class="feq-card"') == len(g5.cursos()) == 11,
       "home: um card por curso do catálogo")
 check(_home.startswith(ponte.HOME_MARCA) and "<style>" in _home,
       "home: bloco marcado e com CSS escopado (não vaza no resto da página)")
