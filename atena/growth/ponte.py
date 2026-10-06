@@ -1472,8 +1472,115 @@ def home_cursos_html(g, ont, hoje=None):
     return f"{HOME_MARCA} v={home_marca_versao(corpo)} -->{corpo}"
 
 
+_HEAD_SEL = re.compile(r"lp-head|lp-site-nav|lp-busca|menu-tgl|menu-btn|btn-mini")
+_REGRA_CSS = re.compile(r"([^{}]+)\{((?:[^{}]|\{[^{}]*\})*)\}")
+
+
+def _css_cabecalho():
+    """Regras do cabeçalho tiradas do PRÓPRIO bridge.css (incluindo as do @media
+    mobile) — a home não tem cópia do CSS para envelhecer diferente das LPs."""
+    css = re.sub(r"/\*.*?\*/", "", (_WEB / "bridge.css").read_text(), flags=re.S)
+    out = []
+    for sel, corpo in _REGRA_CSS.findall(css):
+        sel = sel.strip()
+        if sel == ":root":                       # a paleta: na home vale só no cabeçalho
+            out.append(".feq-head{%s}" % corpo.strip())
+        elif sel.startswith("@media"):
+            dentro = "".join("%s{%s}" % (a.strip(), b.strip())
+                             for a, b in _REGRA_CSS.findall(corpo) if _HEAD_SEL.search(a))
+            if dentro:
+                out.append("%s{%s}" % (sel, dentro))
+        elif _HEAD_SEL.search(sel):
+            out.append("%s{%s}" % (sel, corpo.strip()))
+    return re.sub(r"\s+", " ", "".join(out))
+
+
+def home_cabecalho_html():
+    """Cabeçalho da HOME = o das LPs (mesmo HTML do bridge-template, mesmo CSS do
+    bridge.css). Viaja dentro do bloco de cursos porque é o único pedaço da home que
+    publicamos; por isso é `fixed` (o `sticky` da LP só gruda quando o cabeçalho é
+    filho direto da página) e o cabeçalho do tema (#masthead + menu mobile) é ocultado.
+    Única diferença: o botão, que na LP abre o formulário, aqui leva à grade #cursos."""
+    tpl = (_WEB / "bridge-template.html").read_text()
+    head = re.search(r'<header class="lp-head">.*?</header>', tpl, re.S).group(0)
+    head = re.sub(r"<!--.*?-->", "", head, flags=re.S)
+    head = re.sub(r'<button data-cta class="btn-mini">.*?</button>',
+                  '<a href="https://cursos-extensao.feq.unicamp.br/#cursos" class="btn-mini">'
+                  'Ver cursos</a>', head)
+    head = head.replace("{{LOGO_URL}}", os.environ.get("GROWTH_LOGO_URL") or LOGO_URL_DEFAULT)
+    return ('<div class="feq-head"><style>'
+            # #masthead = cabeçalho das páginas Elementor (home); #site-header = o das
+            # páginas comuns do tema (contatos). Os dois, para servir a qualquer página.
+            '#masthead,#site-header,#header-container,.mob-menu-header-holder,.mobmenu-panel,'
+            '.mobmenu-overlay,.page-header,.pre-content{display:none!important}'
+            'body{padding-top:73px!important}'   # altura medida do .lp-head (desktop 73 · mobile 57)
+            '@media(max-width:700px){body{padding-top:57px!important}}'
+            '.feq-head{position:fixed;top:0;left:0;right:0;z-index:9999;'
+            'font-family:Montserrat,"Helvetica Neue",Arial,sans-serif;line-height:1.6}'
+            '.admin-bar .feq-head{top:32px}'
+            '.feq-head *{box-sizing:border-box}'
+            '.feq-head a{text-decoration:none}'
+            '.feq-head img{max-width:100%}'
+            '.feq-head form{margin:0}'
+            '.feq-head button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}'
+            + _css_cabecalho() + '</style>' + re.sub(r"\s*\n\s*", " ", head) + '</div>')
+
+
+CONTATO_SLUG = "contatos"
+
+
+def pagina_contato_html():
+    """/contatos/ — destino do item "Contato" do cabeçalho (06/10/2026). Só canais
+    confirmados, de contatos.CONTATOS_OFICIAIS (fonte única); nada de endereço ou
+    horário que ninguém confirmou."""
+    from atena.core.contatos import CONTATOS_OFICIAIS, INSTAGRAM
+    sec = CONTATOS_OFICIAIS["secretaria"]
+    wa = sec["telefone"].lstrip("+")
+    itens = [("E-mail", sec["email"], "mailto:" + sec["email"])]
+    if sec.get("whatsapp"):
+        itens.append(("WhatsApp", "+55 " + sec["telefone_exibicao"], "https://wa.me/" + wa))
+    itens.append(("Instagram", INSTAGRAM, "https://www.instagram.com/" + INSTAGRAM.lstrip("@") + "/"))
+    cards = "".join(f'<a class="ct-item" href="{_esc(h)}"><span>{_esc(r)}</span>'
+                    f'<strong>{_esc(v)}</strong></a>' for r, v, h in itens)
+    return (home_cabecalho_html() +
+            '<style>'
+            '#main.clearfix,#container.row-inner,#content,article.page.type-page,'
+            '.entry-content.clearfix{max-width:none!important;width:100%!important;'
+            'margin:0!important;padding:0!important;border:none!important;'
+            'box-shadow:none!important;background:transparent!important}'
+            '.feq-contato{font-family:Montserrat,"Helvetica Neue",Arial,sans-serif;color:#094567;'
+            'max-width:62rem;margin:0 auto;padding:4.5rem 1.75rem 5.5rem;line-height:1.6}'
+            '.feq-contato .ct-olho{font-size:.7rem;font-weight:800;text-transform:uppercase;'
+            'letter-spacing:.14em;color:#065BAA;margin:0 0 .6rem}'
+            '.feq-contato h1{font-size:2.4rem;font-weight:800;letter-spacing:-.03em;line-height:1.15;'
+            'color:#065BAA!important;margin:0 0 1rem}'
+            '.feq-contato p{margin:0;max-width:38rem}'
+            '.feq-contato .ct-grade{display:grid;gap:1px;background:rgba(6,91,170,.18);'
+            'border:1px solid rgba(6,91,170,.18);border-top:4px solid #065BAA;margin-top:2.5rem;'
+            'grid-template-columns:1fr}'
+            '@media(min-width:700px){.feq-contato .ct-grade{grid-template-columns:repeat(3,1fr)}}'
+            '.feq-contato .ct-item{display:flex;flex-direction:column;gap:.4rem;background:#fff;'
+            'padding:1.6rem 1.4rem;text-decoration:none;color:#094567;'
+            'transition:background-color 90ms linear,color 90ms linear}'
+            '.feq-contato .ct-item:hover{background:#094567;color:#fff}'
+            '.feq-contato .ct-item span{font-size:.66rem;font-weight:800;text-transform:uppercase;'
+            'letter-spacing:.14em;color:#065BAA}'
+            '.feq-contato .ct-item:hover span{color:#19ABB5}'
+            '.feq-contato .ct-item strong{font-size:1.05rem;font-weight:800;letter-spacing:-.02em;'
+            'overflow-wrap:anywhere}'
+            '</style>'
+            '<div class="feq-contato">'
+            '<p class="ct-olho">Extensão FEQ Unicamp</p>'
+            '<h1>Fale com a Secretaria de Extensão</h1>'
+            '<p>Dúvidas sobre cursos, inscrição, pagamento ou documentos? Fale com a '
+            'Secretaria de Extensão da Faculdade de Engenharia Química da Unicamp por um '
+            'destes canais.</p>'
+            f'<div class="ct-grade">{cards}</div>'
+            '</div>')
+
+
 def _home_corpo(cards):
-    return ('<div class="feq-cards"><style>'
+    return (home_cabecalho_html() + '<div class="feq-cards"><style>'
             '.feq-cards{font-family:Montserrat,"Helvetica Neue",Arial,sans-serif;'
             'display:grid;gap:1px;background:rgba(6,91,170,.18);border:1px solid rgba(6,91,170,.18);'
             'grid-template-columns:1fr}'

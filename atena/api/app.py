@@ -725,6 +725,7 @@ def notificacoes():
                           "tipo": p.get("tipo") or "aprovacao",
                           "texto": f"{p.get('nome') or p.get('curso') or ''}: {p.get('motivo') or ''}".strip(": "),
                           "card_id": p.get("card_id"), "ts": ts, "lido": False,
+                          "chave": p["chave"],
                           "acao": ABAS.get(p.get("acao"), "aprovacoes")})
     except Exception as e:      # a caixa de entrada nunca pode cair por causa de uma fonte
         print(f"[notificacoes] aprovações indisponíveis: {e}", flush=True)
@@ -1581,7 +1582,7 @@ def aprovacoes():
     return jsonify(_aprovacoes_payload())
 
 
-def _aprovacoes_payload():
+def _aprovacoes_payload(incluir_dispensadas=False):
     """Fila de intervenção humana — ACIONÁVEL (spec 18).
 
     Antes isto era uma lista de texto sem botão: quando o agente desistia e pedia
@@ -1606,7 +1607,8 @@ def _aprovacoes_payload():
             itens.append({"tipo": "escalonamento", "prioridade": 1, "card_id": cid,
                           "nome": l.get("nome") or cid, "curso": l.get("curso"),
                           "motivo": l.get("motivo") or "o agente pediu ajuda",
-                          "horas": _ha_h(l.get("atualizado")), "acao": "abrir"})
+                          "horas": _ha_h(l.get("atualizado")), "acao": "abrir",
+                          "marca": l.get("atualizado")})
             continue
         # 2) lead em modo manual com fala nova esperando resposta humana
         if (l.get("modo") or "auto") == "manual":
@@ -1616,7 +1618,8 @@ def _aprovacoes_payload():
                 itens.append({"tipo": "manual", "prioridade": 2, "card_id": cid,
                               "nome": l.get("nome") or cid, "curso": l.get("curso"),
                               "motivo": "conversa em modo manual — você conduz",
-                              "horas": _ha_h(ult.get("ts")), "acao": "abrir"})
+                              "horas": _ha_h(ult.get("ts")), "acao": "abrir",
+                              "marca": ult.get("ts")})
     # 3) proposta do agente aguardando aprovação para sair
     for l in EST.listar_leads():
         if l.get("optout") or l["estado_conversa"] == "escalado_humano":
@@ -1626,14 +1629,15 @@ def _aprovacoes_payload():
             itens.append({"tipo": "proposta", "prioridade": 3, "card_id": l["card_id"],
                           "nome": l.get("nome") or l["card_id"], "curso": l.get("curso"),
                           "motivo": (prop.get("mensagem") or "")[:120],
-                          "horas": _ha_h(prop.get("ts")), "acao": "abrir"})
+                          "horas": _ha_h(prop.get("ts")), "acao": "abrir",
+                          "marca": prop.get("id")})
     # 4) dúvidas abertas para a coordenação
     for d in EST.listar_duvidas("aberta"):
         l = EST.get_lead(d["card_id"]) or {}
         itens.append({"tipo": "duvida", "prioridade": 2, "card_id": d["card_id"],
                       "nome": l.get("nome") or d["card_id"], "curso": l.get("curso"),
                       "motivo": d.get("pergunta") or "", "horas": _ha_h(d.get("criado")),
-                      "acao": "duvidas"})
+                      "acao": "duvidas", "ref": d["id"], "marca": d["id"]})
     # 5) curso encerrado com leads ativos (decisão de negócio, não de conversa)
     ativos = {}
     for l in EST.listar_leads():
@@ -1644,17 +1648,44 @@ def _aprovacoes_payload():
         if cap.get("existe") and not cap.get("captavel"):
             itens.append({"tipo": "captabilidade", "prioridade": 4, "curso": cod,
                           "motivo": f"inscrição {cap['status']} · {n} lead(s) ativos",
-                          "acao": "injetor"})
+                          "acao": "injetor", "marca": cap["status"]})
     # 6) proposta de ontologia aguardando aprovação
     for p in EST.listar_propostas("proposta"):
         itens.append({"tipo": "injetor", "prioridade": 3, "pid": p["id"],
-                      "motivo": f"{p['tipo']} em {p['alvo']}", "acao": "injetor"})
+                      "motivo": f"{p['tipo']} em {p['alvo']}", "acao": "injetor",
+                      "marca": p["id"]})
 
+    # Dispensa (spec 14): o operador limpa o item da fila SEM fingir que o trabalho foi
+    # feito. Guardamos a `marca` (o estado do item naquela hora); enquanto ela não
+    # mudar, o item fica oculto — fala nova do lead, proposta nova ou mudança de
+    # status do curso trocam a marca e o item VOLTA sozinho.
+    for i in itens:
+        i["chave"] = f"{i['tipo']}:{i.get('ref') or i.get('card_id') or i.get('pid') or i.get('curso')}"
+        i["marca"] = str(i.get("marca"))
+    if not incluir_dispensadas:
+        itens = [i for i in itens if EST.get_config("disp:" + i["chave"]) != i["marca"]]
     itens.sort(key=lambda x: (x["prioridade"], -(x.get("horas") or 0)))
     agir = [i for i in itens if i["prioridade"] <= 3]
     alertas = [{"tipo": "alerta", "motivo": f"[{a['tipo']}] {a['texto']}",
-                "horas": _ha_h(a.get("criado"))} for a in EST.listar_alertas(8)]
+                "horas": _ha_h(a.get("criado"))} for a in EST.alertas_nao_lidos(8)]
     return {"itens": itens, "alertas": alertas, "agir": len(agir)}
+
+
+@app.route("/api/aprovacoes/dispensar", methods=["POST"])
+def aprovacoes_dispensar():
+    """Limpa item(ns) da fila de intervenção: {chave} para um, {todas: true} para tudo.
+    Não muda lead, proposta nem dúvida — só oculta até o estado do item mudar."""
+    b = request.get_json(silent=True) or {}
+    chave, n = b.get("chave"), 0
+    if not chave and not b.get("todas"):
+        return jsonify({"erro": "informe chave ou todas"}), 400
+    for i in _aprovacoes_payload()["itens"]:
+        if b.get("todas") or i["chave"] == chave:
+            EST.set_config("disp:" + i["chave"], i["marca"])
+            n += 1
+    EST.log_acao(session.get("usuario", "operador"), f"fila de intervenção: {n} item(ns) dispensado(s)",
+                 chave or "todas")
+    return jsonify({"ok": True, "dispensados": n})
 
 
 @app.route("/api/leads/<card_id>/resolver", methods=["POST"])

@@ -59,6 +59,15 @@ com estado melhor (some quando o trabalho é feito, em vez de depender de algué
 marcar como lido). `lido` é coluna nova em `alertas`, separada de `notificado` — uma
 é a marca do humano na Central, a outra é o disparo externo ao operador.
 
+**Dispensa (06/10/2026).** Todo item da fila de intervenção pode ser limpo: ✕ por item e
+"Limpar tudo" (Aprovações e Notificações), via `POST /api/aprovacoes/dispensar`
+(`{chave}` ou `{todas: true}`). Dispensar **não resolve nem apaga nada** — lead, proposta e
+dúvida ficam como estão; a ação entra na auditoria. O servidor guarda a `marca` do item
+(config `disp:<tipo>:<id>`): última fala do lead (manual), id da proposta/dúvida, status
+do curso (captabilidade), `atualizado` (escalonamento). Mudou a marca, o item **volta
+sozinho**. Fichas de inscrição não são dispensáveis (saem ao serem transcritas). O painel
+"Alertas do sistema" mostra só alertas não lidos e tem o próprio "Limpar".
+
 ### 8. Otimização — estrutura de RL (spec 18 §3.2/3.3) em modo sombra
 
 Objetivo de controle explícito: **maximizar inscritos por curso** e **minimizar CPL**,

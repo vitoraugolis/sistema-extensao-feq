@@ -179,6 +179,22 @@ O link sai de `ponte.slug_lp()` — a MESMA função que o deploy usa para publi
 o cross-sell da LP também passou a usar (eram duas implementações, e o cross-sell
 apontava para um slug que o deploy não publicava).
 
+**Cabeçalho da home = o das LPs (06/10/2026).** O bloco passa a carregar também o
+`.lp-head` (`ponte.home_cabecalho_html()`): o HTML é recortado do `bridge-template.html` e o
+CSS é extraído do `bridge.css` (regras do cabeçalho, inclusive as do `@media` mobile) — não
+há cópia para envelhecer diferente. Como viaja dentro de uma seção do Elementor, é
+`position: fixed` (o `sticky` da LP só gruda como filho direto da página) com
+`padding-top` no `body`; o cabeçalho do tema (`#masthead`, menu mobile) é ocultado **só na
+home**. Única diferença para a LP: o botão leva a `#cursos` ("Ver cursos"), pois não há
+formulário a abrir. As demais páginas do site (Projetos, Equipe…) seguem com o do tema.
+
+**Menu do cabeçalho (06/10/2026, corrigido por Vitor).** Home · Projetos
+(`www.feq.unicamp.br/extensao/conheca-os-projetos-de-extensao/`) · Legislações · Cursos ·
+Equipe (`www.feq.unicamp.br/extensao/equipe-de-extensao/`) · Contato. "Comissão" saiu.
+Contato aponta para **`/contatos/`**, página nossa (`ponte.pagina_contato_html`, publicada
+por `wp_deploy_bridge --so-contato`): mesmo cabeçalho, e só os canais confirmados em
+`contatos.CONTATOS_OFICIAIS` (e-mail, WhatsApp da secretaria, Instagram).
+
 **Publicação** (`wp_deploy_bridge --home` ou `--so-home`): a home é uma página
 Elementor (id 8157). O bloco de cursos ocupa VÁRIAS seções — dois títulos e duas
 grades de imagens ligando às páginas antigas — e vira UMA seção com um widget HTML.

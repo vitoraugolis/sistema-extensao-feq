@@ -162,30 +162,40 @@ OBRIGADO_SLUG = "thank-you-page-lp"   # sufixo, não prefixo: "lp-thank-you-page
 # "thank-you-page" (id 18818 no WP, de outra campanha, viva desde 02/2026).
 
 
-def publicar_obrigado():
-    """Publica /lp-thank-you-page/ (spec: pixel Google — ver ponte.pagina_obrigado_html).
-    Página única, idempotente por slug, mesmo padrão de publicar(). Sem credenciais
-    WP, dry-run (mesma regra das LPs)."""
+def _publicar_pagina(slug, titulo, html, noindex=False):
+    """Página avulsa (obrigado, contatos): idempotente por slug, mesmo padrão de
+    publicar(). Sem credenciais WP, dry-run (mesma regra das LPs)."""
     base = (os.environ.get("WP_URL") or "").rstrip("/")
     user, senha = os.environ.get("WP_USER"), os.environ.get("WP_APP_PASSWORD")
     if not (base and user and senha):
-        return {"slug": OBRIGADO_SLUG, "status": "dry_run"}
+        return {"slug": slug, "status": "dry_run"}
     import requests
     s = requests.Session()
     s.auth = (user, senha)
-    corpo = {"title": "Obrigado", "slug": OBRIGADO_SLUG, "status": "publish",
-             "content": "<!-- wp:html -->\n" + ponte.pagina_obrigado_html() + "\n<!-- /wp:html -->",
-             "meta": {"_yoast_wpseo_meta-robots-noindex": "1"}}
-    achado = _wp(s, base, "GET", f"pages?slug={OBRIGADO_SLUG}&per_page=1")
+    corpo = {"title": titulo, "slug": slug, "status": "publish",
+             "content": "<!-- wp:html -->\n" + html + "\n<!-- /wp:html -->"}
+    if noindex:
+        corpo["meta"] = {"_yoast_wpseo_meta-robots-noindex": "1"}
+    achado = _wp(s, base, "GET", f"pages?slug={slug}&per_page=1")
     if achado is None:
-        return {"slug": OBRIGADO_SLUG, "status": "falhou", "motivo": "busca por slug falhou"}
+        return {"slug": slug, "status": "falhou", "motivo": "busca por slug falhou"}
     rota = f"pages/{achado[0]['id']}" if achado else "pages"
     r = _wp(s, base, "POST", rota, json=corpo)
     if r is None and corpo.pop("meta", None):
         r = _wp(s, base, "POST", rota, json=corpo)
     if not r:
-        return {"slug": OBRIGADO_SLUG, "status": "falhou"}
-    return {"slug": OBRIGADO_SLUG, "status": "publicado", "link": r.get("link")}
+        return {"slug": slug, "status": "falhou"}
+    return {"slug": slug, "status": "publicado", "link": r.get("link")}
+
+
+def publicar_obrigado():
+    """Publica /lp-thank-you-page/ (spec: pixel Google — ver ponte.pagina_obrigado_html)."""
+    return _publicar_pagina(OBRIGADO_SLUG, "Obrigado", ponte.pagina_obrigado_html(), noindex=True)
+
+
+def publicar_contato():
+    """Publica /contatos/ — destino do "Contato" do cabeçalho (ponte.pagina_contato_html)."""
+    return _publicar_pagina(ponte.CONTATO_SLUG, "Contatos", ponte.pagina_contato_html())
 
 
 HOME_PAGE_ID = 8157          # "nova-home" — a home do site (Elementor)
@@ -351,6 +361,7 @@ def main(argv):
     ap.add_argument("--home", action="store_true",
                     help="publica TAMBÉM o bloco de cursos da home (só a grade de cards)")
     ap.add_argument("--so-home", action="store_true", help="publica só o bloco da home")
+    ap.add_argument("--so-contato", action="store_true", help="publica só a página /contatos/")
     args = ap.parse_args(argv)
 
     from atena.growth.db import Growth
@@ -364,6 +375,8 @@ def main(argv):
                 g.conn.execute("INSERT OR IGNORE INTO cursos_metas(curso,turma,url) VALUES(?,?,?)",
                                (m["curso"], m.get("turma", ""), m.get("url", "")))
         g.conn.commit()
+    if args.so_contato:
+        return [publicar_contato()]
     if args.so_home:
         return [publicar_home_cursos(g, ont, backup_dir=args.saida)]
     paginas = renderizar(g, ont, cursos, args.saida)

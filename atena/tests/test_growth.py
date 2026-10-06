@@ -454,7 +454,10 @@ check('id="beneficios"' in lp2 and 'id="programa"' in lp2 and 'id="professor"' i
 # o cabeçalho é UMA faixa só, com o menu real do site (não mais uma segunda barra de
 # âncoras da própria página, que lia como cabeçalho duplicado)
 check('class="lp-site-nav"' in lp2 and lp2.count('class="lp-head-in"') == 1
-      and "cursos-extensao.feq.unicamp.br/contato-2/" in lp2
+      and "cursos-extensao.feq.unicamp.br/contatos/" in lp2
+      and "www.feq.unicamp.br/extensao/equipe-de-extensao/" in lp2
+      and "www.feq.unicamp.br/extensao/conheca-os-projetos-de-extensao/" in lp2
+      and "Comissão" not in lp2.split("</header>")[0] and "contato-2" not in lp2
       and 'id="menu-tgl"' in lp2,
       "cabeçalho: uma faixa, menu do site + sanduíche (CSS puro, sem depender de JS)")
 check('id="cta-fixo"' in lp2, "barra de CTA fixa presente")
@@ -721,6 +724,22 @@ check(lp_0670.count("André de Freitas Gonçalves") == 2
 # ninguém ter mudado uma linha de código.
 _HOJE_HOME = datetime.date(2026, 8, 30)
 _home = ponte.home_cursos_html(g5, _ont_real, hoje=_HOJE_HOME)
+# cabeçalho da home = o das LPs (06/10/2026): mesmo HTML do template, mesmo CSS do bridge.css
+_tpl = (ponte._WEB / "bridge-template.html").read_text()
+_nav_lp = re.search(r'<nav class="lp-site-nav">.*?</nav>', _tpl, re.S).group(0)
+check(re.sub(r"\s+", " ", _nav_lp) in _home, "home traz o MESMO menu do cabeçalho das LPs")
+check("#masthead" in _home and 'class="lp-head"' in _home and "position:fixed" in _home,
+      "home oculta o cabeçalho do tema e fixa o das LPs no topo")
+check("data-cta" not in _home.split('class="feq-cards"')[0] and '/#cursos" class="btn-mini"' in _home,
+      "na home o botão do cabeçalho leva à grade de cursos (não há formulário para abrir)")
+check("&" not in ponte.home_cabecalho_html() and "{{" not in _home,
+      "cabeçalho sem & (o WP reescreve) e sem token por substituir")
+_ct = ponte.pagina_contato_html()
+check("mailto:extfeq@unicamp.br" in _ct and "wa.me/551935213911" in _ct and "98262" not in _ct
+      and 'class="lp-head"' in _ct and "&" not in _ct,
+      "página /contatos/: e-mail e WhatsApp da secretaria, com o cabeçalho das LPs")
+check(wpd.publicar_contato()["status"] == "dry_run", "sem credenciais WP, /contatos/ é dry-run")
+check(".menu-tgl:checked ~ .lp-head-in .lp-site-nav" in _home, "regras do menu mobile vieram do @media do bridge.css")
 check(_home.count('class="feq-card"') == len(g5.cursos()) == 11,
       "home: um card por curso do catálogo")
 check(_home.startswith(ponte.HOME_MARCA) and "<style>" in _home,
