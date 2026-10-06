@@ -143,3 +143,18 @@ de fato precisa das libs.
 - AC10 Seção sem dado no curso nunca aparece em branco nem com placeholder — some inteira.
 - AC11 PDF nunca inclui preço/parcela (evita desatualização depois de salvo no dispositivo do lead).
 - AC12 `anexo_guia` só vira anexo de fato se a proposta correspondente foi aprovada pelo Revisor.
+
+## Link que o agente envia (`urlInscricaoLead`, 06/10/2026)
+
+`curso()["url_inscricao"]` é o link pronto para o lead. Por padrão deriva de `urlExtecamp`
+(`/curso/inscricao/<curso>/<turma>`). O campo **opcional** `urlInscricaoLead` no curso vence
+esse padrão e também vira âncora do Revisor — serve para quando o oferecimento já foi declarado
+mas o link público da Extecamp ainda não abre. Removido o campo, o agente volta ao link da
+Extecamp. O Injetor ainda não edita esse campo (mudança direta no catálogo, versionada).
+
+- **FEQ-1000, turma 019** (declarada em 06/10/2026): inscrições 06/10/2026–13/02/2027, aulas
+  13/03/2027–11/11/2028. O link `…/curso/inscricao/FEQ-1000/019` ainda redirecionava para a home
+  da Extecamp, então `urlInscricaoLead` aponta para a LP
+  `https://cursos-extensao.feq.unicamp.br/inscricao-feq-1000/` (slug perene; a LP antiga
+  `inscricao-feq-1000-018` continua no ar com o conteúdo da turma 018). **Pendência:** quando a
+  Extecamp abrir o link, remover o campo.

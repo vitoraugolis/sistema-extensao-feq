@@ -194,10 +194,10 @@ def _brain_deterministico(ont, lead, mensagem_lead, historico=None, hoje=None):
                            + "Posso seguir com o seu registro?")
                     return C.DecisaoAgente(C.QUALIFICAR, "elegível — captação antecipada (sem link Extecamp)",
                                            mensagem_ao_lead=msg, dados={"escolaridade": esc})
-            elif quer_link and c.get("url_extecamp"):
+            elif quer_link and c.get("url_inscricao"):
                 prazo = "/".join(reversed((c.get("inscricoes_fim") or "").split("-")))
                 msg = (f"Aqui está o link de inscrição do {cod}: "
-                       f"{c['url_extecamp']} — as inscrições vão até {prazo}. "
+                       f"{c['url_inscricao']} — as inscrições vão até {prazo}. "
                        f"Qualquer dúvida no preenchimento, é só me chamar.")
                 return C.DecisaoAgente(C.QUALIFICAR, "elegível — link de inscrição enviado",
                                        mensagem_ao_lead=msg, dados={"escolaridade": esc})

@@ -106,12 +106,16 @@ class Ontologia:
 
     def _urls_ancora(self, u):
         """Links legítimos do curso, normalizados — o Revisor aprova só estes."""
+        def norm(x):
+            return re.sub(r"^https?://(www\.)?", "", str(x).strip().lower().rstrip("/"))
+        urls = set()
         raw = str(self.g.value(u, FEQ.urlExtecamp) or "")
-        if not raw:
-            return set()
-        base = raw.strip().lower().rstrip("/")
-        base = re.sub(r"^https?://(www\.)?", "", base)
-        return {base.replace("/curso/dados/", "/curso/inscricao/")}
+        if raw:
+            urls.add(norm(raw).replace("/curso/dados/", "/curso/inscricao/"))
+        pref = self.g.value(u, FEQ.urlInscricaoLead)     # ver curso()["url_inscricao"]
+        if pref:
+            urls.add(norm(pref))
+        return urls
 
     def politica(self, nome):
         """Texto de uma política comercial global (nó feq:Politica no catálogo).
@@ -211,7 +215,12 @@ class Ontologia:
             # agente tinha de convertê-la para /curso/inscricao/ — nessa transformação ele
             # errou a TURMA e 6 leads receberam FEQ-0480/001 em vez de /009. Nada de pedir
             # ao LLM o que uma substituição de string resolve.
-            "url_inscricao": str(self.g.value(u, FEQ.urlExtecamp) or "").replace(
+            # `urlInscricaoLead` (opcional) vence: é o link que o AGENTE manda quando o
+            # da Extecamp ainda não serve — ex.: FEQ-1000/019 em 06/10/2026, oferecimento
+            # declarado mas com o link público fechado; o lead vai para a nossa LP.
+            # Para voltar ao link da Extecamp, basta remover o campo do curso.
+            "url_inscricao": str(self.g.value(u, FEQ.urlInscricaoLead) or "") or str(
+                self.g.value(u, FEQ.urlExtecamp) or "").replace(
                 "/curso/dados/", "/curso/inscricao/"),
             "objetivo": str(self.g.value(u, FEQ.objetivo) or "") or None,
             "conteudo_programatico": str(self.g.value(u, FEQ.conteudoProgramatico) or "") or None,

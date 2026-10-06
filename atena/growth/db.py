@@ -64,7 +64,7 @@ METAS = [
     ("FEQ-0480", "009", 50, 65, "https://ins.extecamp.unicamp.br/curso/inscricao/FEQ-0480/009"),
     ("FEQ-0580", "001", 30, 39, "https://ins.extecamp.unicamp.br/curso/inscricao/FEQ-0580/001"),
     ("FEQ-0333", "001", 25, 33, "https://ins.extecamp.unicamp.br/curso/inscricao/FEQ-0333/001"),
-    ("FEQ-1000", "018", 70, 91, "https://ins.extecamp.unicamp.br/curso/inscricao/FEQ-1000/018"),
+    ("FEQ-1000", "019", 70, 91, "https://ins.extecamp.unicamp.br/curso/inscricao/FEQ-1000/019"),
     # Demais cursos do portfólio (20/07/2026): LP para TODOS, inclusive sem turma
     # aberta — nesse caso a página entra em modo LISTA DE ESPERA (ver ponte.render).
     ("FEQ-0360", "007", 20, 26, "https://ins.extecamp.unicamp.br/curso/inscricao/FEQ-0360/007"),

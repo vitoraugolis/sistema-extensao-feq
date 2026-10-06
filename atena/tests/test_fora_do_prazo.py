@@ -33,26 +33,26 @@ def check(c, msg):
 
 
 # ------------------------------------------------------- 1) o estado novo
-# FEQ-1000: prorrogado em 28/08/2026 — inscrições até 03/09/2026, aulas começam
-# 05/09/2026. A janela de recuperação encolheu para 1 dia só (04/09): datas fixas
+# FEQ-1000, turma 019 (06/10/2026): inscrições até 13/02/2027, aulas começam em
+# 13/03/2027 — a janela de recuperação vai de 14/02 a 12/03. Datas fixas
 # de um curso real são frágeis por natureza (já quebrou 2x nesta suíte por causa
 # disso — test_promocao.py e test_growth.py) mas o comportamento sob teste é o da
 # MÁQUINA DE ESTADOS, não do calendário do FEQ-1000 em si.
 D = datetime.date
-cap = ONT.captavel("FEQ-1000", D(2026, 9, 4))
+cap = ONT.captavel("FEQ-1000", D(2027, 2, 14))
 check(cap["status"] == "fora_do_prazo", "prazo vencido + turma por começar = fora_do_prazo")
 check(cap["recuperavel"] is True, "o estado se declara recuperável")
 check(cap["captavel"] is False,
       "mas NÃO vira captável: inscrição pública segue fechada (nada mais muda sozinho)")
-check(cap["aulas_inicio"] == "2026-09-05", "expõe quando as aulas começam")
+check(cap["aulas_inicio"] == "2027-03-13", "expõe quando as aulas começam")
 
-check(ONT.captavel("FEQ-1000", D(2026, 9, 3))["status"] == "aberta",
+check(ONT.captavel("FEQ-1000", D(2027, 2, 13))["status"] == "aberta",
       "no último dia do prazo ainda é inscrição normal")
-check(ONT.captavel("FEQ-1000", D(2026, 9, 4))["status"] == "fora_do_prazo",
+check(ONT.captavel("FEQ-1000", D(2027, 2, 14))["status"] == "fora_do_prazo",
       "véspera da 1ª aula ainda é recuperável")
-check(ONT.captavel("FEQ-1000", D(2026, 9, 5))["status"] == "encerrada",
+check(ONT.captavel("FEQ-1000", D(2027, 3, 13))["status"] == "encerrada",
       "começou a aula: acabou a janela de recuperação")
-check(ONT.captavel("FEQ-1000", D(2026, 12, 1))["recuperavel"] is False,
+check(ONT.captavel("FEQ-1000", D(2027, 12, 1))["recuperavel"] is False,
       "curso em andamento não é recuperável")
 
 # curso que já começou há meses continua simplesmente encerrado. O código sai do

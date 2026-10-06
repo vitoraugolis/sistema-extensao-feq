@@ -60,7 +60,7 @@ for variacao, desc in [
 
 # curso CITADO na mensagem entra no escopo: linkar outro curso do portfólio é legítimo
 check(revisar_estrutural(
-    "FEQ-0480", "Veja o FEQ-1000: https://ins.extecamp.unicamp.br/curso/inscricao/FEQ-1000/018",
+    "FEQ-0480", "Veja o FEQ-1000: https://ins.extecamp.unicamp.br/curso/inscricao/FEQ-1000/019",
     ONT)["aprovado"], "link de outro curso citado é aprovado (não é alucinação)")
 
 check(revisar_estrutural("FEQ-0480", "Sem link nenhum aqui.", ONT)["aprovado"],
@@ -108,3 +108,15 @@ check(alvo["curso"] == "FEQ-0480" and alvo["correto"] == CERTO,
       "corrige para o curso do link quebrado, mesmo se o card estiver em outro")
 
 print(f"\n{ok}/{ok} passaram.")
+
+# 06/10/2026 — FEQ-1000/019: oferecimento declarado, mas o link público da Extecamp
+# ainda não abre. `urlInscricaoLead` faz o agente mandar a NOSSA LP só nesse curso.
+from atena.ontologia.servico import Ontologia as _O
+_o = _O()
+_lp = "https://cursos-extensao.feq.unicamp.br/inscricao-feq-1000/"
+check(_o.curso("FEQ-1000")["url_inscricao"] == _lp and _o.curso("FEQ-1000")["url_extecamp"].endswith("/FEQ-1000/019"),
+      "FEQ-1000: o link que o agente manda é a LP; o da Extecamp (turma 019) segue registrado")
+check(_o.curso("FEQ-0480")["url_inscricao"].endswith("/curso/inscricao/FEQ-0480/009"),
+      "curso sem urlInscricaoLead continua mandando o link da Extecamp")
+check(revisar_estrutural("FEQ-1000", f"Aqui está o link: {_lp}", _o)["aprovado"],
+      "Revisor aceita a LP como link legítimo do FEQ-1000")

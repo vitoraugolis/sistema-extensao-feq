@@ -241,4 +241,8 @@ Reescrita **v2** (monólito modular `atena/`, ancoragem ontológica) implementad
 - FEQ-0499: turma 006 aberta no ADM Cursos, aguardando abrir o link público de inscrição.
   Quando sair: `POST /api/injetor/oferecimento` (turma + URL) — atualiza `cursos_metas` e
   republica a LP num passo só.
+- **FEQ-1000 turma 019** (06/10/2026): declarada com inscrições até 13/02/2027, mas o link
+  público da Extecamp (`/FEQ-1000/019`) ainda não abre. O agente manda a LP
+  (`urlInscricaoLead`, `specs/08`); quando o link abrir, remover esse campo do catálogo de
+  produção. A LP antiga `inscricao-feq-1000-018` segue no ar como "lista de espera".
 - Rotacionar quaisquer segredos que tenham circulado em texto.

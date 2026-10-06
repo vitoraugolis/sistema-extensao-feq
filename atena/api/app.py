@@ -191,7 +191,8 @@ def divergencias_catalogo(curso, info, ofer):
     if inicio and str(info.get("aulas_inicio") or "") != inicio:
         fora.append(f"aulas começam {ofer['ofer_inicio']} na Extecamp, "
                     f"{info.get('aulas_inicio') or '—'} aqui")
-    url, turma = info.get("url_inscricao") or "", ofer.get("turma")
+    # url_extecamp, não url_inscricao: esta pode ser a LP (urlInscricaoLead), sem turma
+    url, turma = info.get("url_extecamp") or "", ofer.get("turma")
     if turma and url and not url.rstrip("/").endswith(f"/{turma}"):
         fora.append(f"o link de inscrição aponta para outra turma (Extecamp: {turma})")
     if turma and not url:
