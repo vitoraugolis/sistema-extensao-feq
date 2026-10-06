@@ -308,8 +308,23 @@ check(r["ok"] and r["card_id"],
 
 # --- deploy WP: renderiza todas e, sem credenciais, não publica ------------------
 pgs = wpd.renderizar(g5, FakeOnt(), g5.cursos(), tempfile.mkdtemp())
-check(len(pgs) == 11 and all(pathlib.Path(p["arquivo"]).exists() for p in pgs),
+check(len({p["curso"] for p in pgs}) == 11 and all(pathlib.Path(p["arquivo"]).exists() for p in pgs),
       "deploy renderiza as 11 LPs do portfólio em disco")
+# FEQ-1000 mudou de turma (018 -> 019): o slug vira o perene e o LEGADO recebe o mesmo HTML
+_p1000 = [p for p in pgs if p["curso"] == "FEQ-1000"]
+check([p["slug"] for p in _p1000] == ["inscricao-feq-1000", "inscricao-feq-1000-018"]
+      and _p1000[0]["html"] == _p1000[1]["html"] and len(pgs) == 12,
+      "turma nova: LP no slug perene E espelhada na URL legada (que já circula)")
+# contagem de inscritos é da turma CORRENTE
+_gt = Growth(":memory:")
+_gt.add_evento("x1", "FEQ-1000", "inscricao_confirmada")
+check(_gt.inscritos("FEQ-1000") == 1, "sem troca de turma, inscrição antiga conta")
+import time as _tm; _tm.sleep(1.1)
+_gt.set_oferecimento("FEQ-1000", "020", "https://ins.extecamp.unicamp.br/curso/inscricao/FEQ-1000/020")
+check(_gt.inscritos("FEQ-1000") == 0, "oferecimento novo zera a contagem (inscritos da turma anterior não contam)")
+_gt.add_evento("x2", "FEQ-1000", "inscricao_confirmada")
+_gt.set_oferecimento("FEQ-1000", "020", "https://ins.extecamp.unicamp.br/curso/inscricao/FEQ-1000/020")
+check(_gt.inscritos("FEQ-1000") == 1, "regravar a MESMA turma não zera de novo")
 check(all(x["status"] == "dry_run" for x in wpd.publicar(pgs)),
       "sem credenciais WP o deploy é dry-run (não publica nada)")
 

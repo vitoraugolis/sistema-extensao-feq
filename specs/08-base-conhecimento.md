@@ -156,5 +156,17 @@ Extecamp. O Injetor ainda não edita esse campo (mudança direta no catálogo, v
   13/03/2027–11/11/2028. O link `…/curso/inscricao/FEQ-1000/019` ainda redirecionava para a home
   da Extecamp, então `urlInscricaoLead` aponta para a LP
   `https://cursos-extensao.feq.unicamp.br/inscricao-feq-1000/` (slug perene; a LP antiga
-  `inscricao-feq-1000-018` continua no ar com o conteúdo da turma 018). **Pendência:** quando a
+  `inscricao-feq-1000-018` é espelhada com o mesmo conteúdo). **Pendência:** quando a
   Extecamp abrir o link, remover o campo.
+
+### O que muda sozinho quando um oferecimento novo é declarado (revisão de 06/10/2026)
+
+- **Contagem de inscritos (pacing, spec 15)**: `cursos_metas.turma_desde` marca o início da
+  turma corrente; `Growth.inscritos()` conta só `inscricao_confirmada` a partir dali, e
+  `set_oferecimento` zera `inscritos_extra`. Regravar a mesma turma não zera de novo.
+- **Totais da Extecamp no Painel (spec 20)**: `totais_extecamp()` devolve `None` ("—") enquanto
+  o total guardado for de outra turma — a coleta troca sozinha quando enxergar a nova.
+- **LP (spec 17)**: publicada no slug perene e **espelhada na URL legada** de `LEGADO_TURMA`.
+- **Precedentes do agente**: resposta antiga que cita data (`dd/mm`) não é mais usada como
+  precedente — data é fato do oferecimento e vem do registro do curso.
+- Os leads da turma anterior (matriculados, cancelados) **permanecem** no funil como histórico.

@@ -101,6 +101,10 @@ class Growth:
             self.conn.execute("ALTER TABLE eventos_funil ADD COLUMN valor REAL")  # spec 16
         except sqlite3.OperationalError:
             pass  # coluna já existe
+        try:   # início da turma CORRENTE: inscritos() conta só o que veio depois
+            self.conn.execute("ALTER TABLE cursos_metas ADD COLUMN turma_desde TEXT")
+        except sqlite3.OperationalError:
+            pass
         # spec 17 §2: destino é o formulário de inscrição, não a página de dados
         self.conn.execute("UPDATE cursos_metas SET url=REPLACE(url,'/curso/dados/','/curso/inscricao/')"
                           " WHERE url LIKE '%/curso/dados/%'")
@@ -129,16 +133,25 @@ class Growth:
         branco aqui, na única porta de escrita — é onde importa fazer isso uma vez."""
         with self._lock:
             n = self.conn.execute(
-                "UPDATE cursos_metas SET turma=?, url=?, atualizado=? WHERE curso=?",
-                ((turma or "").strip(), (url or "").strip(), _agora(), curso)).rowcount
+                "UPDATE cursos_metas SET turma=?, url=?, atualizado=?,"
+                # oferecimento novo ZERA a contagem: inscritos da turma anterior não
+                # são progresso desta (FEQ-1000/019 nasceu com 4 inscritos da 018).
+                " turma_desde=CASE WHEN turma IS ? THEN turma_desde ELSE ? END,"
+                " inscritos_extra=CASE WHEN turma IS ? THEN inscritos_extra ELSE 0 END"
+                " WHERE curso=?",
+                ((turma or "").strip(), (url or "").strip(), _agora(),
+                 (turma or "").strip(), _agora(), (turma or "").strip(), curso)).rowcount
             self.conn.commit()
         return n > 0
 
     def inscritos(self, curso):
+        """Inscrições confirmadas da turma CORRENTE (desde `turma_desde`, quando há)."""
         with self._lock:
             n = self.conn.execute(
                 "SELECT COUNT(DISTINCT card_id) FROM eventos_funil"
-                " WHERE curso=? AND tipo='inscricao_confirmada'", (curso,)).fetchone()[0]
+                " WHERE curso=? AND tipo='inscricao_confirmada' AND ts >= COALESCE("
+                "(SELECT turma_desde FROM cursos_metas WHERE curso=?), '')",
+                (curso, curso)).fetchone()[0]
             extra = self.conn.execute(
                 "SELECT inscritos_extra FROM cursos_metas WHERE curso=?", (curso,)).fetchone()
         return n + (extra[0] if extra else 0)

@@ -12,6 +12,7 @@ existindo resposta pronta no histórico).
 Nunca quebra a conversa: qualquer falha (corpus vazio, embedding fora do ar)
 devolve string vazia e o cérebro segue como antes.
 """
+import re
 import sys
 import pathlib
 
@@ -36,9 +37,15 @@ def _corpus():
     return _CORPUS
 
 
+# Data é FATO do oferecimento e vem do registro do curso, nunca de conversa antiga:
+# precedente que cita data envelhece na virada de turma (44 respostas do FEQ-1000
+# citavam o calendário da 018 quando a 019 abriu) e o Revisor bloquearia a cópia.
+_DATA_RE = re.compile(r"\b\d{1,2}/\d{1,2}(/\d{2,4})?\b")
+
+
 def _util(resposta):
     r = (resposta or "").strip().lower()
-    return len(r) >= 40 and not any(x in r for x in _RUINS)
+    return len(r) >= 40 and not any(x in r for x in _RUINS) and not _DATA_RE.search(r)
 
 
 def precedentes(mensagem, curso=None, k=MAX_PRECEDENTES, corpus=None):

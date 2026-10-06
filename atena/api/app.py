@@ -209,6 +209,12 @@ def totais_extecamp(curso):
     mostra "—" em vez de inventar zero, que leria como "ninguém se inscreveu".
     """
     t = json.loads(EST.get_config(f"coleta_totais:{curso}") or "{}")
+    # Totais de OUTRA turma não são desta: declarado um oferecimento novo, os números
+    # da turma anterior somem até a coleta enxergar a nova (FEQ-1000: os 56 da 018
+    # apareciam contra a meta da 019).
+    atual = next((m.get("turma") for m in GRW.cursos() if m["curso"] == curso), None)
+    if atual and t.get("turma") and t["turma"] != atual:
+        return None
     tot = t.get("totais") or {}
     insc, mat = tot.get("inscritos"), tot.get("matriculados")
     if insc is None and mat is None:

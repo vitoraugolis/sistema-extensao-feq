@@ -65,6 +65,13 @@ def renderizar(g, ont, cursos, saida, est=None):
         arq = saida / f"{slug}.html"
         arq.write_text(html)
         paginas.append({"curso": m["curso"], "slug": slug, "arquivo": str(arq), "html": html})
+        # Turma nova muda o slug para o perene, mas a URL legada já circula em anúncio
+        # e mensagem antiga: ela recebe o MESMO conteúdo, senão segue no ar dizendo
+        # "lista de espera" com o curso aberto (FEQ-1000-018, 06/10/2026).
+        legada = ponte.LEGADO_TURMA.get(m["curso"])
+        if legada and slug != _slug(m["curso"], legada):
+            paginas.append({"curso": m["curso"], "slug": _slug(m["curso"], legada),
+                            "arquivo": str(arq), "html": html})
     return paginas
 
 
