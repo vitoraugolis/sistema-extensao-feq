@@ -22,6 +22,7 @@ from atena.core import guardrails as G
 from atena.agentes.bibliotecario import Bibliotecario
 from atena.core.orquestrador import brain_deterministico
 from atena.ontologia.servico import instituicao_do_codigo
+from atena.core.contatos import secretaria_texto
 
 import time as _time
 import collections
@@ -245,7 +246,7 @@ def _bloco_promo(c):
         "Os valores acima já estão calculados nos dados — reproduza-os exatamente, nunca "
         "recalcule nem arredonde. Se o lead se encaixa numa condição melhor (ex.: grupo), diga "
         "isso proativamente: é dinheiro no bolso dele. Não some a campanha com outros descontos "
-        "nem prometa acúmulo — se perguntarem, consultar_coordenacao. "
+        "nem prometa acúmulo — descontos não acumulam; se perguntarem, diga isso. "
         f"Depois de {fim} a promoção acaba: a urgência que você comunica é essa data real, "
         "nunca uma pressão inventada.\n")
 
@@ -292,18 +293,21 @@ def _bloco_descontos(ctx):
     ora o promocional (o que o operador viu como "agentes confusos" em 06/08)."""
     base = ("DESCONTOS: TODOS os cursos da Extensão FEQ dão 10% para alunos e ex-alunos da "
             "Unicamp (qualquer nível — graduação, pós, extensão etc.) — informe isso "
-            "diretamente quando perguntarem e confirme se o lead se enquadra. ")
+            "diretamente quando perguntarem e confirme se o lead se enquadra. "
+            "DESCONTOS NUNCA ACUMULAM: cada um é isolado e vale um só por inscrição (ex.: quem "
+            "é ex-aluno e paga à vista fica com o maior, não com a soma). Diga isso direto se "
+            "perguntarem; não é caso de consultar_coordenacao. ")
     if (ctx.get("curso") or {}).get("promocao"):
         return base + (
             "Este curso está EM CAMPANHA: o preço que você anuncia é o promocional, que já vem "
             "pronto nos dados — não recalcule nem arredonde. Sobre os 10% de ex-aluno, não os "
             "chame de desconto 'adicional' nem 'extra' enquanto a campanha valer: essas palavras "
-            "afirmam um acúmulo que não está confirmado. Diga que é outra política e que você "
-            "confirma se vale junto (consultar_coordenacao). ")
+            "afirmam um acúmulo que não existe. Diga que é outra política e que não soma com a "
+            "campanha. ")
     return base + (
         "NUNCA CALCULE o valor com desconto aplicado (nem a parcela, nem o à vista): diga a "
-        "porcentagem e o valor CHEIO que está nos dados; o abatimento é aplicado pela Extecamp "
-        "na inscrição. Valor calculado por você não existe na base e é bloqueado antes de "
+        "porcentagem e o valor CHEIO que está nos dados; o abatimento é aplicado pela secretaria "
+        "(o campo 'descontos' dos dados diz como, quando houver). Valor calculado por você não existe na base e é bloqueado antes de "
         "chegar ao lead. ")
 
 
@@ -416,6 +420,8 @@ def _system_prompt(ctx, lead_nome=None, precedentes=""):
         "quase na hora; boleto até 3 dias úteis) ele acessa a área do aluno para enviar os "
         "documentos; (4) após o FIM das inscrições, a secretaria da FEQ envia por e-mail o 1º "
         "boleto do curso. Não invente etapas nem prazos além destes.\n"
+        f"CONTATO DA SECRETARIA (informe exatamente assim quando o lead pedir; não invente "
+        f"outro e-mail nem outro número): {secretaria_texto((ctx.get('curso') or {}).get('codigo'))}.\n"
         'Responda SOMENTE em JSON (nada de texto fora do objeto, nada de cercas ```), '
         'preenchendo os campos com conteúdo REAL (nunca reticências ou placeholder): '
         '{"mensagem_ao_lead": "<o texto completo que será enviado ao lead>", '

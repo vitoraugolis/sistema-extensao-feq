@@ -89,6 +89,14 @@ alertaCatalogo?, wasDerivedFrom`.
 
 ## Insights de venda (campo `insightVenda`; usado por SDR/Nutrição, não pelo Revisor)
 - **FEQ-0480** (playbook): desconto gradual a partir de 8% + workshop.
+  Política vigente (05/10/2026, confirmada por Vitor): **15% de desconto no pagamento à vista**,
+  registrada no campo `descontos` do curso (o agente informa a % e o valor cheio; não calcula).
+  O lead seleciona o pagamento à vista na inscrição e o desconto vem direto no boleto, na
+  linha de descontos. **Descontos nunca acumulam** (regra geral, no prompt do cérebro).
+- **Contato da Secretaria de Extensão da FEQ**: e-mail `extfeq@unicamp.br` ou WhatsApp
+  +55 19 3521-3911. Fonte única em `atena/core/contatos.py`; o cérebro o recebe no prompt via
+  `secretaria_texto(codigo)` (por instituto — o IE não tem WhatsApp confirmado). É o **único** WhatsApp informado: o antigo
+  (19) 98262-0072 foi removido de `contatos.py`, do guia em PDF e da Central.
 - **FEQ-0333**: esclarecer que são módulos (não curso pela metade) e que não é 100% em inglês.
 - **FEQ-1000**: vende-se sozinho; cadência informativa (vaga máx. 90).
 - **FEQ-0655**: qualificar diploma cedo (gargalo de elegibilidade).

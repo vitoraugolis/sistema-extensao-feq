@@ -205,6 +205,12 @@ Reescrita **v2** (monólito modular `atena/`, ancoragem ontológica) implementad
   formar; LP e guia derivam isso da ontologia (`continuo`, `certificacao`). FEQ-0295 ganhou a
   taxa de inscrição (R$ 24) e o link de inscrição em `cursos_metas`. `test_continuo.py` (20 checks).
 
+- ✅ **Descontos e contato da secretaria** (05/10/2026, `specs/08`): FEQ-0480 dá 15% no pagamento
+  à vista (campo `descontos`; aplicado no boleto, na linha de descontos). **Descontos nunca
+  acumulam** (regra no prompt do cérebro). Contato da Secretaria FEQ — extfeq@unicamp.br ou
+  WhatsApp (19) 3521-3911 — agora entra no prompt (`contatos.secretaria_texto`); o antigo
+  WhatsApp (19) 98262-0072 foi removido de tudo.
+
 ## 10. Riscos e pendências abertas
 
 - ✅ FEQ-0499 confirmado em inscrição (turma **006**, até 06/02/2027) na coleta de

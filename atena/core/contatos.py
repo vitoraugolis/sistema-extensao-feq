@@ -10,6 +10,8 @@ Dados retirados literalmente da página de contato do "Guia do Curso" de referê
 (material oficial já publicado pela Extensão FEQ) — não são inventados aqui.
 E-mail da secretaria atualizado para extfeq@unicamp.br em 28/08/2026, por confirmação
 direta do usuário (divergia do sextfeq@unicamp.br do Guia).
+O antigo "WhatsApp da Extensão FEQ" (19 98262-0072) saiu em 05/10/2026: por confirmação
+do usuário, o único WhatsApp a informar é o da secretaria, (19) 3521-3911.
 """
 
 CONTATOS_OFICIAIS = {
@@ -22,14 +24,6 @@ CONTATOS_OFICIAIS = {
         # reteste via API em 28/08/2026 (enviar_template) devolveu wa_id igual ao
         # telefone e message_status "accepted" — o número passou a ter WhatsApp
         # (o bug de 10/08/2026, "este número não está no WhatsApp", não se repetiu).
-        "whatsapp": True,
-    },
-    "whatsapp": {
-        "org": "Extensão FEQ Unicamp",
-        "rotulo": "WhatsApp da Extensão FEQ",
-        "telefone": "+5519982620072",
-        "telefone_exibicao": "(19) 98262-0072",
-        "email": None,
         "whatsapp": True,
     },
     "secretaria_ie": {
@@ -54,6 +48,14 @@ SITE = "https://extensao.feq.unicamp.br"
 INSTAGRAM = "@extensaofequnicamp"
 
 
+def secretaria_texto(codigo):
+    """Frase com o contato da secretaria do instituto do curso, para o prompt do
+    cérebro. Só chama de WhatsApp o número confirmado (`whatsapp: True`)."""
+    c = CONTATOS_OFICIAIS["secretaria_ie" if (codigo or "").upper().startswith("ECO") else "secretaria"]
+    canal = "WhatsApp" if c.get("whatsapp") else "telefone"
+    return f"{c['rotulo']}: e-mail {c['email']} ou {canal} {c['telefone_exibicao']}"
+
+
 def payload_contato(chave):
     """Monta o objeto 'contacts' no formato da WhatsApp Business Cloud API.
     None se a chave não existir — quem chama decide como falhar."""
@@ -76,7 +78,7 @@ def payload_contato(chave):
     }
     # site institucional: só o da FEQ está confirmado (SITE). Sem um do IE/CERI, omite
     # em vez de linkar a instituição errada — mesma regra fail-closed do Revisor.
-    site = c.get("url", SITE if chave in ("secretaria", "whatsapp") else None)
+    site = c.get("url", SITE if chave == "secretaria" else None)
     if site:
         contato["urls"] = [{"url": site, "type": "WORK"}]
     if c["email"]:

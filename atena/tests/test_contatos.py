@@ -73,7 +73,8 @@ check(p["name"]["formatted_name"] == CONTATOS_OFICIAIS["secretaria"]["rotulo"],
 check(p["phones"][0]["phone"] == CONTATOS_OFICIAIS["secretaria"]["telefone_exibicao"],
       "telefone de exibição vai no cartão")
 check("emails" in p, "secretaria tem e-mail — entra no payload")
-check("emails" not in payload_contato("whatsapp"), "contato sem e-mail não inventa o campo")
+check("emails" not in payload_contato("secretaria_ie") or CONTATOS_OFICIAIS["secretaria_ie"]["email"],
+      "e-mail só entra quando existe")
 check(payload_contato("chave_inexistente") is None, "chave desconhecida devolve None, não quebra")
 
 # Reteste via API em 28/08/2026 confirmou que a secretaria PASSOU a ter WhatsApp
@@ -81,8 +82,8 @@ check(payload_contato("chave_inexistente") is None, "chave desconhecida devolve 
 # agora o wa_id entra no payload dela também.
 check(p["phones"][0].get("wa_id") == "551935213911",
       "secretaria tem WhatsApp confirmado: leva wa_id (clique-para-conversar)")
-check(payload_contato("whatsapp")["phones"][0]["wa_id"] == "5519982620072",
-      "número que TEM WhatsApp de verdade continua levando wa_id (clique-para-conversar)")
+check(payload_contato("whatsapp") is None and "98262" not in str(CONTATOS_OFICIAIS),
+      "o antigo WhatsApp (98262-0072) saiu: só o da secretaria é informado")
 
 wa = WhatsApp(est, orq)
 r = wa.enviar_contato("5519999990001", "secretaria")
@@ -95,3 +96,19 @@ r3 = wa.enviar_contato("5519999990002", "secretaria")
 check(r3["ok"] is False and r3["status"] == "bloqueado", "opt-out bloqueia envio de contato também")
 
 print(f"\n{ok}/{ok} passaram.")
+
+# 05/10/2026: o cérebro não recebia o contato da secretaria (o lead perguntava e o
+# agente não tinha de onde tirar). Agora vem de CONTATOS_OFICIAIS, por instituto.
+from atena.core.contatos import secretaria_texto
+from atena.agentes.cerebro import _system_prompt
+from atena.ontologia.servico import Ontologia
+_ont = Ontologia()
+_s = secretaria_texto("FEQ-0480")
+check("extfeq@unicamp.br" in _s and "WhatsApp (19) 3521-3911" in _s, "secretaria FEQ: e-mail + WhatsApp")
+_e = secretaria_texto("ECO-1100")
+check("iecoext@unicamp.br" in _e and "WhatsApp" not in _e and "3911" not in _e,
+      "secretaria do IE: sem WhatsApp não confirmado e sem dado da FEQ")
+check(_s in _system_prompt({"curso": _ont.curso("FEQ-0480"), "captavel": _ont.captavel("FEQ-0480")}), "contato da secretaria está no prompt do cérebro")
+check("não são cumulativos" in (_ont.curso("FEQ-0480")["descontos"] or "") and "à vista tem 15%" in (_ont.curso("FEQ-0480")["descontos"] or ""), "FEQ-0480: 15% à vista na ontologia")
+check("à vista" not in (_ont.curso("FEQ-0580")["descontos"] or ""), "os 15% à vista são só do FEQ-0480")
+print(f"{ok}/{ok} passaram.")

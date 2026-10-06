@@ -47,7 +47,7 @@ CACHE_DIR = pathlib.Path(__file__).resolve().parents[1] / "data" / "guias"
 INSTITUTOS = {
     "FEQ": {
         "nome": "Extensão FEQ Unicamp", "curto": "a Extensão FEQ", "a": "à", "de": "da", "sigla": "FEQ Unicamp",
-        "logo": WEB / "assets" / "feq.png", "contato": "secretaria", "whatsapp": "whatsapp",
+        "logo": WEB / "assets" / "feq.png", "contato": "secretaria",
         "site": SITE, "instagram": INSTAGRAM, "motivos": True,
         "boas_vindas": " Os cursos de extensão da FEQ combinam metodologia, qualidade de "
                        "ensino e geração de networking profissional — sem exigência de "
@@ -57,7 +57,7 @@ INSTITUTOS = {
     "ECO": {
         "nome": "Instituto de Economia (IE) Unicamp", "curto": "o Instituto de Economia", "a": "ao", "de": "do",
         "sigla": "Instituto de Economia Unicamp",
-        "logo": WEB / "assets" / "ie.png", "contato": "secretaria_ie", "whatsapp": None,
+        "logo": WEB / "assets" / "ie.png", "contato": "secretaria_ie",
         # site/Instagram do IE não confirmados: omite em vez de linkar a FEQ
         "site": None, "instagram": None, "motivos": False, "boas_vindas": "",
     },
@@ -350,9 +350,8 @@ def _modulos_html(c):
 def _contatos_html(inst):
     """Só os canais confirmados DO INSTITUTO do curso — canal sem dado some."""
     sec = CONTATOS_OFICIAIS[inst["contato"]]
-    linhas = [sec["telefone_exibicao"], sec.get("telefone2_exibicao")]
-    if inst["whatsapp"]:
-        linhas.append("WhatsApp: " + CONTATOS_OFICIAIS[inst["whatsapp"]]["telefone_exibicao"])
+    linhas = [("WhatsApp: " if sec.get("whatsapp") else "") + sec["telefone_exibicao"],
+              sec.get("telefone2_exibicao")]
     if inst["instagram"]:
         linhas.append("Instagram: " + inst["instagram"])
     linhas.append(sec.get("email"))
