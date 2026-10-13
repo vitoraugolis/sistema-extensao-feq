@@ -6,7 +6,7 @@
 set -e
 IP="$1"
 SSHUSER="${2:-auto}"
-KEY="$HOME/.ssh/Ext-FEQ.pem"
+KEY="${ATENA_SSH_KEY:-$HOME/.ssh/Ext-FEQ.pem}"   # outro servidor: ATENA_SSH_KEY=~/.ssh/outra.pem
 DIR="$(cd "$(dirname "$0")/../.." && pwd)"
 [ -z "$IP" ] && { echo "uso: zsh atena/ops/deploy_vps.sh <IP> [usuario]"; exit 1; }
 
