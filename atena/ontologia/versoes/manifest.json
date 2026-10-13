@@ -96,5 +96,47 @@
     "autor": "vitor",
     "motivo": "Injetor: prorrogacao em FEQ-1000",
     "pre_imagem": "catalogo_pre_v0014_1787887622.jsonld"
+  },
+  {
+    "versao": "v0015",
+    "ts": "2026-08-31T09:13:56",
+    "autor": "supervisor",
+    "motivo": "Injetor: prorrogacao em FEQ-0580",
+    "pre_imagem": "catalogo_pre_v0015_1788178436.jsonld"
+  },
+  {
+    "versao": "v0016",
+    "ts": "2026-09-17T21:52:38",
+    "autor": "vitor",
+    "motivo": "Injetor: adiciona ECO-1100 (Desvendando a Economia Global, Instituto de Economia) ao catalogo -- curso fora da FEQ, sem gate academico, aplicado via Claude Code a pedido de Vitor (validado SHACL offline antes do deploy)",
+    "pre_imagem": "catalogo_pre_v0016_1789692758.jsonld"
+  },
+  {
+    "versao": "v0017",
+    "ts": "2026-10-05T16:34:06",
+    "autor": "vitor (via Claude Code)",
+    "motivo": "FEQ-1150 novo (difusao continua; fonte: Extecamp dados/FEQ-1150/001) + taxa de inscricao R$24 no FEQ-0295",
+    "pre_imagem": "catalogo_pre_v0017_1791228846.jsonld"
+  },
+  {
+    "versao": "v0018",
+    "ts": "2026-10-05T18:33:09",
+    "autor": "vitor",
+    "motivo": "FEQ-0480: 15% de desconto no pagamento à vista (descontos não cumulativos)",
+    "pre_imagem": "catalogo_pre_v0018_1791235989.jsonld"
+  },
+  {
+    "versao": "v0019",
+    "ts": "2026-10-06T11:12:51",
+    "autor": "vitor",
+    "motivo": "Injetor: novo_oferecimento em FEQ-1000",
+    "pre_imagem": "catalogo_pre_v0019_1791295971.jsonld"
+  },
+  {
+    "versao": "v0020",
+    "ts": "2026-10-06T11:12:52",
+    "autor": "vitor",
+    "motivo": "FEQ-1000: agente envia o link da LP enquanto o link da Extecamp (019) não abre",
+    "pre_imagem": "catalogo_pre_v0020_1791295972.jsonld"
   }
 ]

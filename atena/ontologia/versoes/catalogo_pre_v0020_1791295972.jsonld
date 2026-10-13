@@ -1,0 +1,841 @@
+{
+  "@context": {
+    "feq": "https://feq.unicamp.br/ontologia#",
+    "xsd": "http://www.w3.org/2001/XMLSchema#",
+    "prov": "http://www.w3.org/ns/prov#",
+    "rdfs": "http://www.w3.org/2000/01/rdf-schema#",
+    "codigo": "feq:codigo",
+    "nome": "feq:nome",
+    "modalidade": "feq:modalidade",
+    "horarioAula": "feq:horarioAula",
+    "formatoAulasResumo": "feq:formatoAulasResumo",
+    "formatoAulasDetalhe": "feq:formatoAulasDetalhe",
+    "professorResponsavel": "feq:professorResponsavel",
+    "professoresAdicionais": {
+      "@id": "feq:professoresAdicionais",
+      "@container": "@list"
+    },
+    "publicoAlvo": "feq:publicoAlvo",
+    "certificacao": "feq:certificacao",
+    "urlExtecamp": "feq:urlExtecamp",
+    "insightVenda": "feq:insightVenda",
+    "conteudoProgramatico": "feq:conteudoProgramatico",
+    "objetivo": "feq:objetivo",
+    "descontos": "feq:descontos",
+    "alertaCatalogo": "feq:alertaCatalogo",
+    "requisito": "feq:requisito",
+    "nivelMinimo": {
+      "@id": "feq:nivelMinimo",
+      "@type": "@id"
+    },
+    "janelaInscricao": "feq:janelaInscricao",
+    "janelaOferecimento": "feq:janelaOferecimento",
+    "inicio": {
+      "@id": "feq:inicio",
+      "@type": "xsd:date"
+    },
+    "fim": {
+      "@id": "feq:fim",
+      "@type": "xsd:date"
+    },
+    "planoPagamento": "feq:planoPagamento",
+    "taxaInscricao": {
+      "@id": "feq:taxaInscricao",
+      "@type": "xsd:decimal"
+    },
+    "numParcelas": {
+      "@id": "feq:numParcelas",
+      "@type": "xsd:integer"
+    },
+    "valorParcela": {
+      "@id": "feq:valorParcela",
+      "@type": "xsd:decimal"
+    },
+    "aVista": {
+      "@id": "feq:aVista",
+      "@type": "xsd:decimal"
+    },
+    "cargaHoraria": "feq:cargaHoraria",
+    "horas": {
+      "@id": "feq:horas",
+      "@type": "xsd:integer"
+    },
+    "vagasMin": {
+      "@id": "feq:vagasMin",
+      "@type": "xsd:integer"
+    },
+    "vagasMax": {
+      "@id": "feq:vagasMax",
+      "@type": "xsd:integer"
+    },
+    "wasDerivedFrom": {
+      "@id": "prov:wasDerivedFrom",
+      "@type": "@id"
+    },
+    "label": "rdfs:label",
+    "objetivosJson": "feq:objetivosJson",
+    "habilidadesJson": "feq:habilidadesJson",
+    "programaDetalheJson": "feq:programaDetalheJson",
+    "depoimentosJson": "feq:depoimentosJson",
+    "empresasJson": "feq:empresasJson",
+    "avaliacaoTexto": "feq:avaliacaoTexto",
+    "salarioRef": "feq:salarioRef",
+    "garantia7dias": "feq:garantia7dias",
+    "plataformaAula": "feq:plataformaAula",
+    "promocao": "feq:promocao",
+    "rotulo": "feq:rotulo",
+    "janela": "feq:janela",
+    "ofertas": {
+      "@id": "feq:ofertas",
+      "@container": "@list"
+    },
+    "condicao": "feq:condicao",
+    "percentualDesconto": {
+      "@id": "feq:percentualDesconto",
+      "@type": "xsd:integer"
+    },
+    "comoAplicar": "feq:comoAplicar",
+    "texto": "feq:texto",
+    "dataBoleto": {
+      "@id": "feq:dataBoleto",
+      "@type": "xsd:date"
+    },
+    "fichaInscricao": "feq:fichaInscricao",
+    "captacaoAntecipada": "feq:captacaoAntecipada",
+    "oferecimentoContinuo": "feq:oferecimentoContinuo"
+  },
+  "@graph": [
+    {
+      "@id": "feq:FEQ-0360",
+      "@type": "feq:Especializacao",
+      "codigo": "FEQ-0360",
+      "nome": "Gestão de Processos Industriais: Confiabilidade e Segurança de Processos",
+      "modalidade": "A distância (Online)",
+      "horarioAula": "sábados 09h-12h e 13h-16h",
+      "professorResponsavel": "Leonardo Vasconcelos Fregolente",
+      "requisito": {
+        "@type": "feq:RequisitoAcademico",
+        "nivelMinimo": "feq:superiorCompleto"
+      },
+      "cargaHoraria": {
+        "@type": "feq:Duracao",
+        "horas": 398
+      },
+      "vagasMin": 20,
+      "vagasMax": 60,
+      "janelaInscricao": {
+        "@type": "feq:JanelaTemporal",
+        "fim": "2027-01-06"
+      },
+      "janelaOferecimento": {
+        "@type": "feq:JanelaTemporal",
+        "inicio": "2027-02-06",
+        "fim": "2028-04-08"
+      },
+      "planoPagamento": {
+        "@type": "feq:PlanoPagamento",
+        "taxaInscricao": "69.00",
+        "numParcelas": 15,
+        "valorParcela": "1115.96",
+        "aVista": "16739.36"
+      },
+      "urlExtecamp": "https://ins.extecamp.unicamp.br/curso/inscricao/FEQ-0360/007",
+      "objetivo": "Capacitar o aluno na gestão de processos industriais, integrando segurança, confiabilidade e otimização, para se tornar referência na área — com autonomia para formular estratégias e implementar as melhores práticas de mercado.",
+      "conteudoProgramatico": "(1) Liderança de Pessoas em Ambientes Industriais; (2) Comportamento Humano: Segurança de Processos e Confiabilidade Industrial; (3) Processos Industriais; (4) Confiabilidade Operacional; (5) Gestão de Manutenção e Inspeção de Equipamentos; (6) Técnicas de Otimização Aplicadas à Confiabilidade; (7) Análise Econômica para Gestão de Confiabilidade; (8) Técnicas de Análise de Risco; (9) Segurança Operacional; (10) Programa de Gerenciamento de Resíduos; (11) Tratamentos Convencionais e Não Convencionais; (12) Sistemas de Disposição Final; (13) Trabalho de Final de Curso (Monografia). Professores: Leonardo Fregolente, Fabio Marcelo Brogna (Petrobras), Angela Hayashi.",
+      "insightVenda": "Queixas de preço amenizadas com webinar + descontos; testar anúncios de urgência.",
+      "wasDerivedFrom": "feq:fonteNotion",
+      "descontos": "Alunos e ex-alunos Unicamp/Extecamp têm 10% de desconto.",
+      "plataformaAula": "Google Classroom",
+      "salarioRef": "R$ 15.883,00 — Glassdoor, Engenheiro de Segurança de Processos",
+      "professoresAdicionais": [
+        "Fabio Marcelo Brogna",
+        "Angela Hayashi"
+      ],
+      "empresasJson": "[\"EMS\", \"Solvay\", \"3M\", \"Petrobras\", \"Eaton\", \"Buckman\", \"Boehringer\", \"Braskem\"]",
+      "avaliacaoTexto": "Frequência atestada pela entrega de atividades — presença ao vivo não é obrigatória. Turmas de no máximo 50 alunos; aulas gravadas na plataforma. Trabalho de Final de Curso (monografia) ao término.",
+      "objetivosJson": "[{\"t\": \"Tornar os alunos referências\", \"d\": \"Capacitação na gestão integrada de segurança, confiabilidade e otimização de processos industriais, com autonomia estratégica e as ferramentas do mercado.\"}, {\"t\": \"Formação otimizada\", \"d\": \"Integração de fundamentos e prática em modelo de ensino a distância, com web-aulas ao vivo e conteúdos práticos e aprofundados.\"}]",
+      "habilidadesJson": "[\"Liderança de pessoas em ambientes industriais\", \"Comportamento humano voltado à segurança de processo\", \"Confiabilidade operacional\", \"Manutenção e inspeção de equipamentos\", \"Técnicas de otimização em processos\", \"Análise econômica para decisões de confiabilidade\", \"Gestão de riscos e segurança operacional\", \"Gerenciamento de resíduos industriais\", \"Tratamentos convencionais e não convencionais\", \"Pesquisa aplicada (monografia)\"]",
+      "depoimentosJson": "[{\"nome\": \"Juliana Panizza\", \"cargo\": \"Analista de Projetos Pleno\", \"texto\": \"Durante o emprego como técnica, fiz o curso da Extensão FEQ. Dois meses depois de terminar consegui um emprego como analista de projetos! Sinto que minha carreira de fato começou agora — trabalho numa empresa legal, com um salário bom e promessa de plano de carreira.\", \"foto\": \"https://cursos-extensao.feq.unicamp.br/wp-content/uploads/2024/02/juliana.png\"}, {\"nome\": \"Edson Papassídero\", \"cargo\": \"Docente\", \"texto\": \"Tive a grata satisfação de ser aluno da Extensão FEQ Unicamp, onde encontrei Grandes Mestres e Grandes Profissionais. O curso superou minhas expectativas. Uma de minhas metas era me qualificar para a docência e em 2022 fui selecionado pelo SENAI.\", \"foto\": \"https://cursos-extensao.feq.unicamp.br/wp-content/uploads/2024/07/papassidero.png\"}]",
+      "programaDetalheJson": "[{\"t\": \"Liderança de Pessoas em Ambientes Industriais\", \"s\": [\"Gestão de pessoas em rotinas operacionais\", \"Construção de equipe de alto desempenho\", \"Confiabilidade humana\", \"Casos de estudo em gestão de pessoas\"]}, {\"t\": \"Comportamento Humano: Segurança de Processos e Confiabilidade Industrial\", \"s\": [\"Cultura de segurança\", \"Confiabilidade humana: erros e falhas\", \"Comportamento de grupo\", \"Abordagens do erro humano (indivíduo × sistema)\"]}, {\"t\": \"Processos Industriais\", \"s\": [\"Tecnologias de processos químicos\", \"Equipamentos da indústria química\", \"Histórico de grandes acidentes\", \"Novas tendências em processos químicos\"]}, {\"t\": \"Confiabilidade Operacional\", \"s\": [\"Fundamentos da Engenharia de Confiabilidade\", \"HAZOP\", \"Análise de Camadas de Proteção (LOPA)\", \"Cálculos de Confiabilidade (SIL)\", \"Fatores humanos nos acidentes\", \"Gerenciamento de alarmes\"]}, {\"t\": \"Gestão de Manutenção e Inspeção de Equipamentos\", \"s\": [\"Estrutura organizacional da manutenção\", \"Manutenção e gestão de ativos\", \"Preventiva, sistemática, sob condição e corretiva\", \"Planejamento e criticidade\", \"Tecnologia 4.0 na manutenção e inspeção\"]}, {\"t\": \"Técnicas de Otimização Aplicadas à Confiabilidade\", \"s\": [\"Fundamentos de métodos de otimização\", \"Ferramentas de otimização\", \"Métodos matemáticos e estatísticos\"]}, {\"t\": \"Análise Econômica para Gestão de Confiabilidade\", \"s\": [\"Estimativa de custos de investimento e operacionais\", \"Matemática financeira\", \"Avaliação de lucratividade de alternativas\"]}, {\"t\": \"Técnicas de Análise de Risco\", \"s\": [\"Matriz de risco\", \"Checklist e 5 Porquês\", \"Análise preliminar de perigo\", \"Árvore de falhas\", \"HAZOP\", \"FMEA\"]}, {\"t\": \"Segurança Operacional\", \"s\": [\"Sistema de gestão de segurança operacional\", \"Gestão de mudanças\", \"Isolamento de energias\", \"Permissão de trabalho\", \"Plano de resposta a emergências\", \"Fatores humanos\"]}, {\"t\": \"Programa de Gerenciamento de Resíduos\", \"s\": [\"Gestão integrada\", \"Modelo de programa de gerenciamento\", \"Prevenção, controle e contenção\"]}, {\"t\": \"Tratamentos Convencionais e Não Convencionais\", \"s\": [\"Fontes geradoras de resíduos\", \"Tratamento de efluentes líquidos\", \"Tratamento de resíduos sólidos\", \"Confiabilidade nos sistemas de tratamento\"]}, {\"t\": \"Sistemas de Disposição Final\", \"s\": [\"Aterros sanitários e industriais\", \"Remediação de áreas contaminadas\", \"Confiabilidade na disposição final\"]}, {\"t\": \"Trabalho de Final de Curso (Monografia)\", \"s\": []}]",
+      "dataBoleto": "2027-01-07"
+    },
+    {
+      "@id": "feq:FEQ-0480",
+      "@type": "feq:Especializacao",
+      "codigo": "FEQ-0480",
+      "nome": "Técnicas de Inteligência Artificial Aplicadas às Engenharias de Processos",
+      "modalidade": "A distância (Online)",
+      "horarioAula": "segundas e quartas 19h30-22h30",
+      "formatoAulasResumo": "Aulas online ao vivo + gravadas",
+      "formatoAulasDetalhe": "Aulas teóricas gravadas liberadas às segundas e aulas práticas online ao vivo às quartas, sempre das 19h30 às 22h30.",
+      "professorResponsavel": "Flavio Vasconcelos da Silva",
+      "professoresAdicionais": [
+        "Claudio Vieira Neto",
+        "Douglas Alves Goulart",
+        "Felipe Matheus Mota Sousa",
+        "Raphael Santana Almeida",
+        "Tiago Ferreira Souza",
+        "Victor Santana Ramos",
+        "Vitor Augusto Oliveira da Silva",
+        "Vitor Machado Viana Cruz"
+      ],
+      "requisito": {
+        "@type": "feq:RequisitoAcademico",
+        "nivelMinimo": "feq:superiorCompleto"
+      },
+      "cargaHoraria": {
+        "@type": "feq:Duracao",
+        "horas": 368
+      },
+      "vagasMin": 45,
+      "vagasMax": 60,
+      "janelaInscricao": {
+        "@type": "feq:JanelaTemporal",
+        "inicio": "2026-04-25",
+        "fim": "2027-01-03"
+      },
+      "janelaOferecimento": {
+        "@type": "feq:JanelaTemporal",
+        "inicio": "2027-01-18",
+        "fim": "2028-06-19"
+      },
+      "planoPagamento": {
+        "@type": "feq:PlanoPagamento",
+        "taxaInscricao": "69.00",
+        "numParcelas": 19,
+        "valorParcela": "866.09",
+        "aVista": "16455.75"
+      },
+      "urlExtecamp": "https://ins.extecamp.unicamp.br/curso/dados/FEQ-0480/009",
+      "objetivo": "Qualificar profissionais para atuar em projetos de melhoria e inovação nas engenharias de processos usando ferramentas modernas de Inteligência Artificial: engenharia e simulação de processos, machine learning e deep learning, controle inteligente, análise de dados, otimização com algoritmos genéticos, lógica fuzzy e aprendizado por reforço.",
+      "conteudoProgramatico": "(1) Engenharia de Processos e Inteligência Artificial; (2) Ferramentas Computacionais para IA (Python); (3) Ferramentas Estatísticas para Análise de Dados; (4) Análise e Simulação de Processos; (5) Técnicas de Otimização e Algoritmos Genéticos; (6) Machine Learning em Processos Industriais; (7) Modelagem e Suporte à Decisão Fuzzy; (8) Controle de Processos com Lógica Fuzzy; (9) Sistemas Neuro-Fuzzy; (10) Deep Learning em Processos Industriais; (11) Aprendizado por Reforço; (12) Processamento de Linguagem Natural (NLP); (13) Projetos Finais.",
+      "insightVenda": "Preço era o entrave; desconto gradual a partir de 8% + workshop funcionou. Curso modelo do portfólio.",
+      "wasDerivedFrom": "feq:fonteNotion",
+      "descontos": "Alunos e ex-alunos Unicamp/Extecamp têm 10% de desconto. Pagamento à vista tem 15% de desconto: basta selecionar o pagamento à vista na inscrição, e o desconto vem aplicado direto no boleto, na linha de descontos. Os descontos não são cumulativos.",
+      "plataformaAula": "Google Classroom",
+      "avaliacaoTexto": "Frequência atestada pela entrega de atividades — presença ao vivo não é obrigatória para aprovação. Atividades avaliativas após cada módulo e Projeto Final de Curso desenvolvido em grupo, em quatro partes ao longo do curso.",
+      "salarioRef": "R$ 14.000,00 — referência de mercado para engenharia de processos",
+      "objetivosJson": "[{\"t\": \"Tornar os profissionais diferenciados\", \"d\": \"Qualificação no desenvolvimento de projetos de melhoria e inovação em processos, com capacidade de formular estratégias e implantá-las por meio das ferramentas de Inteligência Artificial mais modernas do mercado.\"}, {\"t\": \"Formação otimizada\", \"d\": \"Integração de fundamentos e prática sob um modelo otimizado de ensino a distância: web-aulas ao vivo com conteúdos práticos e aprofundados para os maiores desafios do mercado atual.\"}]",
+      "habilidadesJson": "[\"Engenharia e Simulação de Processos Industriais\", \"Machine Learning e Deep Learning\", \"Sistemas de Controle Inteligente\", \"Ferramentas Computacionais para IA (Python)\", \"Análise Estatística e Processamento de Dados Industriais\", \"Otimização com Algoritmos Genéticos\", \"Modelagem Fuzzy e Aprendizado por Reforço\"]",
+      "empresasJson": "[\"EMS\", \"Solvay\", \"3M\", \"Petrobras\", \"Eaton\", \"Buckman\", \"Boehringer\", \"Braskem\"]",
+      "depoimentosJson": "[{\"nome\": \"Luiz Octavio\", \"cargo\": \"Engenheiro — Petrobras\", \"texto\": \"Sou engenheiro químico e trabalho com pesquisa e desenvolvimento na indústria de óleo e gás. E tenho visto como cada vez mais o mercado de trabalho demanda que os engenheiros desenvolvam soluções de ciência de dados e IA nas suas posições de trabalho. O curso ensina as principais técnicas de IA trazendo para a realidade da indústria química. Em poucas aulas, já iniciei a aplicação dos conhecimentos no meu trabalho e estudos. O curso é totalmente hands on e imperdível para quem quer aprender programação em Python, análise de dados e IA para a indústria de processos.\", \"foto\": \"https://cursos-extensao.feq.unicamp.br/wp-content/uploads/2024/02/luiz.png\"}, {\"nome\": \"Juliana Panizza\", \"cargo\": \"Analista de Projetos Pleno\", \"texto\": \"Eu me formei em dezembro de 2016 e, apesar de ter feito estágio numa indústria química por dois anos, eu fiquei desempregada por um ano após me formar engenheira. Consegui um emprego como técnica, onde trabalhei por três anos. Durante este emprego, eu fiz o curso da Extensão FEQ. Dois meses depois de terminar o curso eu consegui um emprego como analista de projetos! Sinto que minha carreira de fato começou agora. Trabalho numa empresa legal, com um salário bom e com uma promessa de plano de carreira.\", \"foto\": \"https://cursos-extensao.feq.unicamp.br/wp-content/uploads/2024/02/juliana.png\"}]",
+      "programaDetalheJson": "[{\"t\": \"Engenharia de Processos e a Inteligência Artificial\", \"s\": [\"Introdução: Inteligência Artificial e Indústria 4.0\"]}, {\"t\": \"Ferramentas Computacionais para IA\", \"s\": [\"Introdução ao Python\", \"Instalação e ambientes de programação\", \"Sintaxe\", \"Condicionais e estruturas iterativas\", \"Bibliotecas\"]}, {\"t\": \"Ferramentas Estatísticas para Análise de Dados de Processos\", \"s\": [\"Análise exploratória de dados\", \"Distribuição de dados e amostras\", \"Regressão e predição\", \"Classificação\", \"Aprendizagem de máquinas estatística\", \"Aprendizado não supervisionado\"]}, {\"t\": \"Análise e Simulação de Processos\", \"s\": [\"Introdução\", \"Modelos matemáticos dos sistemas de engenharia\", \"Simulação computacional\", \"Dinâmica e controle no domínio do tempo\", \"Processos multivariáveis\"]}, {\"t\": \"Projeto Final de Curso — Parte I\", \"s\": [\"Formação de equipes\", \"Estudo de viabilidade\", \"Definição do cronograma\", \"Requisitos\", \"Avaliação preliminar das propostas\", \"Orientação teórico-metodológica\"]}, {\"t\": \"Técnicas de Otimização e Algoritmos Genéticos\", \"s\": [\"Conceitos básicos de otimização\", \"Algoritmos de otimização\", \"Otimização multiobjetivo\", \"Algoritmos genéticos\"]}, {\"t\": \"Machine Learning em Processos Industriais\", \"s\": [\"Introdução ao Machine Learning\", \"Classificação\", \"Regressão\", \"Agrupamento\", \"Redução dimensional\", \"Pré-processamento e seleção de modelos\"]}, {\"t\": \"Modelagem e Suporte à Decisão Fuzzy\", \"s\": [\"Introdução à Lógica Fuzzy\", \"Teoria dos Conjuntos Fuzzy\", \"Variáveis e termos linguísticos\", \"Funções de pertinência\", \"Conjunto de Regras Fuzzy\", \"Fuzzificação e Defuzzificação\", \"Auxílio à tomada de decisão\"]}, {\"t\": \"Controle de Processos Industriais com Lógica Fuzzy\", \"s\": [\"Introdução ao controle\", \"Controladores PID\", \"Controladores Fuzzy\", \"Sintonia\"]}, {\"t\": \"Projeto Final de Curso — Parte II\", \"s\": [\"Orientação de escrita e apresentação de resultados\", \"Definição de projetos aplicados em IA\", \"Coleta e pré-processamento de dados\", \"Seleção e implementação de algoritmos\", \"Avaliação e métricas de desempenho\"]}, {\"t\": \"Sistemas Neuro-Fuzzy\", \"s\": [\"Introdução\", \"Modelos matemáticos dos sistemas de engenharia\", \"Simulação computacional\", \"Dinâmica e controle no domínio do tempo\", \"Processos multivariáveis\"]}, {\"t\": \"Deep Learning em Processos Industriais\", \"s\": [\"Introdução ao Deep Learning\", \"Redes Neurais Artificiais\", \"Redes Neurais Profundas\", \"Redes Neurais Convolucionais\", \"Redes Recorrentes\"]}, {\"t\": \"Projeto Final de Curso — Parte III\", \"s\": [\"Elaboração e análise do projeto\", \"Orientação para escrita\", \"Implementação de modelos com frameworks populares\", \"Ética e considerações legais em IA\", \"Apresentação preliminar e documentação\"]}, {\"t\": \"Aprendizado por Reforço (Reinforcement Learning)\", \"s\": [\"Conceitos fundamentais e terminologia\", \"Processo de Decisão de Markov (MDP)\", \"Q-Learning, SARSA, Policy Gradient, DDPG\", \"Exploração e explotação\", \"Funções de valor, políticas e modelagem\", \"Aplicações em processos industriais e tomada de decisões\"]}, {\"t\": \"Processamento de Linguagem Natural (NLP)\", \"s\": [\"Conceitos, desafios e aplicações\", \"Pré-processamento de texto (tokenização, stop words, stemming)\", \"Análise sintática e semântica\", \"Embeddings: Word2Vec, GloVe, BERT\", \"Classificação de texto e sentimentos\", \"Geração de texto e sumarização\", \"NLP em chatbots e assistentes virtuais\"]}, {\"t\": \"Projeto Final de Curso — Parte IV\", \"s\": [\"Orientação final\", \"Material para a defesa pública\", \"Definição de avaliadores\", \"Sessões de apresentações orais\"]}]",
+      "promocao": {
+        "@type": "feq:Promocao",
+        "rotulo": "Campanha de Agosto 2026",
+        "janela": {
+          "@type": "feq:JanelaTemporal",
+          "inicio": "2026-08-06",
+          "fim": "2026-08-16"
+        },
+        "ofertas": [
+          {
+            "@type": "feq:Oferta",
+            "rotulo": "Promoção de agosto",
+            "condicao": "inscrição individual, parcelado",
+            "numParcelas": 19,
+            "valorParcela": "799.00"
+          },
+          {
+            "@type": "feq:Oferta",
+            "rotulo": "Grupo (3+) ou pagamento à vista",
+            "condicao": "inscrição em grupo de 3 ou mais pessoas, ou pagamento à vista",
+            "percentualDesconto": 15,
+            "numParcelas": 19,
+            "valorParcela": "736.18",
+            "aVista": "13987.39"
+          }
+        ],
+        "comoAplicar": "O formulário de inscrição da Extecamp mostra o valor CHEIO — o desconto da campanha não aparece lá. Ele é aplicado depois, direto nos boletos das mensalidades: conclua a inscrição normalmente e nos avise aqui pelo WhatsApp, que o valor com desconto entra no termo de compromisso."
+      },
+      "dataBoleto": "2027-01-08"
+    },
+    {
+      "@id": "feq:FEQ-1000",
+      "@type": "feq:Especializacao",
+      "codigo": "FEQ-1000",
+      "nome": "Engenharia de Processos Químicos",
+      "modalidade": "A distância (Online — Google Meet + Moodle)",
+      "horarioAula": "aulas teóricas ao vivo aos sábados, das 9h às 12h",
+      "formatoAulasResumo": "Teoria ao vivo aos sábados de manhã (9h-12h); tarde assíncrona",
+      "formatoAulasDetalhe": "As aulas teóricas ao vivo acontecem aos sábados pela manhã, das 9h às 12h. A tarde é dedicada à resolução de cases e exercícios, que NÃO exigem presença síncrona — o aluno faz no seu ritmo. O formato é pensado para que até quem tem uma rotina bastante corrida consiga acompanhar.",
+      "professorResponsavel": "Osvaldir Pereira Taranto",
+      "professoresAdicionais": [
+        "Dirceu Noriler",
+        "Edneu Jatkoski (Petrobras)",
+        "Eduardo de Britto Perez",
+        "Flavio Vasconcelos da Silva",
+        "Guilherme Jose de Castilho",
+        "João Lameu da Silva Júnior",
+        "Leonardo Vasconcelos Fregolente",
+        "Mariana Conceicao da Costa",
+        "Raphael Soeiro Suppino",
+        "Sérgio D Amore Filho",
+        "Victorio Gomieiro Neto"
+      ],
+      "requisito": {
+        "@type": "feq:RequisitoAcademico",
+        "nivelMinimo": "feq:superiorCompleto"
+      },
+      "cargaHoraria": {
+        "@type": "feq:Duracao",
+        "horas": 448
+      },
+      "vagasMin": 46,
+      "vagasMax": 90,
+      "janelaInscricao": {
+        "@type": "feq:JanelaTemporal",
+        "inicio": "2026-10-06",
+        "fim": "2027-02-13"
+      },
+      "janelaOferecimento": {
+        "@type": "feq:JanelaTemporal",
+        "inicio": "2027-03-13",
+        "fim": "2028-11-11"
+      },
+      "planoPagamento": {
+        "@type": "feq:PlanoPagamento",
+        "taxaInscricao": "69.00",
+        "numParcelas": 20,
+        "valorParcela": "892.81",
+        "aVista": "17856.13"
+      },
+      "urlExtecamp": "https://ins.extecamp.unicamp.br/curso/inscricao/FEQ-1000/019",
+      "objetivo": "Formar o Engenheiro de Processos referência da próxima década, com repertório técnico e administrativo para gerir os processos de grandes empresas, integrando conhecimentos técnicos e habilidades gerenciais para realizar e gerir projetos e processos da indústria.",
+      "conteudoProgramatico": "(1) Introdução aos Processos Químicos (balanços de massa/energia, conversões, eficiências); (2) Relações Termodinâmicas e Equilíbrio de Fases; (3) Transferência de Quantidade de Movimento (Navier-Stokes, escoamentos, tubulações); (4) Escoamento de Fluidos não Newtonianos; (5) Dimensionamento de Bombas e Compressores (NPSH, potências); (6) Fluidização, Ciclones e Transporte Pneumático; (7) Engenharia das Reações Químicas (reatores, modelagem); (8) Trocadores de Calor (análise pinch); (9) Avaliação Econômica de Processos e Gestão de Projetos (VPL, TIR, ROI); (10) Controle e Instrumentação (sensores, PLCs, sintonia, preditivos); (11) Processos de Separação (destilação, extração, absorção); (12) Vasos, Tanques e Materiais; (13) Utilidades da Indústria Química (água, vapor, co-geração, ar comprimido); (14) Gerenciamento de Risco de Processo (HAZOP, FMEA); (15) Dispositivos de Segurança e NR 13; (16) Elementos de Refinação e Petroquímica; (17) Projeto Final do Curso.",
+      "insightVenda": "Vende-se sozinho (maior histórico). Cadência informativa para controlar volume (vaga máx. 90).",
+      "wasDerivedFrom": "feq:fonteNotion",
+      "descontos": "Alunos e ex-alunos Unicamp/Extecamp têm 10% de desconto.",
+      "plataformaAula": "Google Classroom",
+      "garantia7dias": "true",
+      "avaliacaoTexto": "Frequência atestada pela entrega de atividades — presença ao vivo não é obrigatória. Atividades avaliativas após cada módulo e Projeto Final de Curso (PFC) desenvolvido em grupo sob orientação do coordenador.",
+      "salarioRef": "R$ 12.000,00 — Glassdoor, Engenharia de Processos Químicos",
+      "objetivosJson": "[{\"t\": \"Tornar os alunos referências\", \"d\": \"Construção do Engenheiro de Processos referência da próxima década: o profissional com todo o repertório técnico-administrativo para gerir os processos de grandes empresas do futuro.\"}, {\"t\": \"Atualização profissional com formação integrada\", \"d\": \"Integrar conhecimentos técnicos e habilidades gerenciais para realizar e gerir projetos e processos da indústria, com as ferramentas mais recentes do mercado e da academia.\"}]",
+      "habilidadesJson": "[\"Balanços de massa e energia em processos químicos\", \"Dimensionamento de bombas, compressores e trocadores de calor\", \"Modelagem e controle de processos industriais\", \"Sistemas de separação: destilação, extração e absorção\", \"Simulação de processos em softwares específicos\", \"Avaliação econômica de projetos (VPL, TIR, ROI)\", \"Gerenciamento de riscos: HAZOP e FMEA\", \"Seleção de materiais e especificação de equipamentos\", \"Utilidades industriais e integração energética\", \"Projeto final aplicado na área química\"]",
+      "empresasJson": "[\"EMS\", \"Solvay\", \"3M\", \"Petrobras\", \"Buckman\", \"Braskem\"]",
+      "depoimentosJson": "[{\"nome\": \"Edson Papassídero\", \"cargo\": \"Instrutor de Educação Profissional\", \"texto\": \"Tive a grata satisfação de ser aluno da Extensão FEQ Unicamp, onde encontrei Grandes Mestres e Grandes Profissionais. O Curso superou minhas expectativas, inclusive quanto às capacidades que pude agregar em minha trajetória profissional. Uma de minhas metas era me qualificar para a docência e no ano de 2022 fui selecionado pelo SENAI. Desde então estou desempenhando com muito orgulho esta nova atividade profissional. Agradeço de coração por todo o cuidado e carinho de TODOS os envolvidos na oferta do curso.\", \"foto\": \"https://cursos-extensao.feq.unicamp.br/wp-content/uploads/2024/07/papassidero.png\"}, {\"nome\": \"Juliana Panizza\", \"cargo\": \"Analista de Projetos Pleno\", \"texto\": \"Eu me formei em dezembro de 2016 e, apesar de ter feito estágio numa indústria química por dois anos, eu fiquei desempregada por um ano após me formar engenheira. Consegui um emprego como técnica, onde trabalhei por três anos. Durante este emprego, eu fiz o curso da Extensão FEQ. Dois meses depois de terminar o curso eu consegui um emprego como analista de projetos! Sinto que minha carreira de fato começou agora.\", \"foto\": \"https://cursos-extensao.feq.unicamp.br/wp-content/uploads/2024/02/juliana.png\"}, {\"nome\": \"Luiz Octavio\", \"cargo\": \"Engenheiro — Petrobras\", \"texto\": \"O curso é totalmente hands on e imperdível. Em poucas aulas, já iniciei a aplicação dos conhecimentos no meu trabalho e estudos — o mercado demanda cada vez mais que os engenheiros desenvolvam soluções aplicadas na indústria de processos.\", \"foto\": \"https://cursos-extensao.feq.unicamp.br/wp-content/uploads/2024/02/luiz.png\"}]",
+      "programaDetalheJson": "[{\"t\": \"Introdução aos Processos Químicos\", \"s\": [\"Balanço para cálculo de capacidade de equipamento\", \"Balanço para rendimentos e conversões\", \"Avaliação de geração de subprodutos\", \"Balanço de energia em processos físicos e químicos\", \"Eficiências energéticas e perdas\"]}, {\"t\": \"Relações Termodinâmicas e Equilíbrio de Fases\", \"s\": [\"Relações P-V-T dos fluidos reais\", \"Produção de trabalho pelo calor\", \"Análise termodinâmica de processos\", \"Equilíbrio líquido-vapor, líquido-líquido e químico\", \"Pacotes termodinâmicos dos simuladores\", \"Aplicações: destilação, extração LL, absorção, destilação azeotrópica e extrativa\"]}, {\"t\": \"Transferência de Quantidade de Movimento\", \"s\": [\"Balanço de massa (diferencial e integral)\", \"Navier-Stokes\", \"Perfis de velocidade, pressão e vazão em escoamento laminar\", \"Perdas de carga e redes de tubulações\", \"Escoamento compressível: estagnação, velocidade do som, Mach\", \"Escoamento isentrópico em bocais\", \"Duto adiabático com atrito\"]}, {\"t\": \"Escoamento de Fluidos não Newtonianos\", \"s\": [\"Fluidos não Newtonianos\", \"Classificação reológica dos materiais\", \"Escoamento de fluidos não Newtonianos\", \"Histerese elástica\"]}, {\"t\": \"Dimensionamento e Seleção de Bombas e Compressores\", \"s\": [\"Tipos, seleção e associação de bombas\", \"Sucção, escorva e NPSH\", \"Fluxo mínimo\", \"Velocidades e potências de motores\", \"Sopradores e compressores\", \"Formas termodinâmicas de compressão\", \"Número de estágios\"]}, {\"t\": \"Fluidização, Ciclones e Transporte Pneumático\", \"s\": [\"Fluidização com gases e líquidos\", \"Queda de pressão e mínima fluidização\", \"Expansão de leito fluidizado\", \"Velocidade terminal em campo centrífugo\", \"Ciclones\", \"Transporte pneumático horizontal e vertical\"]}, {\"t\": \"Engenharia das Reações Químicas\", \"s\": [\"Reações homogêneas em reatores reais\", \"Catálise por sólidos e sistemas não catalíticos\", \"Projeto de reatores\", \"Leito fixo, multifásicos, Air-Lift e fluidizados\", \"Modelagem, DTR, agitação e mistura\"]}, {\"t\": \"Trocadores de Calor sem Combustão\", \"s\": [\"Permutadores, condensadores e refervedores via software\", \"Placas, tubos retorcidos\", \"Isolamentos quentes e frios\", \"Análise pinch\", \"Vibrações em permutadores\"]}, {\"t\": \"Avaliação Econômica de Processos e Gestão de Projetos\", \"s\": [\"Estimativa de investimento e índices\", \"Custos fixos, variáveis e depreciação\", \"VPL, TIR, payback, ROI e ROE\", \"Impostos e contribuições\", \"Etapas e fases do projeto (FEL, FEED)\", \"Gerenciamento global e fontes de estimativa\"]}, {\"t\": \"Controle e Instrumentação de Processos Químicos\", \"s\": [\"Sensores de pressão, temperatura, nível e fluxo\", \"Simbologia de instrumentos\", \"Válvulas de controle e inversores\", \"CLPs\", \"Funções de transferência e respostas transientes\", \"Sintonia, estabilidade, cascata e preditivos\", \"Controle de destilação e reatores\", \"SDCD e controle wireless\"]}, {\"t\": \"Processos de Separação: Destilação, Extração e Absorção\", \"s\": [\"Métodos multicomponentes e refluxos\", \"Simuladores de processo\", \"Projeto de torres, internos e recheios\", \"Hidráulica de bandejas (Sieve & Glitsch)\", \"Diâmetro, altura e perda de carga\", \"Batch distillation, economia de energia, troubleshooting\", \"Síntese de processos\"]}, {\"t\": \"Vasos, Tanques e Materiais para Equipamentos\", \"s\": [\"Separadores vapor-líquido e líquido-líquido\", \"Dimensionamento mecânico\", \"Tanques: escolha, proteção e emergência\", \"Tubulações, válvulas, purgadores e normas\", \"Testes hidrostáticos e pneumáticos\", \"Materiais para equipamentos\"]}, {\"t\": \"Utilidades da Indústria Química\", \"s\": [\"Captação e condicionamento de águas\", \"Balanço termoelétrico e co-geração\", \"Ciclos de frio e calor\", \"Ar comprimido e gás inerte\", \"Confiabilidade das utilidades\", \"Biomassa e combustíveis alternativos\", \"Integração energética entre plantas\"]}, {\"t\": \"Gerenciamento de Risco de Processo\", \"s\": [\"Histórico de grandes acidentes (case BP 2005)\", \"Perigo e risco; danos pessoais, ambientais e econômicos\", \"APP, HAZOP e FMEA\", \"Análise quantitativa e árvore de falhas\", \"Tolerabilidade, risco individual e social\", \"Seguro, cálculo de risco e prêmio\"]}, {\"t\": \"Dispositivos de Segurança e NR 13\", \"s\": [\"Válvulas de segurança e discos de ruptura\", \"Vent, flare e fire proof\", \"Inertização, pressão e vácuo\", \"Eletricidade estática e aterramento\", \"Geradores, alarmes e intertravamentos\", \"Bacias de emergência e tubulações\", \"NR 13\"]}, {\"t\": \"Elementos de Refinação e Petroquímica\", \"s\": [\"Derivados do petróleo: obtenção e especificações\", \"Processos de refinação\", \"Cadeia petroquímica e valor agregado\", \"Olefinas, oxigenados e nafta\", \"Polietilenos, PVC e polipropileno\", \"Plásticos verdes e biodegradáveis\"]}, {\"t\": \"Projeto Final do Curso (PFC)\", \"s\": [\"Projeto em grupo sob orientação do coordenador ao longo do programa\"]}]"
+    },
+    {
+      "@id": "feq:FEQ-0499",
+      "@type": "feq:Extensao",
+      "codigo": "FEQ-0499",
+      "nome": "Eficiência Energética de Processos de Manufatura e Sistemas de Utilidades Industriais",
+      "modalidade": "A distância (Online)",
+      "horarioAula": "sábados 9h-16h",
+      "professorResponsavel": "Flavio Vasconcelos da Silva",
+      "requisito": {
+        "@type": "feq:RequisitoAcademico",
+        "nivelMinimo": "feq:superiorCompleto"
+      },
+      "janelaInscricao": {
+        "@type": "feq:JanelaTemporal",
+        "fim": "2027-03-05"
+      },
+      "janelaOferecimento": {
+        "@type": "feq:JanelaTemporal",
+        "inicio": "2027-03-06",
+        "fim": "2027-05-22"
+      },
+      "planoPagamento": {
+        "@type": "feq:PlanoPagamento",
+        "taxaInscricao": "22.00",
+        "numParcelas": 4,
+        "valorParcela": "949.94",
+        "aVista": "3799.74"
+      },
+      "alertaCatalogo": "Sem turma aberta na Extecamp — LP em modo lista de espera até reabrir.",
+      "objetivo": "Qualificar profissionais na análise de eficiência energética em processos de manufatura e sistemas de utilidades industriais, aprendendo novas técnicas para identificar e priorizar oportunidades de redução de consumo de energia na indústria.",
+      "conteudoProgramatico": "(1) Conceito de utilidades na indústria; (2) Modelo operacional para aumento da eficiência energética; (3) Objetivos estratégicos e desdobramentos; (4) Classes de consumidores de energia na indústria; (5) Métricas de eficiência energética; (6) Metodologia para identificar oportunidades de redução de consumo; (7) Ferramentas para priorização de oportunidades; (8) Fundamentos de engenharia aplicados à eficiência energética; (9) Oportunidades de eficiência em sistemas de bombeamento, ventilação/ar condicionado, geração de vapor, refrigeração de processo, ar comprimido, acionamento elétrico e estufas de secagem.",
+      "insightVenda": "Base mal calibrada; precisa testes de público.",
+      "wasDerivedFrom": "feq:fonteNotion",
+      "cargaHoraria": {
+        "@type": "feq:Duracao",
+        "horas": 60
+      },
+      "professoresAdicionais": [
+        "Eduardo Perez"
+      ],
+      "descontos": "Alunos e ex-alunos Unicamp/Extecamp têm 10% de desconto.",
+      "plataformaAula": "Google Classroom",
+      "empresasJson": "[\"EMS\", \"Solvay\", \"3M\", \"Petrobras\", \"Eaton\", \"Buckman\", \"Boehringer\", \"Braskem\"]",
+      "avaliacaoTexto": "100% online, aulas gravadas. Frequência atestada por atividades; turmas reduzidas.",
+      "objetivosJson": "[{\"t\": \"Tornar profissionais diferenciados\", \"d\": \"Qualificar profissionais na análise de eficiência energética em processos de manufatura e sistemas de utilidades industriais.\"}, {\"t\": \"Formação otimizada\", \"d\": \"Integração de fundamentos e prática sob um modelo otimizado de ensino a distância.\"}]",
+      "depoimentosJson": "[{\"nome\": \"Vitor Carvalho Rollasenna\", \"cargo\": \"Usiminas — Ipatinga\", \"texto\": \"O conteúdo foi muito bem estruturado. A didática do professor merece destaque.\"}, {\"nome\": \"Alice Souza\", \"cargo\": \"Engenheira de Processos Jr. — Yara Fertilizantes\", \"texto\": \"Extremamente proveitoso e enriquecedor, com muitos exemplos práticos.\"}, {\"nome\": \"José Lévican Asenjo\", \"cargo\": \"Technical Project Manager — Ndustrial IO\", \"texto\": \"Excelente organização do curso e qualidade do material utilizado.\"}, {\"nome\": \"Vinícius Ribeiro Alves\", \"cargo\": \"Supervisor Comercial\", \"texto\": \"A estrutura do curso é simplesmente exemplar. A abordagem é incrivelmente envolvente.\"}]",
+      "programaDetalheJson": "[{\"t\": \"Conceito de utilidades na indústria\", \"s\": []}, {\"t\": \"Modelo operacional para aumento da eficiência energética\", \"s\": []}, {\"t\": \"Objetivos estratégicos e desdobramentos\", \"s\": []}, {\"t\": \"Classes de consumidores de energia na indústria\", \"s\": []}, {\"t\": \"Métricas de eficiência energética\", \"s\": []}, {\"t\": \"Metodologia para identificar oportunidades de redução de consumo\", \"s\": []}, {\"t\": \"Ferramentas para priorização de oportunidades\", \"s\": []}, {\"t\": \"Fundamentos de engenharia aplicados à eficiência energética\", \"s\": []}, {\"t\": \"Oportunidades de eficiência por sistema\", \"s\": [\"Bombeamento\", \"Ventilação e ar-condicionado\", \"Geração de vapor\", \"Refrigeração de processo\", \"Ar comprimido\", \"Acionamento elétrico\", \"Estufas de secagem\"]}]"
+    },
+    {
+      "@id": "feq:FEQ-0333",
+      "@type": "feq:Extensao",
+      "codigo": "FEQ-0333",
+      "nome": "CCUS — Carbon Capture, Utilization and Storage; Module 1: Introduction",
+      "modalidade": "Semipresencial — 1º encontro presencial (FEQ, Campinas/SP); demais sábados online",
+      "horarioAula": "1º sábado presencial 8h-16h; demais sábados (online) 8h-12h",
+      "formatoAulasResumo": "Presencial no 1º encontro + online ao vivo",
+      "formatoAulasDetalhe": "Primeiro encontro presencial (FEQ, Campinas/SP); demais encontros online ao vivo aos sábados, das 8h às 12h.",
+      "professorResponsavel": "Luis Fernando Mercier Franco",
+      "professoresAdicionais": [
+        "Gustavo Doubek",
+        "Sallie Elizabeth Greenberg"
+      ],
+      "certificacao": "Certificado",
+      "publicoAlvo": "Qualquer área de formação; setores industrial e acadêmico, agências reguladoras; participantes nacionais e internacionais.",
+      "requisito": {
+        "@type": "feq:RequisitoAcademico",
+        "nivelMinimo": "feq:superiorCompleto"
+      },
+      "cargaHoraria": {
+        "@type": "feq:Duracao",
+        "horas": 40,
+        "label": "40h (8h presenciais + 32h EAD)"
+      },
+      "vagasMin": 25,
+      "vagasMax": 60,
+      "janelaInscricao": {
+        "@type": "feq:JanelaTemporal",
+        "inicio": "2025-12-03",
+        "fim": "2026-07-19"
+      },
+      "janelaOferecimento": {
+        "@type": "feq:JanelaTemporal",
+        "inicio": "2026-08-01",
+        "fim": "2026-12-19"
+      },
+      "planoPagamento": {
+        "@type": "feq:PlanoPagamento",
+        "taxaInscricao": "22.00",
+        "numParcelas": 3,
+        "valorParcela": "1000.12",
+        "aVista": "3000.37"
+      },
+      "urlExtecamp": "https://ins.extecamp.unicamp.br/curso/inscricao/FEQ-0333/001",
+      "objetivo": "Compreender captura, utilização e armazenamento de carbono (CCUS) e seu papel na mitigação climática e na descarbonização: dominar a cadeia de valor (captura-transporte-utilização-armazenamento de CO₂), tecnologias de captura e aplicações comerciais, o cenário global e brasileiro, e políticas públicas/mercados de carbono. Desenvolve pensamento crítico sobre o tema. Ministrado EM INGLÊS.",
+      "conteudoProgramatico": "8 módulos: (1) Mudanças Climáticas e o Papel do CCUS — Acordo de Paris, metas net-zero, por que reduzir emissões não basta; (2) O que é CCUS? — definição, CCS vs CCUS, história da tecnologia; (3) A Cadeia de Valor do CCUS — captura de CO₂ (fontes e tecnologias), transporte (modais e infraestrutura, realidade brasileira), utilização (aplicações comerciais e pesquisas) e armazenamento (geológico, mineralização; potencial do Brasil); (4) Panorama Global do CCUS — projetos em operação/desenvolvimento, países líderes, hubs; (5) Desafios Técnicos do CCUS — principais barreiras no Brasil; (6) CCUS no Brasil — perfil de emissões, prioridades de descarbonização, licenciamento e percepção pública; (7) Desafios e Oportunidades — barreiras técnicas, econômicas, regulatórias e sociais, e oportunidades de inovação e investimento; (8) CCUS e Políticas Públicas — incentivos internacionais, créditos de carbono, mercados voluntários.",
+      "insightVenda": "Aulas ministradas EM INGLÊS. São módulos (Module 1), não curso pela metade. Primeiro oferecimento. Início 01/08/2026 (1º encontro presencial na FEQ, Campinas), término 19/12/2026.",
+      "wasDerivedFrom": "feq:fonteNotion",
+      "salarioRef": "R$ 12.500,00 — referência de mercado para especialistas em CCUS",
+      "empresasJson": "[\"EMS\", \"Solvay\", \"3M\", \"Petrobras\", \"Eaton\", \"Buckman\", \"Boehringer\", \"Braskem\"]",
+      "avaliacaoTexto": "Frequência atestada pela entrega de atividades.",
+      "objetivosJson": "[{\"t\": \"Fundamentos de CCUS\", \"d\": \"Apresentar os conceitos fundamentais sobre captura, utilização e armazenamento de carbono, sua relevância para a mitigação das mudanças climáticas e seu papel nas estratégias de descarbonização.\"}, {\"t\": \"Pensamento crítico\", \"d\": \"Desenvolver habilidades e pensamento crítico sobre as principais tecnologias, o cenário global e brasileiro, e as políticas públicas e mercados de carbono.\"}]",
+      "habilidadesJson": "[\"Mudanças climáticas e metas net-zero\", \"Cadeia de valor do CCUS (captura, transporte, utilização, armazenamento)\", \"Tecnologias de captura e aplicações comerciais\", \"Panorama global de projetos e hubs\", \"Desafios técnicos, econômicos e regulatórios\", \"Oportunidades de inovação e investimento\", \"Políticas públicas, incentivos e mercados de carbono\", \"CCUS no contexto brasileiro\"]",
+      "programaDetalheJson": "[{\"t\": \"Mudanças Climáticas e o Papel do CCUS\", \"s\": [\"Crise climática e metas do Acordo de Paris\", \"Por que só reduzir emissões não basta\", \"CCUS nas trajetórias de neutralidade de carbono (net-zero)\"]}, {\"t\": \"O que é CCUS?\", \"s\": [\"Definição e escopo\", \"Diferença entre CCS e CCUS\", \"História e evolução da tecnologia\"]}, {\"t\": \"A Cadeia de Valor do CCUS\", \"s\": [\"Captura de CO₂: fontes e tecnologias\", \"Transporte: modais, infraestrutura e a malha brasileira\", \"Utilização: aplicações comerciais e pesquisas\", \"Armazenamento: geológico, mineralização e potencial do Brasil\"]}, {\"t\": \"Panorama Global do CCUS\", \"s\": [\"Projetos em operação e em desenvolvimento\", \"Países líderes e setores envolvidos\", \"Iniciativas multilaterais e hubs\"]}, {\"t\": \"Desafios Técnicos do CCUS\", \"s\": [\"Principais barreiras técnicas para a adoção no Brasil\"]}, {\"t\": \"CCUS no Brasil\", \"s\": [\"Perfil de emissões e prioridades de descarbonização\", \"Percepção pública e licenciamento\", \"Papel do sistema nacional de inovação\"]}, {\"t\": \"Desafios e Oportunidades\", \"s\": [\"Barreiras técnicas, econômicas, regulatórias e sociais\", \"Oportunidades de inovação e investimento\", \"CCUS como indutor do desenvolvimento sustentável\", \"Desigualdades regionais\"]}, {\"t\": \"CCUS e Políticas Públicas\", \"s\": [\"Políticas e incentivos internacionais\", \"Créditos tributários, mercados voluntários e regulamentações\"]}]"
+    },
+    {
+      "@id": "feq:FEQ-0580",
+      "@type": "feq:Extensao",
+      "codigo": "FEQ-0580",
+      "nome": "Dominando a Tomada de Decisão: Otimização e Simulação de Processos Industriais com Python",
+      "modalidade": "A distância (Online)",
+      "horarioAula": "sábados 8h30-12h30",
+      "formatoAulasResumo": "Aulas gravadas + laboratório ao vivo",
+      "formatoAulasDetalhe": "Aulas teóricas gravadas e laboratórios práticos ao vivo aos sábados, das 8h30 às 12h30.",
+      "professorResponsavel": "Flavio Vasconcelos da Silva",
+      "professoresAdicionais": [
+        "Claudio Vieira Neto"
+      ],
+      "requisito": {
+        "@type": "feq:RequisitoAcademico",
+        "nivelMinimo": "feq:superiorCompleto"
+      },
+      "cargaHoraria": {
+        "@type": "feq:Duracao",
+        "horas": 166
+      },
+      "vagasMin": 20,
+      "vagasMax": 60,
+      "janelaInscricao": {
+        "@type": "feq:JanelaTemporal",
+        "inicio": "2025-03-19",
+        "fim": "2027-02-21"
+      },
+      "janelaOferecimento": {
+        "@type": "feq:JanelaTemporal",
+        "inicio": "2027-03-20",
+        "fim": "2028-07-29"
+      },
+      "planoPagamento": {
+        "@type": "feq:PlanoPagamento",
+        "taxaInscricao": "22.00",
+        "numParcelas": 13,
+        "valorParcela": "733.34",
+        "aVista": "9533.46"
+      },
+      "urlExtecamp": "https://ins.extecamp.unicamp.br/curso/inscricao/FEQ-0580/001",
+      "objetivo": "Jornada completa: dos fundamentos de programação em Python (bibliotecas, lógica, manipulação de dados) às técnicas avançadas de otimização e simulação — pesquisa operacional, solvers, otimização por força bruta e algoritmos genéticos, programação por restrições, simulação de Monte Carlo e de eventos discretos/processos contínuos — culminando em um projeto final aplicado. Curso mão-na-massa: Python aplicado à tomada de decisão em processos industriais.",
+      "conteudoProgramatico": "17 módulos obrigatórios: (1) Introdução à Programação com Python; (2) Introdução à Pesquisa Operacional; (3) Laboratório ao Vivo I; (4) Introdução à Simulação; (5) Técnicas de Simulação Aplicadas; (6) Laboratório ao Vivo II; (7) Programação Linear; (8) Programação Linear Inteira Mista; (9) Laboratório ao Vivo III; (10) Programação Não Linear; (11) Programação Não Linear Inteira Mista; (12) Programação por Restrições; (13) Laboratório ao Vivo IV; (14) Técnicas de IA aplicadas à Otimização e Apoio à Decisão; (15) Laboratório ao Vivo V; (16) Introdução à Pesquisa Científica; (17) Projeto Final de Curso.",
+      "insightVenda": "Curso extremamente prático/mão na massa (Python aplicado a otimização e simulação de processos industriais). Entrave costuma ser clareza, não preço; leads pedem o conteúdo programático.",
+      "wasDerivedFrom": "feq:fonteNotion",
+      "avaliacaoTexto": "Jornada mão na massa com laboratórios ao vivo intercalados aos módulos e projeto final de curso aplicado ao término.",
+      "empresasJson": "[\"EMS\", \"Solvay\", \"3M\", \"Petrobras\", \"Eaton\", \"Buckman\", \"Boehringer Ingelheim\", \"Braskem\"]",
+      "objetivosJson": "[{\"t\": \"Do zero ao avançado em Python\", \"d\": \"Jornada completa desde fundamentos de programação (bibliotecas, lógica, manipulação de dados) até técnicas avançadas de otimização e simulação.\"}, {\"t\": \"Decisão baseada em modelos\", \"d\": \"Pesquisa operacional, solvers e frameworks de modelagem; programação linear e não linear, algoritmos genéticos, constraint programming, Monte Carlo e simulação de eventos discretos — culminando em projeto aplicado.\"}]",
+      "habilidadesJson": "[\"Programação em Python aplicada\", \"Pesquisa operacional e complexidade de algoritmos\", \"Programação linear e inteira mista\", \"Programação não linear\", \"Constraint programming\", \"Simulação de Monte Carlo e eventos discretos\", \"IA aplicada à otimização e apoio à decisão\"]"
+    },
+    {
+      "@id": "feq:FEQ-0331",
+      "@type": "feq:Extensao",
+      "codigo": "FEQ-0331",
+      "nome": "Análise Quantitativa de Riscos combinada à Fluidodinâmica Computacional e Aprendizagem de Máquina",
+      "modalidade": "A distância (Online — Google Meet + Classroom)",
+      "horarioAula": "sextas-feiras 8h-12h",
+      "professorResponsavel": "Savio Souza Venancio Vianna",
+      "certificacao": "Certificado",
+      "publicoAlvo": "Profissionais de segurança, engenheiros, analistas de risco.",
+      "requisito": {
+        "@type": "feq:RequisitoAcademico",
+        "nivelMinimo": "feq:superiorCompleto"
+      },
+      "cargaHoraria": {
+        "@type": "feq:Duracao",
+        "horas": 60
+      },
+      "vagasMin": 15,
+      "vagasMax": 60,
+      "janelaInscricao": {
+        "@type": "feq:JanelaTemporal",
+        "inicio": "2026-05-15",
+        "fim": "2026-08-15"
+      },
+      "janelaOferecimento": {
+        "@type": "feq:JanelaTemporal",
+        "inicio": "2026-09-04",
+        "fim": "2026-12-18"
+      },
+      "planoPagamento": {
+        "@type": "feq:PlanoPagamento",
+        "taxaInscricao": "22.00",
+        "numParcelas": 5,
+        "valorParcela": "1163.19",
+        "aVista": "5815.95"
+      },
+      "urlExtecamp": "https://ins.extecamp.unicamp.br/curso/inscricao/FEQ-0331/004",
+      "objetivo": "Capacitar profissionais da indústria de processos a identificar, analisar e calcular riscos com técnicas quantitativas avançadas, integrando Análise Quantitativa de Riscos (AQR) com Fluidodinâmica Computacional (CFD) e Aprendizado de Máquina, em aulas online ao vivo.",
+      "conteudoProgramatico": "(1) Ferramentas Quantitativas e Qualitativas (modelagem, simulação de Monte Carlo, cenários acidentais); (2) Aplicação Prática (estudos de caso e projetos reais); (3) Tomada de Decisão Baseada em Riscos (estratégias de mitigação); (4) Tecnologia em AQR (software especializado e dados); (5) Comunicação de Riscos (relatórios e recomendações); (6) Desenvolvimento Contínuo em AQR (tendências emergentes); (7) CFD e Machine Learning aplicados à análise de risco. 60 horas-aula em 4 meses. Professor: Sávio Vianna.",
+      "insightVenda": "Dados insuficientes / sem campanhas recentes.",
+      "wasDerivedFrom": "feq:fonteNotion",
+      "descontos": "Alunos e ex-alunos Unicamp/Extecamp têm 10% de desconto.",
+      "plataformaAula": "Google Classroom",
+      "professoresAdicionais": [],
+      "empresasJson": "[\"EMS\", \"Solvay\", \"3M\", \"Petrobras\", \"Eaton\", \"Buckman\", \"Boehringer\", \"Braskem\"]",
+      "avaliacaoTexto": "100% online, todas as aulas gravadas. Turmas de no máximo 60 alunos; frequência atestada por atividades, sem presença ao vivo obrigatória.",
+      "objetivosJson": "[{\"t\": \"Formar profissionais diferenciados\", \"d\": \"Capacitação de profissionais da indústria de processos para identificar, analisar e calcular riscos com técnicas quantitativas avançadas.\"}, {\"t\": \"Formação otimizada\", \"d\": \"Aulas online ao vivo com conteúdos práticos e aprofundados, preparando o aluno para os maiores desafios do mercado.\"}]",
+      "habilidadesJson": "[\"Identificar e analisar riscos em diversos contextos\", \"Cálculo de riscos com técnicas quantitativas\", \"Modelagem e simulação de Monte Carlo\", \"Tomada de decisão baseada em riscos\", \"Estratégias de mitigação de riscos\", \"Comunicação de riscos para stakeholders\", \"Software especializado em AQR\", \"Fluidodinâmica computacional (CFD)\", \"Aprendizado de máquina em análise de risco\", \"Programação Python\"]",
+      "depoimentosJson": "[{\"nome\": \"Luiz Octavio\", \"cargo\": \"Engenheiro — Petrobras\", \"texto\": \"O mercado demanda cada vez mais que os engenheiros desenvolvam soluções de ciência de dados e IA. Em poucas aulas, já iniciei a aplicação dos conhecimentos no meu trabalho. O curso é totalmente hands on e imperdível para quem quer aprender Python, análise de dados e IA para a indústria de processos.\", \"foto\": \"https://cursos-extensao.feq.unicamp.br/wp-content/uploads/2024/02/luiz.png\"}, {\"nome\": \"Juliana Panizza\", \"cargo\": \"Analista de Projetos Pleno\", \"texto\": \"Durante o emprego como técnica, fiz o curso da Extensão FEQ. Dois meses depois consegui um emprego como analista de projetos! Sinto que minha carreira de fato começou agora.\", \"foto\": \"https://cursos-extensao.feq.unicamp.br/wp-content/uploads/2024/02/juliana.png\"}]",
+      "programaDetalheJson": "[{\"t\": \"Ferramentas Quantitativas e Qualitativas\", \"s\": [\"Modelagem\", \"Simulação de Monte Carlo\", \"Modelagem de cenários acidentais\"]}, {\"t\": \"Aplicação Prática\", \"s\": [\"Estudos de caso\", \"Projetos com situações reais\"]}, {\"t\": \"Tomada de Decisão Baseada em Riscos\", \"s\": [\"Trade-offs entre risco e retorno\", \"Estratégias de mitigação eficazes\"]}, {\"t\": \"Tecnologia em AQR\", \"s\": [\"Software especializado\", \"Papel dos dados na modelagem de riscos\"]}, {\"t\": \"Comunicação de Riscos\", \"s\": [\"Relatórios\", \"Apresentação de recomendações a stakeholders\"]}, {\"t\": \"Desenvolvimento Contínuo\", \"s\": [\"Tendências emergentes\", \"Abordagem proativa à educação em riscos\"]}, {\"t\": \"CFD e Machine Learning\", \"s\": [\"Fluidodinâmica computacional aplicada\", \"Aprendizado de máquina em análise de risco\"]}]",
+      "promocao": {
+        "@type": "feq:Promocao",
+        "rotulo": "Campanha de Agosto 2026",
+        "janela": {
+          "@type": "feq:JanelaTemporal",
+          "inicio": "2026-08-06",
+          "fim": "2026-08-15"
+        },
+        "ofertas": [
+          {
+            "@type": "feq:Oferta",
+            "rotulo": "10% de desconto + parcelamento em 6x",
+            "condicao": "promoção de agosto, válida para novas inscrições",
+            "percentualDesconto": 10,
+            "numParcelas": 6,
+            "valorParcela": "872.39",
+            "aVista": "5234.36"
+          }
+        ],
+        "comoAplicar": "O formulário de inscrição da Extecamp mostra o valor CHEIO — o desconto da campanha não aparece lá. Ele é aplicado depois, direto nos boletos das mensalidades: conclua a inscrição normalmente e nos avise aqui pelo WhatsApp, que o valor com desconto entra no termo de compromisso."
+      }
+    },
+    {
+      "@id": "feq:FEQ-0655",
+      "@type": "feq:Extensao",
+      "codigo": "FEQ-0655",
+      "nome": "Excelência e Sustentabilidade na Gestão de Condomínios",
+      "modalidade": "A distância (Online)",
+      "horarioAula": "terças e quintas 19h30-22h30",
+      "professorResponsavel": "Dirceu Noriler",
+      "requisito": {
+        "@type": "feq:RequisitoAcademico",
+        "nivelMinimo": "feq:superiorCompleto"
+      },
+      "cargaHoraria": {
+        "@type": "feq:Duracao",
+        "horas": 300
+      },
+      "vagasMin": 25,
+      "vagasMax": 75,
+      "janelaInscricao": {
+        "@type": "feq:JanelaTemporal",
+        "inicio": "2025-11-06",
+        "fim": "2026-05-10"
+      },
+      "janelaOferecimento": {
+        "@type": "feq:JanelaTemporal",
+        "inicio": "2026-06-09",
+        "fim": "2027-07-29"
+      },
+      "planoPagamento": {
+        "@type": "feq:PlanoPagamento",
+        "taxaInscricao": "65.00",
+        "numParcelas": 15,
+        "valorParcela": "905.07",
+        "aVista": "13576.09"
+      },
+      "urlExtecamp": "https://ins.extecamp.unicamp.br/curso/dados/FEQ-0655/001",
+      "objetivo": "Capacitar profissionais para a administração condominial com excelência e sustentabilidade, desenvolvendo gestão administrativa, legislação, planejamento financeiro, gestão de contratos, manutenção predial, gestão de pessoas e práticas de sustentabilidade social e ambiental.",
+      "conteudoProgramatico": "Disciplinas: (1) A Constituição dos Condomínios; (2) Normas e Diretrizes de um Condomínio; (3) Estratégias Excelentes da Gestão de Condomínios; (4) Sustentabilidade Social na Gestão de Condomínios; (5) Sustentabilidade Ambiental; (6) Legislação I; (7) Legislação II; (8) Estratégias Financeiras e Contábeis; (9) Excelência da Manutenção; (10) Excelência do Atendimento a Pessoas; (11) Excelência de Fornecedores e Contratos; (12) Gestão de Projetos com Excelência; (13) Projeto Final de Aplicação.",
+      "insightVenda": "Gargalo: muitos não têm diploma e não conseguem se inscrever. Qualificar diploma CEDO.",
+      "wasDerivedFrom": "feq:fonteNotion"
+    },
+    {
+      "@id": "feq:FEQ-0299",
+      "@type": "feq:Extensao",
+      "codigo": "FEQ-0299",
+      "nome": "Introdução à Ciência dos Materiais",
+      "modalidade": "A distância (Online)",
+      "horarioAula": "sem horário fixo — assista quando quiser",
+      "formatoAulasResumo": "Aulas assíncronas (gravadas)",
+      "formatoAulasDetalhe": "Aulas gravadas, disponíveis para assistir no seu próprio ritmo, com atividades assíncronas.",
+      "professorResponsavel": "Ronierik Pioli Vieira",
+      "requisito": {
+        "@type": "feq:RequisitoAcademico",
+        "nivelMinimo": "feq:medio"
+      },
+      "cargaHoraria": {
+        "@type": "feq:Duracao",
+        "horas": 10,
+        "label": "10h (6h teóricas + 4h práticas)"
+      },
+      "janelaInscricao": {
+        "@type": "feq:JanelaTemporal",
+        "inicio": "2026-06-08",
+        "fim": "2026-08-07"
+      },
+      "planoPagamento": {
+        "@type": "feq:PlanoPagamento",
+        "taxaInscricao": "24.00",
+        "numParcelas": 6,
+        "valorParcela": "158.53",
+        "aVista": "951.19"
+      },
+      "urlExtecamp": "https://ins.extecamp.unicamp.br/curso/inscricao/FEQ-0299/001",
+      "plataformaAula": "Google Classroom",
+      "salarioRef": "R$ 9.500,00 — referência para técnicos e engenheiros júnior em análise de materiais",
+      "objetivo": "Apresentar os fundamentos da Ciência dos Materiais, com foco nas estruturas atômicas e cristalinas e na organização estrutural de metais, cerâmicas e polímeros, desenvolvendo a compreensão das relações entre estrutura e propriedades dos materiais.",
+      "objetivosJson": "[{\"t\": \"Fundamentos da Ciência dos Materiais\", \"d\": \"Estruturas atômicas e cristalinas e a organização estrutural de metais, cerâmicas e polímeros.\"}, {\"t\": \"Estrutura × propriedades\", \"d\": \"Compreender as relações entre a estrutura e as propriedades dos materiais.\"}]",
+      "habilidadesJson": "[\"Estrutura atômica, ligações químicas e organização periódica\", \"Estruturas cristalinas em metais e cerâmicas (CCC, CFC, HC) e celas unitárias\", \"Empacotamento atômico e defeitos estruturais\", \"Software educacional CrystalWalk para análise de cristalinidade\", \"Lei de Bragg e espectros de difração de raios X\", \"Estrutura e classificação dos polímeros\", \"Microscopia aplicada à Ciência dos Materiais\", \"Relação estrutura-propriedades de metais, cerâmicas e polímeros\"]",
+      "empresasJson": "[\"EMS\", \"Solvay\", \"3M\", \"Petrobras\", \"Eaton\", \"Buckman\", \"Boehringer\", \"Braskem\"]",
+      "avaliacaoTexto": "Curso 100% a distância, com aulas gravadas (assíncronas) e atividades práticas aplicadas.",
+      "programaDetalheJson": "[{\"t\": \"Fundamentos da Estrutura dos Materiais\", \"s\": [\"Estrutura atômica e organização dos elementos\", \"Ligações químicas e influência nas propriedades\", \"Organização periódica dos elementos\"]}, {\"t\": \"Estruturas Cristalinas em Metais\", \"s\": [\"CCC, CFC e HC\", \"Celas unitárias e empacotamento atômico\", \"Defeitos estruturais em metais\"]}, {\"t\": \"Estruturas Cristalinas em Cerâmicas\", \"s\": [\"Organização cristalina e empacotamento\", \"Defeitos em cerâmicas\", \"Software educacional CrystalWalk\"]}, {\"t\": \"Análise da Cristalinidade das Estruturas\", \"s\": [\"Interpretação da Lei de Bragg\", \"Análise da cristalinidade em metais e cerâmicas\"]}, {\"t\": \"Introdução aos Polímeros\", \"s\": [\"Estrutura e classificação dos polímeros\", \"Estrutura molecular × propriedades\"]}, {\"t\": \"Atividades Práticas e Aplicadas\", \"s\": [\"Análise de imagens de microscopia\", \"Interpretação de espectros de difração\", \"Vídeos demonstrativos e exercícios\"]}]",
+      "insightVenda": "Curso curto e introdutório; requisito só ensino médio. Bom porta de entrada.",
+      "wasDerivedFrom": "feq:fonteNotion",
+      "janelaOferecimento": {
+        "@type": "feq:JanelaTemporal",
+        "inicio": "2026-08-24",
+        "fim": "2026-08-28"
+      }
+    },
+    {
+      "@id": "feq:FEQ-0670",
+      "@type": "feq:Extensao",
+      "codigo": "FEQ-0670",
+      "nome": "Simulação Molecular: Princípios e Prática",
+      "modalidade": "A distância (Online)",
+      "horarioAula": "segundas, terças e quintas, das 16h às 20h",
+      "formatoAulasResumo": "Segundas, terças e quintas, 16h às 20h",
+      "formatoAulasDetalhe": "Aulas online ao vivo, com laboratórios práticos de simulação.",
+      "professorResponsavel": "Luis Fernando Mercier Franco",
+      "professoresAdicionais": [
+        "André de Freitas Gonçalves",
+        "Luiz Guilherme Lomônaco",
+        "Nikolas Ferreira de Souza",
+        "Emerson Parazzi Lyra",
+        "Nathan Barros de Souza"
+      ],
+      "requisito": {
+        "@type": "feq:RequisitoAcademico",
+        "nivelMinimo": "feq:medio"
+      },
+      "cargaHoraria": {
+        "@type": "feq:Duracao",
+        "horas": 120
+      },
+      "janelaInscricao": {
+        "@type": "feq:JanelaTemporal",
+        "inicio": "2026-04-20",
+        "fim": "2027-01-01"
+      },
+      "planoPagamento": {
+        "@type": "feq:PlanoPagamento",
+        "taxaInscricao": "24.00",
+        "numParcelas": 3,
+        "valorParcela": "599.39",
+        "aVista": "1798.18"
+      },
+      "urlExtecamp": "https://ins.extecamp.unicamp.br/curso/inscricao/FEQ-0670/001",
+      "salarioRef": "R$ 6.000,00 — referência para engenheiros e pesquisadores em simulação computacional e modelagem molecular",
+      "objetivo": "Dominar os conceitos básicos de simulação molecular clássica e aplicá-los ao cálculo de propriedades termofísicas, com ferramentas como GROMACS, LAMMPS e RASPA e automação em Python.",
+      "objetivosJson": "[{\"t\": \"Dominar a simulação molecular clássica\", \"d\": \"Conceitos fundamentais e mecânica estatística aplicada.\"}, {\"t\": \"Calcular propriedades termofísicas\", \"d\": \"Aplicar simulação molecular ao cálculo de propriedades para uso industrial.\"}]",
+      "habilidadesJson": "[\"Fundamentos de simulação molecular clássica\", \"Dinâmica molecular no GROMACS\", \"Simulação de sistemas complexos com LAMMPS\", \"Adsorção e materiais porosos com RASPA\", \"Automação de pré e pós-processamento em Python\", \"Desenvolvimento de campos de força com cálculos quânticos e IA\", \"Cálculo de propriedades termofísicas\", \"Interpretação e validação de resultados para a indústria\"]",
+      "empresasJson": "[\"EMS\", \"Solvay\", \"3M\", \"Petrobras\", \"Eaton\", \"Buckman\", \"Boehringer Ingelheim\", \"Braskem\"]",
+      "avaliacaoTexto": "Curso 100% online com laboratórios práticos de simulação e projeto aplicado.",
+      "programaDetalheJson": "[{\"t\": \"Introdução à Simulação Molecular\", \"s\": []}, {\"t\": \"GROMACS\", \"s\": []}, {\"t\": \"LAMMPS\", \"s\": []}, {\"t\": \"RASPA\", \"s\": []}, {\"t\": \"Python para Pré e Pós-processamento\", \"s\": []}, {\"t\": \"Desenvolvimento de Campos de Força (Quântica) + IA\", \"s\": []}]",
+      "insightVenda": "Nicho técnico avançado; público de pesquisa e P&D. Requisito só ensino médio.",
+      "wasDerivedFrom": "feq:fonteNotion",
+      "janelaOferecimento": {
+        "@type": "feq:JanelaTemporal",
+        "inicio": "2027-02-01",
+        "fim": "2027-06-01"
+      }
+    },
+    {
+      "@id": "feq:politicaForaDoPrazo",
+      "@type": "feq:Politica",
+      "rotulo": "Inscrição fora do prazo",
+      "texto": "Quando o prazo de inscrição já venceu mas o curso ainda NÃO começou, costumam sobrar vagas remanescentes e a coordenação consegue gerar um link de inscrição fora do prazo. O link é individual: é gerado a partir do e-mail do interessado e vale 24 horas."
+    },
+    {
+      "@id": "feq:FEQ-0295",
+      "@type": "feq:Extensao",
+      "codigo": "FEQ-0295",
+      "nome": "Gradação Composicional para Simulação de Reservatórios",
+      "modalidade": "A distância (Online)",
+      "horarioAula": "sábados 8h às 15h",
+      "formatoAulasResumo": "Aulas gravadas e discussões online",
+      "formatoAulasDetalhe": "Curso 100% a distância, com aulas gravadas e discussões online aos sábados, das 8h às 15h.",
+      "professorResponsavel": "Luis Fernando Mercier Franco",
+      "professoresAdicionais": [
+        "Rogério Oliveira Espósito"
+      ],
+      "requisito": {
+        "@type": "feq:RequisitoAcademico",
+        "nivelMinimo": "feq:medio"
+      },
+      "cargaHoraria": {
+        "@type": "feq:Duracao",
+        "horas": 80
+      },
+      "vagasMin": 20,
+      "vagasMax": 60,
+      "janelaInscricao": {
+        "@type": "feq:JanelaTemporal",
+        "inicio": "2026-09-01",
+        "fim": "2027-02-01"
+      },
+      "janelaOferecimento": {
+        "@type": "feq:JanelaTemporal",
+        "inicio": "2027-03-01",
+        "fim": "2027-06-01"
+      },
+      "dataBoleto": "2027-02-03",
+      "planoPagamento": {
+        "@type": "feq:PlanoPagamento",
+        "taxaInscricao": "24.00",
+        "numParcelas": 4,
+        "valorParcela": "752.91",
+        "aVista": "3011.64"
+      },
+      "objetivo": "Dar acesso aos fundamentos e aplicações da gradação composicional aplicada à simulação de reservatórios.",
+      "publicoAlvo": "Graduados no Ensino Superior ou estudantes de graduação em Engenharia Química e áreas correlatas.",
+      "conteudoProgramatico": "(1) FEQ-0296 - Introdução à Modelagem Termodinâmica de Fluidos de Reservatório (40h, obrigatória); (2) FEQ-0297 - Gradação Composicional (40h, obrigatória).",
+      "avaliacaoTexto": "Nota mínima de 7 (sete) e frequência mínima de 75%.",
+      "urlExtecamp": "https://ins.extecamp.unicamp.br/curso/inscricao/FEQ-0295/001",
+      "empresasJson": "[\"EMS\", \"Solvay\", \"3M\", \"Petrobras\", \"Eaton\", \"Buckman\", \"Boehringer\", \"Braskem\"]",
+      "fichaInscricao": "basica",
+      "captacaoAntecipada": "true"
+    },
+    {
+      "@id": "feq:FEQ-1150",
+      "@type": "feq:Difusao",
+      "codigo": "FEQ-1150",
+      "nome": "Processos sob Controle: do PID ao MPC",
+      "modalidade": "A distância (Online)",
+      "horarioAula": "Livre, conforme disponibilidade do aluno",
+      "formatoAulasResumo": "Horário livre, no seu ritmo",
+      "formatoAulasDetalhe": "Curso 100% a distância, com horário livre, conforme a disponibilidade do aluno. Realizado no Google Classroom e na FEQ Academia.",
+      "professorResponsavel": "Flavio Vasconcelos da Silva",
+      "requisito": {
+        "@type": "feq:RequisitoAcademico",
+        "nivelMinimo": "feq:nenhum"
+      },
+      "cargaHoraria": {
+        "@type": "feq:Duracao",
+        "horas": 108
+      },
+      "janelaInscricao": {
+        "@type": "feq:JanelaTemporal",
+        "inicio": "2026-07-16",
+        "fim": "2031-07-01"
+      },
+      "janelaOferecimento": {
+        "@type": "feq:JanelaTemporal",
+        "inicio": "2026-10-02",
+        "fim": "2031-10-06"
+      },
+      "planoPagamento": {
+        "@type": "feq:PlanoPagamento",
+        "taxaInscricao": "24.00",
+        "numParcelas": 1,
+        "valorParcela": "499.16",
+        "aVista": "499.16"
+      },
+      "objetivo": "A proposta central é apresentar o controle de processos como uma competência estratégica para engenheiros que desejam transformar dados, modelos e instrumentação em estabilidade operacional, eficiência industrial e decisões automatizadas de maior qualidade.",
+      "publicoAlvo": "Engenheiros de processos, engenheiros químicos, de alimentos, mecânicos, mecatrônicos, engenheiros de automação, instrumentistas, analistas de processo e profissionais de áreas afins.",
+      "certificacao": "Declaração de frequência emitida pela Unicamp através da Extecamp (Escola de Extensão).",
+      "conteudoProgramatico": "(1) Fundamentos e aplicações de controle de processos industriais; (2) Importância do controle para estabilidade operacional, segurança, qualidade, produtividade, eficiência energética e sustentabilidade; (3) Sistemas dinâmicos em malha aberta e malha fechada; (4) Modelagem matemática de processos por balanços fenomenológicos e modelos empíricos; (5) Linearização, transformada de Laplace, funções de transferência e diagramas de blocos; (6) Análise de resposta transitória e estacionária; (7) Identificação de processos e obtenção de modelos dinâmicos; (8) Projeto, análise e sintonia de malhas de controle por realimentação; (9) Controladores P, PI, PD e PID; (10) Estabilidade, robustez e desempenho de sistemas de controle; (11) Estratégias avançadas de controle, incluindo cascata, antecipativo, razão, seletor e controle multivariável; (12) Introdução ao controle preditivo baseado em modelo e à otimização em tempo real; (13) Estudos de caso e projeto integrador aplicado a processos industriais.",
+      "urlExtecamp": "https://ins.extecamp.unicamp.br/curso/inscricao/FEQ-1150/001",
+      "plataformaAula": "Google Classroom e FEQ Academia",
+      "oferecimentoContinuo": "true",
+      "insightVenda": "Difusão de oferecimento contínuo: inscrição aberta até 01/07/2031, horário livre, sem pré-requisito de escolaridade e ticket baixo (R$ 499,16 à vista, boleto ou cartão). Emite declaração de frequência, não certificado."
+    },
+    {
+      "@id": "feq:ECO-1100",
+      "@type": "feq:Difusao",
+      "codigo": "ECO-1100",
+      "nome": "Desvendando a Economia Global: Perspectivas sobre um Mundo em Transformação",
+      "modalidade": "A distância (100% online, assíncrono)",
+      "formatoAulasResumo": "100% assíncrono — aulas gravadas no Moodle",
+      "formatoAulasDetalhe": "Aulas gravadas de cerca de 30 minutos cada, liberadas no Moodle. Sem aula ao vivo nem horário fixo: o aluno organiza o próprio ritmo de estudo dentro do período de oferecimento.",
+      "professorResponsavel": "Roberto Alexandre Zanchetta Borghi",
+      "professoresAdicionais": [
+        "Adriana Nunes Ferreira",
+        "Alex Wilhans Antonio Palludeto",
+        "Ana Rosa Ribeiro de Mendonça Sarti",
+        "Fernanda Oliveira Ultremare",
+        "Giuliano Contento de Oliveira",
+        "Paulo Sergio Fracalanza",
+        "Simone Silva de Deos"
+      ],
+      "publicoAlvo": "Profissionais e estudantes de diversas áreas interessados na compreensão da economia internacional. Não há pré-requisito nem formação prévia em economia.",
+      "certificacao": "Declaração de frequência emitida pela Unicamp através da Extecamp (Escola de Extensão).",
+      "requisito": {
+        "@type": "feq:RequisitoAcademico",
+        "nivelMinimo": "feq:nenhum"
+      },
+      "cargaHoraria": {
+        "@type": "feq:Duracao",
+        "horas": 20
+      },
+      "vagasMax": 50,
+      "janelaInscricao": {
+        "@type": "feq:JanelaTemporal",
+        "fim": "2026-10-20"
+      },
+      "janelaOferecimento": {
+        "@type": "feq:JanelaTemporal",
+        "inicio": "2026-10-26",
+        "fim": "2027-01-31"
+      },
+      "planoPagamento": {
+        "@type": "feq:PlanoPagamento",
+        "taxaInscricao": "24.00",
+        "numParcelas": 3,
+        "valorParcela": "143.54",
+        "aVista": "430.63"
+      },
+      "urlExtecamp": "https://ins.extecamp.unicamp.br/curso/dados/ECO-1100/001",
+      "objetivo": "Apresentar os principais elementos que estruturam a dinâmica econômica internacional contemporânea. Por meio do exame de transformações nas dimensões monetário-financeira, produtivo-tecnológico-comercial e ambiental, fornecer subsídios analíticos e empíricos para uma compreensão crítica das relações econômicas globais na atualidade.",
+      "conteudoProgramatico": "20 horas organizadas em 4 eixos temáticos (Dinheiro e poder, Produção, Clima, Geopolítica) cobrindo 10 temas, da dominância financeira às cadeias globais de valor e à nova geopolítica internacional.",
+      "insightVenda": "Primeiro curso do portfólio fora da FEQ — é do Instituto de Economia (CERI), não da Extensão FEQ Unicamp. Sem pré-requisito de escolaridade, 100% assíncrono, ticket de entrada baixo (R$ 430,63). Bom produto de entrada; a landing page própria é externa (eco-1100-landing.vercel.app) e este curso NÃO entra na página cursos-extensao.feq.unicamp.br nem nas varreduras da coleta Extecamp (sem acesso a cursos ECO no ADM Cursos por ora).",
+      "wasDerivedFrom": "feq:fonteEco1100",
+      "plataformaAula": "Moodle"
+    }
+  ]
+}
