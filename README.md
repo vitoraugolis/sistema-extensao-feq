@@ -59,7 +59,7 @@ desenvolve sem gastar token nem falar com lead de verdade.
 ## Deploy
 
 ```bash
-zsh atena/ops/deploy_vps.sh 3.218.159.36 ubuntu
+zsh atena/ops/deploy_vps.sh 144.33.22.236 ubuntu
 ```
 
 O rsync **não sobrescreve** `.env`, `atena/data/` nem a ontologia: são dado vivo de
