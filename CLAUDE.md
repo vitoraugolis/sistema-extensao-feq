@@ -114,8 +114,8 @@ set -a && source .env && set +a
 # Sistema v2 (atena/) — PRODUÇÃO no VPS Oracle Cloud 144.33.22.236 (systemd atena+caddy),
 # migrado do Lightsail em 13/10/2026 (atena/ops/RUNBOOK_migracao_vps.md). Chave: ~/.ssh/oracle-b.key
 # https://feq.vitoraugolis.com.br (domínio definitivo) · https://144.33.22.236.sslip.io (fallback por IP)
-# NUNCA rode o deploy no Lightsail antigo (3.218.159.36): ele é só um proxy Caddy para o
-# servidor novo e o deploy religaria o serviço atena lá (mensagens duplicadas aos leads).
+# O Lightsail antigo (3.218.159.36) foi APAGADO em 13/10/2026; o deploy recusa esse IP.
+# Webhooks da Meta (WhatsApp e leadgen) apontam para o domínio desde a mesma data.
 zsh atena/ops/deploy_vps.sh 144.33.22.236 ubuntu   # deploy (rsync; NÃO sobrescreve
 #   .env, atena/data nem a ontologia — catalogo.jsonld/versoes são dado de produção,
 #   escritos pelo Injetor; sobrescrevê-los desfazia mudanças aprovadas em silêncio)
@@ -238,11 +238,13 @@ Reescrita **v2** (monólito modular `atena/`, ancoragem ontológica) implementad
   `lp_auto.rodar`) republica sozinho toda LP cuja renderização mude. As baselines
   (`config lp_hash_<curso>`) foram congeladas no estado atual para nada ir ao ar sem
   revisão; os valores anteriores estão em `config lp_hash_backup_31ago`.
-- As LPs no ar ainda embutem o webhook em `3.218.159.36.sslip.io`. Desde a migração de
-  13/10/2026 esse host é o Lightsail antigo fazendo proxy para o servidor novo, então o
-  **Lightsail não pode ser desligado** enquanto houver LP com `sslip.io`. Republicá-las
-  passa todas para `feq.vitoraugolis.com.br` — é publicação em página pública, então só
-  sob decisão explícita.
+- ✅ As 12 LPs no ar já usam `feq.vitoraugolis.com.br` nos webhooks (conferido em
+  13/10/2026 decodificando o bloco base64 de cada página). Nada depende mais de `sslip.io`.
+- `META_ADS_TOKEN` expirou em 10/10/2026: as chamadas ao Meta Ads (`atena/growth/meta_ads.py`)
+  falham até gerar um token novo (os de WhatsApp e Página são de system user e
+  não expiram).
+- O `.env` de produção tem valor com espaços (`WP_APP_PASSWORD`): `. ./.env` no shell o
+  trunca. O app lê o arquivo com parser próprio; scripts avulsos devem fazer o mesmo.
 - As versões dos pacotes Python em produção foram fixadas iguais às do Lightsail
   (pyshacl 0.31.0, weasyprint 69.0); o deploy não as atualiza. Não há `requirements.txt`.
 - FEQ-0499: turma 006 aberta no ADM Cursos, aguardando abrir o link público de inscrição.

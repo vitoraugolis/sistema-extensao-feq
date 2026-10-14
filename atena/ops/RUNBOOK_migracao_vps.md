@@ -1,5 +1,14 @@
 # Runbook — migração da Atena para um novo VPS
 
+> **Executado em 13/10/2026**: Lightsail `3.218.159.36` → Oracle Cloud `144.33.22.236`
+> (parada de ~35 s, sha256 do banco conferido). Diferenças em relação ao texto abaixo:
+> as LPs já usavam o domínio (o passo 7 não foi necessário); os **webhooks da Meta** é que
+> ainda apontavam para `sslip.io` e foram trocados pela API (`POST /{app}/subscriptions`);
+> na Oracle é preciso liberar 80/443 também no `iptables` do host, não só na Security
+> List; e as versões dos pacotes foram fixadas com o `pip freeze` do servidor antigo.
+> O Lightsail foi apagado no mesmo dia. Numa próxima migração, confira os webhooks da
+> Meta **antes** de desligar o servidor antigo.
+
 Escrito em 13/10/2026 a partir do estado real do VPS atual (Lightsail `3.218.159.36`).
 Todos os comandos rodam **no Mac**, na raiz do repositório, salvo indicação.
 

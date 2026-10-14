@@ -9,10 +9,9 @@ SSHUSER="${2:-auto}"
 KEY="${ATENA_SSH_KEY:-$HOME/.ssh/oracle-b.key}"   # outro servidor: ATENA_SSH_KEY=~/.ssh/outra.pem
 DIR="$(cd "$(dirname "$0")/../.." && pwd)"
 [ -z "$IP" ] && { echo "uso: zsh atena/ops/deploy_vps.sh <IP> [usuario]"; exit 1; }
-# 3.218.159.36 é o Lightsail antigo: hoje só um proxy Caddy para o servidor novo, com o
-# .env de produção ainda em disco. Este script religaria o serviço atena lá e os leads
-# receberiam mensagens em dobro (duas instâncias do agendador). Ver RUNBOOK_migracao_vps.md.
-[ "$IP" = "3.218.159.36" ] && { echo "recusado: $IP é o servidor antigo (proxy). Produção: 144.33.22.236"; exit 1; }
+# 3.218.159.36 era o Lightsail, apagado em 13/10/2026. O IP voltou para a AWS e pode ser
+# de outra pessoa: um deploy por hábito mandaria o código para um servidor alheio.
+[ "$IP" = "3.218.159.36" ] && { echo "recusado: $IP era o servidor antigo (apagado). Produção: 144.33.22.236"; exit 1; }
 
 # 1) Descobre o usuário SSH (ubuntu ou ec2-user)
 if [ "$SSHUSER" = "auto" ]; then
