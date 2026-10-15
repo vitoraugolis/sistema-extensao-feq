@@ -22,7 +22,8 @@ from atena.core import guardrails as G
 from atena.agentes.bibliotecario import Bibliotecario
 from atena.core.orquestrador import brain_deterministico
 from atena.ontologia.servico import instituicao_do_codigo
-from atena.core.contatos import secretaria_texto
+from atena.core.contatos import secretaria_texto, orientacao_matriculado
+from atena.core.estado import alcancou
 
 import time as _time
 import collections
@@ -339,7 +340,21 @@ def _bloco_curso(ctx):
         + _bloco_janela(ctx))
 
 
-def _system_prompt(ctx, lead_nome=None, precedentes=""):
+def _bloco_matriculado(ctx, fase):
+    """Quem já é matriculado é atendido pela secretaria do instituto, não pela captação."""
+    if not alcancou(fase, "Matriculado"):
+        return ""
+    return ("LEAD JÁ MATRICULADO neste curso: não venda, não qualifique e não ofereça "
+            "inscrição nem link. Responda com cordialidade ao que ele disse e encaminhe com "
+            "ESTES contatos, exatamente como estão (não troque número nem e-mail): "
+            f"\"{orientacao_matriculado((ctx.get('curso') or {}).get('codigo'))}\" "
+            "Pedido de cancelamento ou desistência NÃO se resolve aqui nem se escala: a "
+            "orientação acima (formalizar por e-mail) já é o encaminhamento; use "
+            "proxima_acao='continuar'. Se ele perguntar de OUTRO curso do portfólio, pode "
+            "informar normalmente.\n")
+
+
+def _system_prompt(ctx, lead_nome=None, precedentes="", fase=None):
     nome = (lead_nome or "").strip()
     # Instituto do curso DESTE lead — ECO-1100 é do Instituto de Economia, não da FEQ
     # (specs/08 § "Cursos fora da FEQ"); sem curso ainda (descoberta), assume FEQ (a
@@ -371,6 +386,7 @@ def _system_prompt(ctx, lead_nome=None, precedentes=""):
         "item em sua PRÓPRIA linha, separando com quebra de linha real (\\n) — nunca emende tudo "
         "num parágrafo corrido. Deixe uma linha em branco entre blocos para arejar a leitura.\n"
         + _bloco_curso(ctx)
+        + _bloco_matriculado(ctx, fase)
         + f"PORTFÓLIO COMPLETO (você conhece todos; a maioria é da FEQ, mas repare no "
         f"código — ECO-1100 é do Instituto de Economia, não da FEQ; use p/ orientar e "
         f"redirecionar sem misturar a identidade institucional):\n"
@@ -449,7 +465,8 @@ def cerebro_llm(ont, lead, mensagem_lead, historico=None):
     # Precedentes do corpus (spec 18): nunca bloqueia a conversa — sem corpus, string vazia
     from atena.corpus.recuperacao import bloco_prompt
     sysp = _system_prompt(ctx, lead.get("nome"),
-                          precedentes=bloco_prompt(mensagem_lead, lead.get("curso")))
+                          precedentes=bloco_prompt(mensagem_lead, lead.get("curso")),
+                          fase=lead.get("fase"))
     turns = _turns(historico, mensagem_lead)
     # tenta o modelo escolhido; se falhar e não for Claude, tenta Claude; só então o determinístico
     tentativas = [None]

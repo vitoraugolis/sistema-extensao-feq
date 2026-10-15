@@ -92,6 +92,9 @@ TEMPLATES_ROL = [
      "params": [{"k": "nome", "rotulo": "Nome"}, {"k": "curso", "rotulo": "Curso"},
                 {"k": "url_inscricao", "rotulo": "Link de inscrição"},
                 {"k": "prazo", "rotulo": "Prazo de inscrição"}]},
+    {"nome": "feq_inscricao_garantida", "idioma": "pt_BR", "titulo": "Inscrição garantida",
+     "descricao": "Inscrição garantida; o link para prosseguir sai quando a Extecamp abrir o curso.",
+     "params": [{"k": "nome", "rotulo": "Nome"}, {"k": "curso", "rotulo": "Curso"}]},
 ]
 
 
@@ -139,6 +142,7 @@ PARAMS_TEMPLATE = {
     "feq_promo_0480": ("nome", "prazo"),
     "feq_promo_0331": ("nome", "prazo"),
     "feq_link_corrigido": ("nome", "curso", "url_inscricao", "prazo"),
+    "feq_inscricao_garantida": ("nome", "curso"),
 }
 
 

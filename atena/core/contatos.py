@@ -56,6 +56,20 @@ def secretaria_texto(codigo):
     return f"{c['rotulo']}: e-mail {c['email']} ou {canal} {c['telefone_exibicao']}"
 
 
+def orientacao_matriculado(codigo):
+    """Quem JÁ é matriculado fala com a secretaria do instituto do curso, não com o
+    agente de captação (decisão do Vitor, 15/10/2026). Cancelamento/desistência só vale
+    formalizado por e-mail. Texto pronto: entra no prompt e no fallback determinístico."""
+    ie = (codigo or "").upper().startswith("ECO")
+    c = CONTATOS_OFICIAIS["secretaria_ie" if ie else "secretaria"]
+    canal = "WhatsApp" if c.get("whatsapp") else "telefone"
+    fones = " ou ".join(x for x in (c["telefone_exibicao"], c.get("telefone2_exibicao")) if x)
+    horario = f" (atendimento das {c['horario_atendimento']})" if c.get("horario_atendimento") else ""
+    return (f"Como você já está matriculado(a), quem cuida do seu atendimento a partir de agora é "
+            f"a {c['rotulo']}: {canal} {fones}{horario}. Se quiser cancelar a matrícula ou "
+            f"desistir do curso, formalize o pedido pelo e-mail {c['email']}.")
+
+
 def payload_contato(chave):
     """Monta o objeto 'contacts' no formato da WhatsApp Business Cloud API.
     None se a chave não existir — quem chama decide como falhar."""

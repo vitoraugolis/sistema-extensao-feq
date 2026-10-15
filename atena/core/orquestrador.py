@@ -15,7 +15,8 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2]))
 
 from atena.ontologia.servico import Ontologia, CODE_RE, normalizar_codigo, instituicao_do_codigo
 from atena.revisor.ontologico import revisar
-from atena.core.estado import Estado
+from atena.core.estado import Estado, alcancou
+from atena.core.contatos import orientacao_matriculado
 from atena.core.faro import Faro
 from atena.core import contratos as C
 from atena.core import guardrails as G
@@ -107,6 +108,11 @@ def _brain_deterministico(ont, lead, mensagem_lead, historico=None, hoje=None):
                                mensagem_ao_lead="Claro, vou repassar para uma pessoa do time falar "
                                                 "com você. Só um momento.",
                                escalonamento_motivo="lead pediu atendimento humano")
+    if alcancou(lead.get("fase"), "Matriculado"):
+        # antes do gatilho sensível: "cancelar matrícula" de quem já é aluno tem
+        # caminho definido (e-mail da secretaria), não é caso de escalar a captação
+        return C.DecisaoAgente(C.CONTINUAR, "lead já matriculado — encaminhado à secretaria",
+                               mensagem_ao_lead=orientacao_matriculado(cod))
     if G.gatilho_sensivel(mensagem_lead):
         return C.DecisaoAgente(C.ESCALAR, "gatilho sensível",
                                escalonamento_motivo="desconto/reclamação/intenção de fechar")

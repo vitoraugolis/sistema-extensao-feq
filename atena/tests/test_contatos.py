@@ -111,4 +111,27 @@ check("iecoext@unicamp.br" in _e and "WhatsApp" not in _e and "3911" not in _e,
 check(_s in _system_prompt({"curso": _ont.curso("FEQ-0480"), "captavel": _ont.captavel("FEQ-0480")}), "contato da secretaria está no prompt do cérebro")
 check("não são cumulativos" in (_ont.curso("FEQ-0480")["descontos"] or "") and "à vista tem 15%" in (_ont.curso("FEQ-0480")["descontos"] or ""), "FEQ-0480: 15% à vista na ontologia")
 check("à vista" not in (_ont.curso("FEQ-0580")["descontos"] or ""), "os 15% à vista são só do FEQ-0480")
+
+# 15/10/2026: lead JÁ matriculado vai para a secretaria do instituto; cancelamento por e-mail.
+from atena.core.contatos import orientacao_matriculado
+from atena.revisor.ontologico import revisar
+_mf, _me = orientacao_matriculado("FEQ-1000"), orientacao_matriculado("ECO-1100")
+check("(19) 3521-3911" in _mf and "extfeq@unicamp.br" in _mf and "cancelar" in _mf,
+      "matriculado FEQ: secretaria FEQ + e-mail para cancelar")
+check("iecoext@unicamp.br" in _me and "3521-5728" in _me and "3911" not in _me and "extfeq" not in _me,
+      "matriculado ECO: só contatos do IE")
+check(revisar("FEQ-1000", _mf, _ont)["aprovado"] and revisar("ECO-1100", _me, _ont)["aprovado"],
+      "orientação passa no Revisor")
+_ctx = {"curso": _ont.curso("FEQ-1000"), "captavel": _ont.captavel("FEQ-1000")}
+check(_mf in _system_prompt(_ctx, fase="Matriculado"), "prompt de matriculado traz a orientação")
+check("LEAD JÁ MATRICULADO" not in _system_prompt(_ctx, fase="Inscrito"),
+      "inscrito ainda não matriculado segue o fluxo de captação")
+from atena.core import contratos as C
+_est = Estado(":memory:")
+_est.upsert_lead("m1", nome="Ana", telefone="+55 19 98888", curso="ECO-1100", fase="Matriculado",
+                 estado_conversa="aguardando_resposta")
+Orquestrador(_est, _ont).processar_mensagem("m1", "quero cancelar minha matrícula")
+_d = _est.listar_decisoes("m1")[0]
+check(_d["acao"] == C.CONTINUAR and _d["mensagem"] == _me and _d["status"] == "proposta",
+      "fallback determinístico: cancelamento de matriculado vira orientação, não escalonamento")
 print(f"{ok}/{ok} passaram.")

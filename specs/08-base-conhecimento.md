@@ -97,6 +97,12 @@ alertaCatalogo?, wasDerivedFrom`.
   +55 19 3521-3911. Fonte única em `atena/core/contatos.py`; o cérebro o recebe no prompt via
   `secretaria_texto(codigo)` (por instituto — o IE não tem WhatsApp confirmado). É o **único** WhatsApp informado: o antigo
   (19) 98262-0072 foi removido de `contatos.py`, do guia em PDF e da Central.
+- **Lead já matriculado** (fase `Matriculado`, 15/10/2026): o agente não vende nem qualifica —
+  encaminha à secretaria do instituto do curso e, para **cancelar matrícula ou desistir**, pede
+  que formalize por e-mail (FEQ: WhatsApp (19) 3521-3911 · `extfeq@unicamp.br`; ECO/IE:
+  (19) 3521-5728 ou 3521-0119, 14h–22h · `iecoext@unicamp.br`). Texto único em
+  `contatos.orientacao_matriculado(codigo)`, usado no prompt e no fallback determinístico
+  (que responde isso antes do gatilho sensível, em vez de escalar o cancelamento).
 - **FEQ-0333**: esclarecer que são módulos (não curso pela metade) e que não é 100% em inglês.
 - **FEQ-1000**: vende-se sozinho; cadência informativa (vaga máx. 90).
 - **FEQ-0655**: qualificar diploma cedo (gargalo de elegibilidade).
