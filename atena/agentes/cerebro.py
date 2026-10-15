@@ -436,7 +436,8 @@ def cerebro_llm(ont, lead, mensagem_lead, historico=None):
     # Decisões determinísticas (não confiar no LLM):
     if G.detectar_optout(mensagem_lead):
         return brain_deterministico(ont, lead, mensagem_lead, historico)
-    ctx = Bibliotecario(ont).contexto(lead["curso"], lead.get("escolaridade"), mensagem=mensagem_lead)
+    ctx = Bibliotecario(ont).contexto(lead["curso"], lead.get("escolaridade"), mensagem=mensagem_lead,
+                                     historico=historico)
     # O agente atende em TRÊS situações (antes só a 1ª chegava aqui; as outras duas
     # caíam no determinístico e viravam escalonamento sem resposta ao lead):
     #   1. curso definido e com inscrição aberta  -> venda normal

@@ -28,7 +28,10 @@ FEQ = Namespace("https://feq.unicamp.br/ontologia#")
 # Bibliotecário, Ontologista e Revisor importam daqui em vez de cada um
 # hardcodar o próprio regex — foi assim que ECO ficou invisível a todos eles
 # de uma vez até este módulo existir. Novo instituto: acrescente o prefixo aqui.
-CODE_RE = re.compile(r"(FEQ|ECO)[-_\s]?(\d{3,4})", re.I)
+# Separador frouxo ("FEQ- 0480", "FEQ - 0480"): com `[-_\s]?` o hífen+espaço
+# escapava, o curso citado não entrava no prompt e o LLM inventava turma e carga
+# (lead wa-5511932445948, 15/10/2026).
+CODE_RE = re.compile(r"(FEQ|ECO)\s*[-_]?\s*(\d{3,4})", re.I)
 
 
 def normalizar_codigo(prefixo, numero):

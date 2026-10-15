@@ -255,6 +255,20 @@ def test_bibliotecario_portfolio_e_citados():
     assert ctx["curso"]["aulas_inicio"]                     # sabe quando começa
 
 
+
+def test_bibliotecario_citado_com_espaco_e_no_historico():
+    """Caso real (wa-5511932445948, 15/10/2026): "FEQ- 0480" escapava do CODE_RE, o
+    curso não entrava no prompt e o LLM inventou turma /001 e 40h. E o "?" seguinte,
+    sem código, chegava ao cérebro sem dado nenhum dos cursos pedidos."""
+    from atena.agentes.bibliotecario import Bibliotecario
+    bib = Bibliotecario(ONT)
+    ctx = bib.contexto("ECO-1100", None, mensagem="FEQ- 0480 e FEQ-0580 , pode me passar")
+    assert [x["curso"]["codigo"] for x in ctx["cursos_citados"]] == ["FEQ-0480", "FEQ-0580"]
+    hist = [{"papel": "lead", "texto": "FEQ - 0480 e FEQ-0580, mais informações"},
+            {"papel": "agente", "texto": "Temos o FEQ-1000 também"}]   # fala do agente não conta
+    ctx = bib.contexto("ECO-1100", None, mensagem="?", historico=hist)
+    assert [x["curso"]["codigo"] for x in ctx["cursos_citados"]] == ["FEQ-0480", "FEQ-0580"]
+
 def test_orquestrador_troca_de_curso():
     from atena.core import contratos as C
     est = Estado(":memory:")

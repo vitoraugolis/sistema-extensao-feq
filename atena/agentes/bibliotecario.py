@@ -23,8 +23,17 @@ class Bibliotecario:
                 out.append({"curso": c, "captavel": self.ont.captavel(c["codigo"], hoje)})
         return out
 
-    def contexto(self, curso, escolaridade=None, mensagem=None, hoje=None):
+    @staticmethod
+    def _busca(mensagem, historico, n=3):
+        """Mensagem atual + as `n` últimas do lead (mais recente primeiro)."""
+        # ponytail: janela fixa de 3 mensagens; vira parâmetro se o prompt inchar
+        do_lead = [h.get("texto") or "" for h in (historico or []) if h.get("papel") == "lead"]
+        return "\n".join([mensagem or ""] + do_lead[::-1][:n])
+
+    def contexto(self, curso, escolaridade=None, mensagem=None, hoje=None, historico=None):
         """hoje: injetável p/ teste, como em `ont.captavel` e `brain_deterministico`.
+        historico: as últimas mensagens DO LEAD também contam como citação — sem isso um
+        "?" ou "e o outro?" logo depois de citar o curso chegava ao cérebro sem os dados.
         A situação do curso ("aberto", "fora do prazo", "encerrado") sai do calendário,
         então teste que não fixa a data passa hoje e falha sozinho semana que vem."""
         info = self.ont.curso(curso)
@@ -36,10 +45,10 @@ class Bibliotecario:
             return {"curso": None, "existe": False, "descoberta": True,
                     "captavel": {}, "elegivel": None,
                     "portfolio": self.ont.portfolio(),
-                    "cursos_citados": self._citados(mensagem, set(), hoje)}
+                    "cursos_citados": self._citados(self._busca(mensagem, historico), set(), hoje)}
         cap = self.ont.captavel(curso, hoje)
         eleg = self.ont.elegivel(escolaridade, curso) if escolaridade else None
-        citados = self._citados(mensagem, {info["codigo"]}, hoje)
+        citados = self._citados(self._busca(mensagem, historico), {info["codigo"]}, hoje)
 
         return {
             "existe": True,

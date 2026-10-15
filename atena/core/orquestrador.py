@@ -219,7 +219,14 @@ class Orquestrador:
         self.est = estado or Estado()
         self.ont = ont or Ontologia()
         self.faro = faro or Faro()
-        self.brain = brain or (lambda lead, msg, hist=None: brain_deterministico(self.ont, lead, msg, hist))
+        self._brain_padrao = lambda lead, msg, hist=None: brain_deterministico(self.ont, lead, msg, hist)
+        self.brain = brain or self._brain_padrao
+
+    @property
+    def reescreve(self):
+        """Reescrever com feedback só serve a cérebro que lê o feedback (LLM); o
+        determinístico devolveria o mesmo texto."""
+        return self.brain is not self._brain_padrao
 
     def processar_mensagem(self, card_id, mensagem_lead, tipo="texto", media_id=None,
                            transcricao=None):
@@ -299,13 +306,45 @@ class Orquestrador:
         rev = {"aprovado": True, "bloqueios": [], "ancoras": []}
         if dec.mensagem_ao_lead:
             rev = revisar(lead["curso"], dec.mensagem_ao_lead, self.ont)
+            if not rev["aprovado"] and self.reescreve:
+                dec, rev = self._reescrever(card_id, lead, entrada, historico, dec, rev, ultima_ag)
             if not rev["aprovado"]:
-                # loop de feedback: 1 tentativa; cérebro determinístico não corrige -> escala
+                # 2º bloqueio (ou cérebro que não reescreve) -> escala. O rascunho vai junto
+                # só para o trace (status 'bloqueada', nunca enviado) — sem ele não dá
+                # para saber o que o LLM tentou dizer.
                 dec = C.DecisaoAgente(C.ESCALAR, "Revisor bloqueou a mensagem proposta",
                                       escalonamento_motivo="; ".join(rev["bloqueios"]),
-                                      dados=dec.dados)
+                                      dados={**dec.dados, "rascunho_bloqueado": dec.mensagem_ao_lead})
         self._aplicar(card_id, dec, rev)
         return {"decisao": dec.__dict__, "revisor": rev}
+
+    FEEDBACK_REVISOR = (
+        "[REVISOR — sua resposta anterior NÃO foi enviada ao lead porque afirmava fatos que "
+        "não estão nos dados do curso: {bloqueios} Reescreva a resposta UMA vez usando SÓ os "
+        "dados fornecidos; o que não estiver neles, omita ou diga que vai confirmar com a "
+        "equipe. Não mencione esta revisão ao lead.]")
+
+    def _reescrever(self, card_id, lead, entrada, historico, dec, rev, ultima_ag):
+        """Spec 12 AC4: no máx. 1 reescrita com os motivos do Revisor. Devolve (dec, rev) da
+        reescrita se ela passar; senão os originais (o chamador escala). O 1º rascunho fica
+        no trace como 'bloqueada' — ninguém o envia."""
+        self.est.add_decisao(card_id, agente="orquestrador", acao=dec.proxima_acao,
+                             mensagem=dec.mensagem_ao_lead,
+                             motivo="1º rascunho bloqueado pelo Revisor — reescrita pedida",
+                             aprovado_revisor=0, bloqueios=rev["bloqueios"], status="bloqueada")
+        nota = self.FEEDBACK_REVISOR.format(bloqueios=" ".join(rev["bloqueios"]))
+        nova = self.brain(lead, f"{entrada}\n\n{nota}", historico)
+        msg = nova.mensagem_ao_lead
+        # Reescrita só substitui uma resposta conversacional: opt-out/consulta à coordenação
+        # têm travas próprias no fluxo principal, e repetir a fala anterior é loop.
+        if not msg or nova.proxima_acao in (C.OPTOUT, C.CONSULTAR) or msg == ultima_ag:
+            return dec, rev
+        rev2 = revisar(lead["curso"], msg, self.ont)
+        if not rev2["aprovado"]:
+            return C.DecisaoAgente(dec.proxima_acao, dec.motivo, mensagem_ao_lead=msg,
+                                   dados=dec.dados), rev2
+        nova.motivo = f"{nova.motivo} (reescrita após bloqueio do Revisor)".strip()
+        return nova, rev2
 
     def _aplicar(self, card_id, dec, rev):
         acao = dec.proxima_acao
@@ -341,15 +380,15 @@ class Orquestrador:
 
         if dec.mensagem_ao_lead and rev["aprovado"]:
             status = "proposta"   # aguardando aprovação humana (envio = tier externa)
-        elif dec.mensagem_ao_lead:
+        elif dec.mensagem_ao_lead or dec.dados.get("rascunho_bloqueado"):
             status = "bloqueada"
         else:
             status = "acao"
         # guia em PDF só faz sentido junto de uma proposta de fato aprovada pelo Revisor
         anexo = "guia_curso" if (status == "proposta" and dec.dados.get("anexo_guia")) else None
         self.est.add_decisao(card_id, agente="orquestrador", acao=acao,
-                             mensagem=dec.mensagem_ao_lead, motivo=dec.motivo,
-                             ancoras=rev.get("ancoras", []),
+                             mensagem=dec.mensagem_ao_lead or dec.dados.get("rascunho_bloqueado"),
+                             motivo=dec.motivo, ancoras=rev.get("ancoras", []),
                              aprovado_revisor=1 if rev["aprovado"] else 0,
                              bloqueios=rev.get("bloqueios", []), status=status, anexo=anexo)
 

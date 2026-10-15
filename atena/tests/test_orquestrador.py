@@ -76,6 +76,59 @@ def test_duas_mensagens_juntas_nao_geram_resposta_duplicada():
     assert props[0] != props[1], f"resposta duplicada: {props}"   # a 2ª viu a 1ª
 
 
+
+def test_bloqueio_do_revisor_guarda_rascunho_sem_enviar():
+    """O rascunho barrado fica no trace (status 'bloqueada') — antes a decisão ficava
+    com mensagem vazia e não dava para auditar o que o LLM tentou dizer."""
+    est, orq = _novo(escolaridade="Superior Completo")
+    orq.brain = lambda lead, msg, hist=None: C.DecisaoAgente(C.CONTINUAR, "x", mensagem_ao_lead=_RUIM)
+    orq.processar_mensagem("c1", "como me inscrevo?")
+    ds = est.listar_decisoes("c1")
+    assert all(d["status"] == "bloqueada" and d["mensagem"] == _RUIM for d in ds)
+    assert est.decisao_pendente("c1") is None                 # nada vira proposta de envio
+    assert est.get_lead("c1")["estado_conversa"] == "escalado_humano"
+
+
+_RUIM = "Inscreva-se: https://ins.extecamp.unicamp.br/curso/inscricao/FEQ-0480/001 (40h)"
+_BOA = "Inscreva-se: https://ins.extecamp.unicamp.br/curso/inscricao/FEQ-0480/009"
+
+
+def test_reescrita_unica_corrige_com_feedback_do_revisor():
+    """Spec 12 AC4: 1º bloqueio devolve ao cérebro com os motivos; se a reescrita passa,
+    vira proposta normal. Caso real: turma /001 e 40h inventadas (wa-5511932445948)."""
+    est, orq = _novo(escolaridade="Superior Completo")
+    vistos = []
+
+    def brain(lead, msg, hist=None):
+        vistos.append(msg)
+        ok = "REVISOR" in msg and "/001" in msg                # recebeu o motivo do bloqueio
+        return C.DecisaoAgente(C.CONTINUAR, "x", mensagem_ao_lead=_BOA if ok else _RUIM)
+    orq.brain = brain
+    r = orq.processar_mensagem("c1", "como me inscrevo?")
+    assert len(vistos) == 2 and vistos[1].startswith("como me inscrevo?")
+    assert r["revisor"]["aprovado"] is True
+    assert est.decisao_pendente("c1")["mensagem"] == _BOA
+    assert est.get_lead("c1")["estado_conversa"] != "escalado_humano"
+    ds = est.listar_decisoes("c1")                            # 1º rascunho fica no trace
+    assert [d["status"] for d in ds] == ["proposta", "bloqueada"] and ds[1]["mensagem"] == _RUIM
+
+
+def test_reescrita_bloqueada_de_novo_escala_sem_3a_tentativa():
+    est, orq = _novo(escolaridade="Superior Completo")
+    n = []
+    orq.brain = lambda lead, msg, hist=None: (n.append(1), C.DecisaoAgente(
+        C.CONTINUAR, "x", mensagem_ao_lead=_RUIM + f" v{len(n)}"))[1]
+    orq.processar_mensagem("c1", "como me inscrevo?")
+    assert len(n) == 2                                        # máx. 1 reescrita
+    assert est.get_lead("c1")["estado_conversa"] == "escalado_humano"
+    assert est.decisao_pendente("c1") is None
+    assert [d["mensagem"][-2:] for d in est.listar_decisoes("c1")] == ["v2", "v1"]
+
+
+def test_cerebro_deterministico_nao_reescreve():
+    est, orq = _novo()                                        # sem brain -> determinístico
+    assert orq.reescreve is False
+
 def test_modo_manual_nao_gera_resposta():
     est, orq = _novo(escolaridade="Superior Completo")
     est.set_lead("c1", modo="manual")

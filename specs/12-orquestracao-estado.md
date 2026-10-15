@@ -46,10 +46,17 @@ proxima_acao ∈ {continuar, qualificar, descartar, em_espera, escalar_humano, e
 ```
 `contexto_ontologico` é injetado pelo Bibliotecário: registro do curso + captabilidade + elegibilidade
 já computadas — o agente **não** consulta o grafo direto.
+Cursos **citados** pelo lead (na mensagem atual ou nas 3 últimas falas dele) entram com o registro
+completo; o código é reconhecido com separador frouxo ("FEQ- 0480", "FEQ 0480") via `CODE_RE`.
+Sem isso o LLM completa turma/carga por analogia (incidente `wa-5511932445948`, 15/10/2026).
 
 ## Loop de feedback fechado + orçamento de execução
 - Revisor bloqueou → devolve ao agente com os motivos; **máx. 1 reescrita**; persistir 2º bloqueio →
   `escalado_humano` (não insistir).
+  ✅ (15/10/2026, `Orquestrador._reescrever`): os bloqueios voltam ao cérebro como nota
+  `[REVISOR — …]` junto da fala do lead. Cada rascunho barrado fica no trace (`decisoes`, status
+  `bloqueada`, nunca enviado). Só cérebro LLM reescreve (o determinístico repetiria o texto);
+  reescrita que vire opt-out, consulta à coordenação ou repita a fala anterior é descartada.
 - **Orçamento por tarefa**: limites de tokens/tempo/reescritas para impedir loop infinito.
 
 ## Disparo (event-driven + scheduler)
