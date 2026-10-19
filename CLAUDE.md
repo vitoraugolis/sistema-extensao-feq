@@ -99,6 +99,7 @@ ATENA_USERS=nome:senha:supervisor,...   # Central v2 (sem isto: operador/operado
 ATENA_SECRET=...                # chave de sessão da Central v2
 ATENA_MASTER=vitor              # dono dos módulos restritos (spec 19) — só ele concede acesso
 OPENAI_API_KEY=sk-...           # Whisper: transcrição dos áudios do lead (spec 09)
+META_APP_ID=971916012498579       # app WABA FEQ: upload da amostra de mídia de template (specs/14)
 GOOGLE_BQ_SA_FILE=/caminho/sa.json  # leads da LP ECO-1100 no BigQuery guara-db (specs/08); sem isto, inerte
 PORT=8080                       # 8090 cérebro v1 · 8095 Central v2
 # Growth Engine (spec 15) — sem estes tokens, tudo roda em dry-run:
@@ -214,6 +215,11 @@ Reescrita **v2** (monólito modular `atena/`, ancoragem ontológica) implementad
   acumulam** (regra no prompt do cérebro). Contato da Secretaria FEQ — extfeq@unicamp.br ou
   WhatsApp (19) 3521-3911 — agora entra no prompt (`contatos.secretaria_texto`); o antigo
   WhatsApp (19) 98262-0072 foi removido de tudo.
+
+- ✅ **Central para várias pessoas** (19/10/2026, `specs/14`): Notificações é a caixa única
+  (Aprovações e Dúvidas absorvidas, ação na própria linha; `pacing_atrasado` fora); templates
+  com cabeçalho de mídia e botões de link/ligar/cupom criados na Central, e campanhas que
+  preenchem cada variável/botão por lead.
 
 ## 10. Riscos e pendências abertas
 

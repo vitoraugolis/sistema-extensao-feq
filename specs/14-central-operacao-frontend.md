@@ -19,6 +19,7 @@ humana** quando necessário, **estatísticas** do funil e a porta do **Injetor**
    - **Intervir:** assumir a conversa (pausa o agente), enviar mensagem manual, ou
      **aprovar/editar/rejeitar** a mensagem que o agente propôs.
 3. **Fila de aprovação humana** — escalonamentos, gates de captabilidade, propostas do Injetor/Curador.
+   Desde 19/10/2026 vive dentro de Notificações (caixa única, ver §6/7).
 4. **Injetor** (`13`) — submeter update → ver diff + relatório de impacto → aprovar/rejeitar.
 5. **Transparência** (`/inspecao`) — para qualquer mensagem: o trace de decisão + **âncoras** que a
    fundamentaram (preço/data/requisito → tripla do grafo).
@@ -67,6 +68,38 @@ dúvida ficam como estão; a ação entra na auditoria. O servidor guarda a `mar
 do curso (captabilidade), `atualizado` (escalonamento). Mudou a marca, o item **volta
 sozinho**. Fichas de inscrição não são dispensáveis (saem ao serem transcritas). O painel
 "Alertas do sistema" mostra só alertas não lidos e tem o próprio "Limpar".
+
+**Caixa única (19/10/2026).** Com mais gente usando a Central, as abas **Aprovações** e
+**Dúvidas** foram absorvidas por Notificações — uma porta só para o trabalho humano. Cada
+item de `GET /api/notificacoes` traz `categoria` (`aprovacao` · `duvida` · `ficha` ·
+`alerta`, com filtros por categoria e contagem em `por_fonte`) e o que é preciso para agir
+na própria linha: proposta com o texto completo (`mensagem`) → Aprovar e enviar / Editar;
+dúvida com `contexto` e `ref` → resposta escrita ali mesmo, "É dado de catálogo → Injetor"
+ou Descartar; escalonamento → Abrir / Resolvido; ontologia e curso encerrado → Injetor.
+Captabilidade (prioridade 4) entrou: sem a aba antiga, era o único lugar onde ela sumiria.
+O re-render do polling respeita foco — não recria a caixa de resposta de quem está digitando.
+**Pacing fora da caixa**: `pacing_atrasado` (um alerta por curso por dia, ~90% da caixa em
+produção) deixou de ser gravado (`growth/pacing.py`) e o legado é filtrado
+(`ALERTAS_FORA_DA_CAIXA`); o ritmo segue no Painel/Medição. CPL estourado e realocação de
+verba continuam alertando — são decisões de verba. `/api/aprovacoes` e `/api/duvidas`
+continuam existindo (testes e integrações), só sem aba própria.
+
+**Templates e campanhas completos (19/10/2026).** O marketing cria tudo na aba Templates:
+cabeçalho (nenhum · texto com até 1 variável · imagem · vídeo · PDF), corpo com variáveis e
+formatação do WhatsApp, rodapé e até 10 botões — resposta rápida, link (fixo ou dinâmico com
+`{{1}}` no final), ligar e copiar cupom (só Marketing) —, com prévia no formato do WhatsApp e
+validação dos limites da Meta antes da chamada (`whatsapp.validar_componentes`). Respostas
+rápidas vão antes dos botões de ação (a Meta recusa intercalados). O arquivo do cabeçalho:
+sobe para a Meta como amostra da revisão (Resumable Upload API do app, `META_APP_ID`) e fica
+em `atena/data/tpl_midia`, servido em `/tplmidia/<nome>.<ext>` (público: a Meta busca o link
+a cada envio). Os exemplos de cabeçalho/link/cupom viram o **padrão de envio**
+(`config tpl_padrao:<nome>`). Na aba Campanhas, ao escolher o template, cada variável do corpo/
+cabeçalho e cada botão dinâmico ganha uma fonte (primeiro nome, curso, código, fim das
+inscrições ou texto fixo), a mídia do cabeçalho vem preenchida com o padrão, e a prévia usa o
+1º lead do público. O disparo é recusado (400) se algum valor sair vazio para esse lead
+(`_componentes_para`) — antes, template criado na Central saía com variável vazia e a Meta
+recusava o lote inteiro. A configuração fica em `campanhas.config_json`. O envio avulso pela
+conversa usa o mesmo caminho, com os padrões da criação.
 
 ### 8. Otimização — estrutura de RL (spec 18 §3.2/3.3) em modo sombra
 

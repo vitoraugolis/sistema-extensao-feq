@@ -215,6 +215,195 @@ def validar_template(nome, categoria, corpo, exemplos=None):
     return None
 
 
+# ---- componentes completos (cabeçalho de mídia, botões de link/telefone/cupom) --------
+# Limites da Cloud API para templates (doc "Template components", out/2026).
+FORMATOS_CABECALHO = ("TEXT", "IMAGE", "VIDEO", "DOCUMENT")
+TIPOS_BOTAO = {"QUICK_REPLY": 10, "URL": 2, "PHONE_NUMBER": 1, "COPY_CODE": 1}
+MAX_BOTOES = 10
+
+
+def normalizar_cabecalho(c):
+    """str (formato antigo da Central: cabeçalho de texto) ou dict -> dict | None."""
+    if not c:
+        return None
+    if isinstance(c, str):
+        return {"formato": "TEXT", "texto": c.strip()} if c.strip() else None
+    c = dict(c)
+    c["formato"] = (c.get("formato") or "TEXT").upper()
+    if c["formato"] == "NONE":
+        return None
+    return c
+
+
+def normalizar_botoes(bs):
+    """Lista de str (quick-replies, formato antigo) ou dicts -> dicts, com as respostas
+    rápidas ANTES dos botões de ação: a Meta recusa os dois grupos intercalados."""
+    out = []
+    for b in bs or []:
+        if isinstance(b, str):
+            b = {"tipo": "QUICK_REPLY", "texto": b}
+        b = {k: (v.strip() if isinstance(v, str) else v) for k, v in dict(b).items()}
+        b["tipo"] = (b.get("tipo") or "QUICK_REPLY").upper()
+        if b["tipo"] == "COPY_CODE" or b.get("texto"):
+            out.append(b)
+    return sorted(out, key=lambda b: b["tipo"] != "QUICK_REPLY")
+
+
+def validar_componentes(categoria, cabecalho=None, rodape=None, botoes=None):
+    """O que a Meta recusaria em cabeçalho/rodapé/botões. Erro (str) ou None."""
+    cab = normalizar_cabecalho(cabecalho)
+    if cab:
+        f = cab["formato"]
+        if f not in FORMATOS_CABECALHO:
+            return f"formato de cabeçalho inválido: {f}"
+        if f == "TEXT":
+            txt = cab.get("texto") or ""
+            if not txt or len(txt) > 60:
+                return "cabeçalho de texto precisa de 1 a 60 caracteres"
+            nums = sorted({int(v) for v in _VAR_RE.findall(txt)})
+            if nums and nums != [1]:
+                return "o cabeçalho aceita no máximo uma variável, e ela tem de ser {{1}}"
+            if nums and not (cab.get("exemplo") or "").strip():
+                return "informe um exemplo para a variável do cabeçalho"
+        elif not (cab.get("handle") or cab.get("midia")):
+            return f"cabeçalho de {f.lower()} precisa de um arquivo de exemplo"
+    if rodape:
+        if len(rodape) > 60:
+            return "rodapé tem no máximo 60 caracteres"
+        if _VAR_RE.search(rodape):
+            return "o rodapé não aceita variáveis"
+    bs = normalizar_botoes(botoes)
+    if len(bs) > MAX_BOTOES:
+        return f"no máximo {MAX_BOTOES} botões por template"
+    for tipo, limite in TIPOS_BOTAO.items():
+        n = sum(1 for b in bs if b["tipo"] == tipo)
+        if n > limite:
+            return f"no máximo {limite} botão(ões) do tipo {tipo}"
+    for b in bs:
+        if b["tipo"] not in TIPOS_BOTAO:
+            return f"tipo de botão inválido: {b['tipo']}"
+        if b["tipo"] != "COPY_CODE" and not 1 <= len(b.get("texto") or "") <= 25:
+            return f"texto do botão \"{b.get('texto') or ''}\" deve ter de 1 a 25 caracteres"
+        if b["tipo"] == "URL":
+            url = b.get("url") or ""
+            if not url.startswith("https://"):
+                return f"o link do botão \"{b['texto']}\" deve começar com https://"
+            vs = _VAR_RE.findall(url)
+            if vs and (vs != ["1"] or not url.endswith("}}")):
+                return "link dinâmico: só uma variável {{1}}, no FINAL do endereço"
+            if vs and not (b.get("exemplo") or "").strip():
+                return f"informe um exemplo do final do link de \"{b['texto']}\""
+        if b["tipo"] == "PHONE_NUMBER" and not re.fullmatch(r"\+?\d{8,20}", re.sub(r"[\s()-]", "", b.get("telefone") or "")):
+            return f"telefone inválido no botão \"{b['texto']}\" (use +55 19 3521-3911)"
+        if b["tipo"] == "COPY_CODE":
+            if categoria != "MARKETING":
+                return "botão de copiar cupom só existe em template de Marketing"
+            if not 1 <= len(b.get("exemplo") or "") <= 15:
+                return "o código do cupom de exemplo deve ter de 1 a 15 caracteres"
+    return None
+
+
+def montar_componentes(corpo, exemplos=None, cabecalho=None, rodape=None, botoes=None):
+    """Spec da Central -> `components` do POST message_templates da Meta."""
+    comps = []
+    cab = normalizar_cabecalho(cabecalho)
+    if cab and cab["formato"] == "TEXT":
+        h = {"type": "HEADER", "format": "TEXT", "text": cab["texto"]}
+        if _VAR_RE.search(cab["texto"]):
+            h["example"] = {"header_text": [cab["exemplo"].strip()]}
+        comps.append(h)
+    elif cab:
+        comps.append({"type": "HEADER", "format": cab["formato"],
+                      "example": {"header_handle": [cab["handle"]]}})
+    corpo_comp = {"type": "BODY", "text": corpo}
+    n = _n_variaveis(corpo)
+    if n:
+        corpo_comp["example"] = {"body_text": [[str(e) for e in (exemplos or [])[:n]]]}
+    comps.append(corpo_comp)
+    if rodape:
+        comps.append({"type": "FOOTER", "text": rodape})
+    bts = []
+    for b in normalizar_botoes(botoes):
+        if b["tipo"] == "QUICK_REPLY":
+            bts.append({"type": "QUICK_REPLY", "text": b["texto"]})
+        elif b["tipo"] == "URL":
+            u = {"type": "URL", "text": b["texto"], "url": b["url"]}
+            if _VAR_RE.search(b["url"]):
+                u["example"] = [_VAR_RE.sub(b["exemplo"].strip(), b["url"])]
+            bts.append(u)
+        elif b["tipo"] == "PHONE_NUMBER":
+            bts.append({"type": "PHONE_NUMBER", "text": b["texto"],
+                        "phone_number": "+" + re.sub(r"\D", "", b["telefone"])})
+        elif b["tipo"] == "COPY_CODE":
+            bts.append({"type": "COPY_CODE", "example": b["exemplo"]})
+    if bts:
+        comps.append({"type": "BUTTONS", "buttons": bts})
+    return comps
+
+
+def estrutura_template(t):
+    """Template da listagem da Meta -> o que o ENVIO precisa preencher: variáveis do
+    corpo e do cabeçalho, mídia do cabeçalho e botões dinâmicos (link/cupom)."""
+    est = {"cabecalho": None, "corpo": "", "n_vars": 0, "rodape": "", "botoes": []}
+    for c in (t or {}).get("components") or []:
+        tipo = (c.get("type") or "").upper()
+        if tipo == "HEADER":
+            f = (c.get("format") or "TEXT").upper()
+            est["cabecalho"] = {"formato": f, "texto": c.get("text") or "",
+                                "n_vars": _n_variaveis(c.get("text")) if f == "TEXT" else 0}
+        elif tipo == "BODY":
+            est["corpo"] = c.get("text") or ""
+            est["n_vars"] = _n_variaveis(est["corpo"])
+        elif tipo == "FOOTER":
+            est["rodape"] = c.get("text") or ""
+        elif tipo == "BUTTONS":
+            for i, b in enumerate(c.get("buttons") or []):
+                bt = (b.get("type") or "").upper()
+                est["botoes"].append({
+                    "index": i, "tipo": bt, "texto": b.get("text") or "",
+                    "url": b.get("url"), "telefone": b.get("phone_number"),
+                    "dinamico": bt == "COPY_CODE" or (bt == "URL" and bool(_VAR_RE.search(b.get("url") or "")))})
+    return est
+
+
+def componentes_envio(est, corpo=None, cabecalho=None, midia=None, botoes=None):
+    """Parâmetros de ENVIO de um template, a partir da sua estrutura.
+    `botoes` = {index: valor} para link dinâmico (o final do endereço) e cupom.
+    Devolve (components, erro) — erro quando falta algo que a Meta exige."""
+    comps = []
+    cab = est.get("cabecalho")
+    if cab and cab["formato"] == "TEXT" and cab.get("n_vars"):
+        if not (cabecalho or "").strip():
+            return None, "falta o valor da variável do cabeçalho"
+        comps.append({"type": "header", "parameters": [{"type": "text", "text": str(cabecalho)}]})
+    elif cab and cab["formato"] in ("IMAGE", "VIDEO", "DOCUMENT"):
+        if not (midia or "").startswith("https://"):
+            return None, f"o cabeçalho é {cab['formato'].lower()}: informe o link https:// do arquivo"
+        tp = cab["formato"].lower()
+        comps.append({"type": "header", "parameters": [{"type": tp, tp: {"link": midia}}]})
+    corpo = [str(v) for v in (corpo or [])]
+    if len(corpo) != est.get("n_vars", 0):
+        return None, f"o corpo tem {est.get('n_vars', 0)} variável(is), recebi {len(corpo)}"
+    if any(not v.strip() for v in corpo):
+        return None, "há variável do corpo vazia — a Meta recusa o envio"
+    if corpo:
+        comps.append({"type": "body", "parameters": [{"type": "text", "text": v} for v in corpo]})
+    botoes = {int(k): v for k, v in (botoes or {}).items()}
+    for b in est.get("botoes") or []:
+        if not b.get("dinamico"):
+            continue
+        v = str(botoes.get(b["index"]) or "").strip()
+        if not v:
+            return None, f"falta o valor do botão \"{b['texto'] or b['tipo']}\""
+        if b["tipo"] == "URL":
+            comps.append({"type": "button", "sub_type": "url", "index": str(b["index"]),
+                          "parameters": [{"type": "text", "text": v}]})
+        else:
+            comps.append({"type": "button", "sub_type": "copy_code", "index": str(b["index"]),
+                          "parameters": [{"type": "coupon_code", "coupon_code": v}]})
+    return comps, None
+
+
 def extrair_mensagem(m):
     """Normaliza um message do webhook -> (tipo, texto/legenda, media_id, mime).
     Cobre texto, cliques de botão (quick-reply de template) e mídias."""
@@ -591,24 +780,15 @@ class WhatsApp:
     def criar_template(self, nome, categoria, corpo, exemplos=None, cabecalho=None,
                        rodape=None, botoes=None, idioma="pt_BR"):
         """Cria um template na Meta e o submete para aprovação (fica PENDING).
-        Valida o que a Meta rejeitaria antes de gastar a chamada. Sem token/WABA: dry-run."""
-        erro = validar_template(nome, categoria, corpo, exemplos)
+        Valida o que a Meta rejeitaria antes de gastar a chamada. Sem token/WABA: dry-run.
+        `cabecalho`: str (texto) ou {formato TEXT|IMAGE|VIDEO|DOCUMENT, texto, exemplo,
+        handle}; `botoes`: str (resposta rápida) ou {tipo QUICK_REPLY|URL|PHONE_NUMBER|
+        COPY_CODE, texto, url, exemplo, telefone}."""
+        erro = (validar_template(nome, categoria, corpo, exemplos)
+                or validar_componentes(categoria, cabecalho, rodape, botoes))
         if erro:
             return {"ok": False, "erro": erro}
-        comps = []
-        if cabecalho:
-            comps.append({"type": "HEADER", "format": "TEXT", "text": cabecalho})
-        corpo_comp = {"type": "BODY", "text": corpo}
-        n = _n_variaveis(corpo)
-        if n:
-            corpo_comp["example"] = {"body_text": [[str(e) for e in (exemplos or [])[:n]]]}
-        comps.append(corpo_comp)
-        if rodape:
-            comps.append({"type": "FOOTER", "text": rodape})
-        botoes = [b for b in (botoes or []) if (b or "").strip()]
-        if botoes:
-            comps.append({"type": "BUTTONS",
-                          "buttons": [{"type": "QUICK_REPLY", "text": b.strip()} for b in botoes[:3]]})
+        comps = montar_componentes(corpo, exemplos, cabecalho, rodape, botoes)
         payload = {"name": nome, "language": idioma, "category": categoria, "components": comps}
         if not self.token or not self.waba_id:
             return {"ok": True, "status": "dry_run", "enviado": payload,
@@ -626,7 +806,27 @@ class WhatsApp:
                 "erro": str(j.get("error", {}).get("error_user_msg")
                             or j.get("error", {}).get("message", ""))[:300]}
 
-    def enviar_template(self, telefone, nome, idioma="pt_BR", params=None):
+    def subir_exemplo_midia(self, conteudo, mime, nome_arquivo):
+        """Amostra do cabeçalho de mídia para a REVISÃO da Meta (header_handle), via
+        Resumable Upload API do app. Não serve para o envio — este usa um link https."""
+        app_id = os.environ.get("META_APP_ID", "971916012498579")   # app "WABA FEQ"
+        if not self.token or not self.waba_id:
+            return {"ok": True, "status": "dry_run", "handle": "dry-run-handle"}
+        import requests
+        s = requests.post(f"{_GRAPH}/{app_id}/uploads", timeout=30,
+                          params={"file_name": nome_arquivo, "file_length": len(conteudo),
+                                  "file_type": mime, "access_token": self.token})
+        sid = (s.json() if s.text else {}).get("id")
+        if s.status_code != 200 or not sid:
+            return {"ok": False, "erro": "upload (sessão) falhou: " + s.text[:200]}
+        u = requests.post(f"{_GRAPH}/{sid}", timeout=180, data=conteudo,
+                          headers={"Authorization": f"OAuth {self.token}", "file_offset": "0"})
+        h = (u.json() if u.text else {}).get("h")
+        if u.status_code != 200 or not h:
+            return {"ok": False, "erro": "upload (arquivo) falhou: " + u.text[:200]}
+        return {"ok": True, "handle": h}
+
+    def enviar_template(self, telefone, nome, idioma="pt_BR", params=None, componentes=None):
         """1º contato / fora da janela de 24h: exige template aprovado.
         ponytail: sem gate de horário aqui (template é operador/sistema-iniciado, pré-aprovado)."""
         card_id = self.est.lead_por_telefone(telefone) if self.est else None
@@ -637,7 +837,9 @@ class WhatsApp:
         if not self.token:
             return {"ok": True, "status": "dry_run", "template": nome, "para": telefone}
         tpl = {"name": nome, "language": {"code": idioma}}
-        if params:
+        if componentes:                 # cabeçalho/botões dinâmicos (componentes_envio)
+            tpl["components"] = componentes
+        elif params:
             tpl["components"] = [{"type": "body",
                                   "parameters": [{"type": "text", "text": str(p)} for p in params]}]
         import requests

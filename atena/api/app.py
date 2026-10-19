@@ -9,6 +9,8 @@ Rodar:
   python3 atena/api/app.py        # http://localhost:8095
 """
 import os
+import re
+import base64
 import sys
 import json
 import hmac
@@ -75,7 +77,8 @@ from atena.agentes.curador import Curador
 from atena.agentes.cerebro import cerebro_factory, modelo_atual, testar_modelo, PROVEDORES, chave_do
 from atena.transporte.whatsapp import (WhatsApp, TEMPLATES_ROL as WhatsApp_TEMPLATES,
                                        CATEGORIAS_TEMPLATE as WhatsApp_CATEGORIAS,
-                                       _n_variaveis)
+                                       _n_variaveis, normalizar_botoes, normalizar_cabecalho,
+                                       estrutura_template, componentes_envio)
 from atena.growth.db import Growth
 from atena.growth.meta_ads import MetaAds
 from atena.growth import ponte
@@ -1323,21 +1326,84 @@ def templates_listar():
     return jsonify({"conectado": True, "categorias": WhatsApp_CATEGORIAS, "templates": lst})
 
 
+TPL_MIDIA_DIR = pathlib.Path(__file__).resolve().parents[1] / "data" / "tpl_midia"
+_TPL_MIDIA_EXT = {"IMAGE": {"image/jpeg": "jpg", "image/png": "png"},
+                  "VIDEO": {"video/mp4": "mp4", "video/3gpp": "3gp"},
+                  "DOCUMENT": {"application/pdf": "pdf"}}
+_TPL_MIDIA_MB = {"IMAGE": 5, "VIDEO": 16, "DOCUMENT": 100}
+
+
+@app.route("/tplmidia/<arq>")
+def tpl_midia(arq):
+    """Mídia de cabeçalho de template — PÚBLICA de propósito: a Meta busca o arquivo
+    por este link no momento de cada envio (o handle da criação só serve à revisão)."""
+    return send_from_directory(str(TPL_MIDIA_DIR), pathlib.Path(arq).name)
+
+
+def _tpl_padrao(nome):
+    try:
+        return json.loads(EST.get_config("tpl_padrao:" + nome) or "{}")
+    except ValueError:
+        return {}
+
+
 @app.route("/api/templates", methods=["POST"])
 def templates_criar():
     """Cria o template na Meta e submete para aprovação (ação externa — o operador
-    dispara conscientemente pela Central; fica PENDING até a Meta revisar)."""
+    dispara conscientemente pela Central; fica PENDING até a Meta revisar).
+
+    Cabeçalho de mídia: o arquivo vem em base64, fica guardado em data/tpl_midia (link
+    público usado nos ENVIOS) e sobe para a Meta como amostra da revisão. Os exemplos
+    de cabeçalho/link/cupom viram o PADRÃO do envio (`tpl_padrao:<nome>`): campanha e
+    envio avulso já saem preenchidos, e o marketing só muda se quiser."""
     b = request.get_json(silent=True) or {}
+    nome = (b.get("nome") or "").strip().lower()
+    cab = normalizar_cabecalho(b.get("cabecalho"))
+    midia_url = None
+    if cab and cab["formato"] in _TPL_MIDIA_EXT:
+        m = cab.pop("midia", None) or {}
+        mime = (m.get("mime") or "").lower()
+        ext = _TPL_MIDIA_EXT[cab["formato"]].get(mime)
+        if not ext:
+            return jsonify({"ok": False, "erro": f"arquivo do cabeçalho: tipo {mime or '?'} não aceito para "
+                            f"{cab['formato'].lower()} ({', '.join(_TPL_MIDIA_EXT[cab['formato']])})"}), 400
+        try:
+            conteudo = base64.b64decode(m.get("base64") or "", validate=True)
+        except (ValueError, TypeError):
+            return jsonify({"ok": False, "erro": "arquivo do cabeçalho corrompido"}), 400
+        if not conteudo or len(conteudo) > _TPL_MIDIA_MB[cab["formato"]] * 1024 * 1024:
+            return jsonify({"ok": False, "erro": f"arquivo do cabeçalho vazio ou acima de "
+                            f"{_TPL_MIDIA_MB[cab['formato']]} MB"}), 400
+        if not re.fullmatch(r"[a-z0-9_]{1,512}", nome):
+            return jsonify({"ok": False, "erro": "nome inválido: use só letras minúsculas, números e _"}), 400
+        up = WA.subir_exemplo_midia(conteudo, mime, f"{nome}.{ext}")
+        if not up.get("ok"):
+            return jsonify({"ok": False, "erro": up.get("erro")}), 400
+        cab["handle"] = up["handle"]
+        TPL_MIDIA_DIR.mkdir(parents=True, exist_ok=True)
+        (TPL_MIDIA_DIR / f"{nome}.{ext}").write_bytes(conteudo)
+        base = (os.environ.get("ATENA_PUBLIC_URL") or request.url_root).rstrip("/")
+        midia_url = f"{base}/tplmidia/{nome}.{ext}"
+    botoes = normalizar_botoes(b.get("botoes"))
     r = WA.criar_template(
-        nome=(b.get("nome") or "").strip().lower(), categoria=(b.get("categoria") or "").strip(),
+        nome=nome, categoria=(b.get("categoria") or "").strip(),
         corpo=b.get("corpo") or "", exemplos=b.get("exemplos") or [],
-        cabecalho=(b.get("cabecalho") or "").strip() or None,
-        rodape=(b.get("rodape") or "").strip() or None, botoes=b.get("botoes") or [])
+        cabecalho=cab, rodape=(b.get("rodape") or "").strip() or None, botoes=botoes)
     if not r.get("ok"):
         return jsonify(r), 400
+    padrao = {"midia": midia_url, "cabecalho": (cab or {}).get("exemplo") or None,
+              "botoes": {str(i): bt["exemplo"] for i, bt in enumerate(botoes) if bt.get("exemplo")}}
+    EST.set_config("tpl_padrao:" + nome, json.dumps(padrao, ensure_ascii=False))
     EST.log_acao(session.get("usuario", "operador"),
-                 f"criar_template {b.get('nome')} ({b.get('categoria')})")
+                 f"criar_template {nome} ({b.get('categoria')})")
     return jsonify(r)
+
+
+# De onde vem o valor de uma variável na hora do envio — o marketing escolhe por
+# variável na campanha; "fixo" é o mesmo texto para todo o público.
+FONTES_VALOR = [("nome", "Primeiro nome do lead"), ("curso", "Curso (nome e código)"),
+                ("codigo", "Código do curso"), ("prazo", "Fim das inscrições"),
+                ("fixo", "Texto fixo")]
 
 
 def _valor_param(k, lead):
@@ -1349,7 +1415,36 @@ def _valor_param(k, lead):
         return f"{info.get('nome', lead.get('curso',''))} ({lead.get('curso','')})"
     if k == "prazo":
         return "/".join(reversed((info.get("inscricoes_fim") or "").split("-")))
+    if k == "codigo":
+        return lead.get("curso", "")
     return ""
+
+
+def _valor_de(fonte, lead):
+    """{fonte, valor} -> texto para este lead (fixo = o próprio valor)."""
+    fonte = fonte or {}
+    if fonte.get("fonte") == "fixo":
+        return str(fonte.get("valor") or "")
+    return _valor_param(fonte.get("fonte"), lead)
+
+
+def _componentes_para(tpl, lead, cfg=None):
+    """Components de envio deste template para ESTE lead. `cfg` (campanha/envio avulso)
+    diz de onde vem cada valor; o que faltar cai no padrão salvo na criação.
+    Devolve (components, textos do corpo, erro)."""
+    cfg = cfg or {}
+    est = tpl.get("estrutura") or {"n_vars": len(tpl["params"]), "botoes": []}
+    pad = tpl.get("padrao") or {}
+    fontes = cfg.get("corpo") or [{"fonte": p["k"]} for p in tpl["params"]]
+    corpo = [_valor_de(f, lead) for f in fontes]
+    cab = _valor_de(cfg["cabecalho"], lead) if cfg.get("cabecalho") else pad.get("cabecalho")
+    botoes = dict(pad.get("botoes") or {})
+    for k, f in (cfg.get("botoes") or {}).items():
+        v = _valor_de(f, lead)
+        if v:
+            botoes[str(k)] = v
+    comps, erro = componentes_envio(est, corpo, cab, cfg.get("midia") or pad.get("midia"), botoes)
+    return comps, corpo, erro
 
 
 def _templates_enviaveis():
@@ -1376,7 +1471,9 @@ def _templates_enviaveis():
             titulo, descricao = nome, corpo[:160]
             params = [{"k": f"var{i + 1}", "rotulo": f"Variável {{{{{i + 1}}}}}"} for i in range(n)]
         out.append({"nome": nome, "idioma": t.get("language", "pt_BR"), "titulo": titulo,
-                    "descricao": descricao, "params": params, "verificado": True})
+                    "descricao": descricao, "params": params, "verificado": True,
+                    "categoria": t.get("category"), "estrutura": estrutura_template(t),
+                    "padrao": _tpl_padrao(nome)})
     return out
 
 
@@ -1409,7 +1506,11 @@ def conversa_enviar_template(card_id):
     params = [str(p) for p in (b.get("params") or [])]
     if len(params) != len(tpl["params"]):
         return jsonify({"erro": f"{tpl['nome']} espera {len(tpl['params'])} variável(is)"}), 400
-    r = WA.enviar_template(lead["telefone"], tpl["nome"], idioma=tpl["idioma"], params=params or None)
+    comps, _, erro = _componentes_para(
+        tpl, lead, {"corpo": [{"fonte": "fixo", "valor": v} for v in params], **(b.get("extras") or {})})
+    if erro:
+        return jsonify({"erro": erro}), 400
+    r = WA.enviar_template(lead["telefone"], tpl["nome"], idioma=tpl["idioma"], componentes=comps)
     if r.get("ok"):
         rotulo = f"[template {tpl['nome']}]" + (f" {' · '.join(params)}" if params else "")
         EST.add_conversa(card_id, "agente", rotulo, wamid=r.get("wamid"), status="enviado",
@@ -1430,7 +1531,7 @@ CAMPANHA_PAUSA_S = float(os.environ.get("CAMPANHA_PAUSA_S", "3"))
 CAMPANHA_TIER_AVISO = 1000  # limite padrão da Meta p/ conta nova: 1.000 destinatários únicos/24h
 
 
-def _disparar_campanha(campanha_id, leads, tpl):
+def _disparar_campanha(campanha_id, leads, tpl, cfg=None):
     """Roda em background (mesmo padrão de _processar_meta/_processar_whatsapp — a rota
     que criou a campanha já respondeu ao operador antes disto começar). Cada envio é uma
     linha normal em `conversas` marcada com campanha_id; falha TAMBÉM é registrada aqui
@@ -1443,8 +1544,9 @@ def _disparar_campanha(campanha_id, leads, tpl):
                 time.sleep(CAMPANHA_PAUSA_S)
             if EST.campanha_cancelada(campanha_id):
                 break
-            params = [_valor_param(p["k"], lead) for p in tpl["params"]] or None
-            r = WA.enviar_template(lead["telefone"], tpl["nome"], idioma=tpl["idioma"], params=params)
+            comps, params, erro = _componentes_para(tpl, lead, cfg)
+            r = ({"ok": False, "motivo": erro} if erro else
+                 WA.enviar_template(lead["telefone"], tpl["nome"], idioma=tpl["idioma"], componentes=comps))
             destino = lead["telefone"]
             if r.get("ok"):
                 rotulo = f"[campanha {tpl['nome']}]" + (f" {' · '.join(params)}" if params else "")
@@ -1472,8 +1574,11 @@ def _disparar_campanha(campanha_id, leads, tpl):
 def campanhas_templates():
     """Templates aprovados, SEM prefill por lead (a campanha atinge muitos leads — o
     prefill de nome/curso acontece por destinatário dentro de _disparar_campanha)."""
-    return jsonify([{"nome": t["nome"], "idioma": t["idioma"], "titulo": t["titulo"],
-                     "n_params": len(t["params"])} for t in _templates_enviaveis()])
+    return jsonify({"fontes": FONTES_VALOR,
+                    "templates": [{"nome": t["nome"], "idioma": t["idioma"], "titulo": t["titulo"],
+                                   "n_params": len(t["params"]), "params": t["params"],
+                                   "estrutura": t.get("estrutura"), "padrao": t.get("padrao") or {}}
+                                  for t in _templates_enviaveis()]})
 
 
 @app.route("/api/campanhas/preview")
@@ -1513,10 +1618,16 @@ def campanhas_ep():
     leads = [l for l in leads if not l.get("optout")]   # nunca dispara p/ opt-out, seja qual for o filtro
     if not leads:
         return jsonify({"erro": "nenhum lead corresponde a este filtro"}), 400
+    cfg = b.get("valores") or {}
+    # confere com o 1º lead ANTES de disparar: variável vazia/mídia faltando faria a
+    # Meta recusar o lote inteiro, um por um
+    _, _, erro = _componentes_para(tpl, leads[0], cfg)
+    if erro:
+        return jsonify({"erro": erro}), 400
     nome = (b.get("nome") or "").strip() or tpl["nome"]
     campanha_id = EST.criar_campanha(nome, tpl["nome"], tpl["idioma"], filtro, len(leads),
-                                     session.get("usuario", "operador"))
-    threading.Thread(target=_disparar_campanha, args=(campanha_id, leads, tpl), daemon=True).start()
+                                     session.get("usuario", "operador"), config=cfg)
+    threading.Thread(target=_disparar_campanha, args=(campanha_id, leads, tpl, cfg), daemon=True).start()
     EST.log_acao(session.get("usuario", "operador"),
                  f"disparou campanha '{nome}' ({tpl['nome']}) para {len(leads)} lead(s)")
     return jsonify({"id": campanha_id, "total_alvo": len(leads)})

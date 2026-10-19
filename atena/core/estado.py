@@ -219,7 +219,10 @@ class Estado:
                     "ALTER TABLE conversas ADD COLUMN clicado_ts TEXT",
                     # Senha definida por OUTRA pessoa (supervisor criou a conta): o
                     # dono troca no 1º login antes de ver qualquer dado (auth.guard).
-                    "ALTER TABLE usuarios ADD COLUMN trocar_senha INTEGER DEFAULT 0"):
+                    "ALTER TABLE usuarios ADD COLUMN trocar_senha INTEGER DEFAULT 0",
+                    # Campanha com template completo: de onde vem cada variável, a mídia
+                    # do cabeçalho e o valor dos botões dinâmicos (link/cupom).
+                    "ALTER TABLE campanhas ADD COLUMN config_json TEXT"):
             try:
                 self.conn.execute(mig)
             except sqlite3.OperationalError:
@@ -757,13 +760,15 @@ class Estado:
         return [dict(r) for r in rows]
 
     # ------------------------------------------------------------ campanhas
-    def criar_campanha(self, nome, template_nome, template_idioma, filtro, total_alvo, criado_por):
+    def criar_campanha(self, nome, template_nome, template_idioma, filtro, total_alvo, criado_por,
+                       config=None):
         with self._lock:
             cur = self.conn.execute(
                 "INSERT INTO campanhas(nome,template_nome,template_idioma,filtro_json,status,"
-                "total_alvo,criado,criado_por) VALUES(?,?,?,?,?,?,?,?)",
+                "total_alvo,criado,criado_por,config_json) VALUES(?,?,?,?,?,?,?,?,?)",
                 (nome, template_nome, template_idioma, json.dumps(filtro or {}, ensure_ascii=False),
-                 "enviando", total_alvo, _agora(), criado_por))
+                 "enviando", total_alvo, _agora(), criado_por,
+                 json.dumps(config or {}, ensure_ascii=False)))
             self.conn.commit()
             return cur.lastrowid
 

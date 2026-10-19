@@ -332,6 +332,18 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--guara);b
 @media(max-width:640px){.tpl-grid{grid-template-columns:1fr;}}
 .tpl-previa{background:var(--guara-bg);border:1px solid var(--border);border-radius:var(--r-m);
  padding:10px 12px;font-size:13px;max-width:340px;box-shadow:var(--shadow);}
+.tpl-midia{border-radius:var(--r-s,8px);background:var(--surface-2);display:flex;align-items:center;
+ justify-content:center;min-height:90px;margin:-2px -4px 8px;overflow:hidden;color:var(--muted);font-size:12px;gap:6px;}
+.tpl-midia img,.tpl-midia video{width:100%;display:block;}
+.tpl-bts{margin:8px -12px -10px;border-top:1px solid var(--border);}
+.tpl-bt{display:flex;align-items:center;justify-content:center;gap:6px;padding:7px;color:var(--guara,#0a7cff);
+ font-weight:600;font-size:12.5px;border-bottom:1px solid var(--border);}
+.tpl-bt:last-child{border-bottom:none;}
+.tpl-botao-ed{display:grid;grid-template-columns:150px 1fr 1fr 1fr auto;gap:6px;align-items:end;margin-top:6px;}
+@media(max-width:640px){.tpl-botao-ed{grid-template-columns:1fr;}}
+.camp-var{display:grid;grid-template-columns:130px 1fr;gap:6px;align-items:center;margin-top:6px;}
+.camp-var input{grid-column:2;}
+@media(max-width:640px){.camp-var{grid-template-columns:1fr;}}
 
 /* Campanhas — construtor de público + progresso por status (mesmo componente de
    barra proporcional da Medição, sem lib nova) */
@@ -632,15 +644,33 @@ try{ const t = localStorage.getItem('tema'); if(t) document.documentElement.data
             <label class="tpl-campo"><span class="muted">Categoria</span>
               <select id="tplCat"></select></label>
           </div>
-          <label class="tpl-campo"><span class="muted">Cabeçalho (opcional)</span>
-            <input id="tplHead" placeholder="Extensão FEQ Unicamp" oninput="tplPreview()"></label>
-          <label class="tpl-campo"><span class="muted">Corpo da mensagem *</span>
-            <textarea id="tplCorpo" rows="4" placeholder="Oi {{1}}! As inscrições do {{2}} estão abertas até {{3}}. Quer que eu te envie o link?" oninput="tplPreview()"></textarea></label>
+          <div class="tpl-grid">
+            <label class="tpl-campo"><span class="muted">Cabeçalho</span>
+              <select id="tplHeadFmt" onchange="tplHeadFmt()">
+                <option value="">Nenhum</option><option value="TEXT">Texto</option>
+                <option value="IMAGE">Imagem (JPG/PNG, até 5 MB)</option>
+                <option value="VIDEO">Vídeo (MP4, até 16 MB)</option>
+                <option value="DOCUMENT">Documento (PDF, até 100 MB)</option></select></label>
+            <div id="tplHeadCampos"></div>
+          </div>
+          <label class="tpl-campo"><span class="muted">Corpo da mensagem * — <code>*negrito*</code>, <code>_itálico_</code>, <code>~riscado~</code>, emojis e quebras de linha funcionam</span>
+            <textarea id="tplCorpo" rows="5" placeholder="Oi {{1}}! As inscrições do {{2}} estão abertas até {{3}}. Quer que eu te envie o link?" oninput="tplPreview()"></textarea></label>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px;">
+            <button class="btn btn-g" style="padding:3px 9px;" onclick="tplInserirVar()"><i class="ti ti-braces"></i> Inserir variável</button>
+            <span class="muted" id="tplContador" style="margin-left:auto;font-size:11.5px;"></span>
+          </div>
           <div id="tplExemplos"></div>
-          <label class="tpl-campo"><span class="muted">Rodapé (opcional)</span>
-            <input id="tplFoot" placeholder="Responda SAIR para não receber mais" oninput="tplPreview()"></label>
-          <label class="tpl-campo"><span class="muted">Botões de resposta rápida (opcional, até 3 — separe por vírgula)</span>
-            <input id="tplBtns" placeholder="Quero o link, Tenho dúvidas" oninput="tplPreview()"></label>
+          <label class="tpl-campo"><span class="muted">Rodapé (opcional, até 60 caracteres)</span>
+            <input id="tplFoot" maxlength="60" placeholder="Responda SAIR para não receber mais" oninput="tplPreview()"></label>
+          <div class="tpl-campo"><span class="muted">Botões (opcional, até 10): respostas rápidas, links do site, ligar e copiar cupom</span>
+            <div id="tplBotoes"></div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;">
+              <button class="btn btn-g" style="padding:4px 9px;" onclick="tplAddBotao('QUICK_REPLY')"><i class="ti ti-message-reply"></i> Resposta rápida</button>
+              <button class="btn btn-g" style="padding:4px 9px;" onclick="tplAddBotao('URL')"><i class="ti ti-link"></i> Link</button>
+              <button class="btn btn-g" style="padding:4px 9px;" onclick="tplAddBotao('PHONE_NUMBER')"><i class="ti ti-phone"></i> Ligar</button>
+              <button class="btn btn-g" style="padding:4px 9px;" onclick="tplAddBotao('COPY_CODE')"><i class="ti ti-copy"></i> Copiar cupom</button>
+            </div>
+          </div>
           <p class="muted" style="margin:12px 2px 4px;">Prévia</p>
           <div id="tplPrevia" class="tpl-previa"></div>
           <div style="display:flex;gap:8px;align-items:center;margin-top:12px;">
@@ -681,9 +711,13 @@ try{ const t = localStorage.getItem('tema'); if(t) document.documentElement.data
                 <option value="manual_humano">Modo manual</option>
               </select></label>
             <label class="tpl-campo"><span class="muted">Template aprovado</span>
-              <select id="campTemplate"></select></label>
+              <select id="campTemplate" onchange="campConteudo()"></select></label>
           </div>
           <div id="campPreviewOut" style="margin-top:10px;"></div>
+          <div class="tpl-grid" style="margin-top:12px;align-items:start;">
+            <div><p class="muted" style="margin:0 0 4px;">Conteúdo — de onde vem cada parte da mensagem</p><div id="campConteudo"></div></div>
+            <div><p class="muted" style="margin:0 0 4px;">Prévia com o 1º lead do público</p><div id="campPrevia" class="tpl-previa"></div></div>
+          </div>
           <div style="display:flex;gap:8px;align-items:center;margin-top:12px;">
             <button class="btn btn-p" onclick="campDisparar()"><i class="ti ti-send"></i> Disparar campanha</button>
             <span class="muted">ação externa — manda WhatsApp de verdade para o público acima</span>
@@ -1182,6 +1216,17 @@ async function lpPublicar(){
 const TPL_STATUS = {APPROVED:['t-ok','aprovado'], PENDING:['t-warn','em análise'],
                     REJECTED:['t-bad','rejeitado'], PAUSED:['t-warn','pausado'],
                     DISABLED:['t-bad','desativado']};
+// components da Meta -> mesma estrutura que o servidor usa (estrutura_template)
+function _estrutura(t){
+  const e = {cabecalho:null, corpo:'', rodape:'', botoes:[]};
+  (t.components||[]).forEach(c=>{
+    if(c.type==='HEADER') e.cabecalho = {formato: c.format||'TEXT', texto: c.text||''};
+    if(c.type==='BODY') e.corpo = c.text||'';
+    if(c.type==='FOOTER') e.rodape = c.text||'';
+    if(c.type==='BUTTONS') e.botoes = (c.buttons||[]).map((b,i)=>({index:i, tipo:b.type, texto:b.text, url:b.url, telefone:b.phone_number}));
+  });
+  return e;
+}
 async function tplCarregar(forcar){
   const d = await api('/api/templates' + (forcar?'?forcar=1':''));
   const cat = $('#tplCat');
@@ -1194,56 +1239,144 @@ async function tplCarregar(forcar){
   const ts = d.templates||[];
   $('#tplLista').innerHTML = ts.length ? ts.map(t=>{
     const st = TPL_STATUS[t.status] || ['t-acc', t.status||'—'];
-    const corpo = ((t.components||[]).find(c=>c.type==='BODY')||{}).text || '';
+    const est = _estrutura(t);
     return `<div class="row" style="align-items:flex-start;">
       <i class="ti ti-mail"></i>
-      <span><strong>${escapeHtml(t.name)}</strong> <span class="muted">${t.language||''} ${t.category?'· '+t.category:''}</span>
-        ${corpo?`<div class="muted" style="margin-top:3px;">${escapeHtml(corpo).slice(0,150)}</div>`:''}
+      <span style="flex:1;min-width:0;"><strong>${escapeHtml(t.name)}</strong> <span class="muted">${t.language||''} ${t.category?'· '+t.category:''}</span>
+        ${est.corpo?`<details style="margin-top:3px;"><summary class="muted" style="cursor:pointer;">${escapeHtml(est.corpo).slice(0,110)}…</summary><div class="tpl-previa" style="margin-top:6px;">${tplBolha(est)}</div></details>`:''}
         ${t.rejected_reason && t.rejected_reason!=='NONE'?`<div style="color:var(--bad);font-size:11.5px;margin-top:3px;">motivo: ${escapeHtml(t.rejected_reason)}</div>`:''}</span>
       <span class="tag ${st[0]}" style="margin-left:auto;">${st[1]}</span></div>`;
   }).join('') : '<div class="muted">Nenhum template.</div>';
   tplPreview();
 }
+// Bolha de prévia no formato do WhatsApp, a partir da ESTRUTURA do template (a
+// mesma que o servidor devolve em /api/campanhas/templates) — criador, lista e
+// campanha mostram a mensagem do mesmo jeito.
+const TPL_BT_ICO = {QUICK_REPLY:'ti-arrow-back-up', URL:'ti-external-link', PHONE_NUMBER:'ti-phone', COPY_CODE:'ti-copy'};
+function _waFmt(s){
+  return escapeHtml(s).replace(/\*([^*\n]+)\*/g,'<strong>$1</strong>').replace(/_([^_\n]+)_/g,'<em>$1</em>')
+    .replace(/~([^~\n]+)~/g,'<s>$1</s>').replace(/\n/g,'<br>');
+}
+function _subst(txt, vals){
+  return (txt||'').replace(/\{\{\s*(\d+)\s*\}\}/g, (m,n)=> (vals && vals[n-1]) ? vals[n-1] : m);
+}
+function tplBolha(est, v){
+  v = v || {};
+  const cab = est.cabecalho;
+  let h = '';
+  if(cab && cab.formato==='TEXT') h += `<div style="font-weight:700;margin-bottom:4px;">${_waFmt(_subst(cab.texto,[v.cabecalho]))}</div>`;
+  else if(cab){
+    const ico = {IMAGE:'ti-photo', VIDEO:'ti-video', DOCUMENT:'ti-file-type-pdf'}[cab.formato]||'ti-file';
+    h += v.midiaHtml ? `<div class="tpl-midia">${v.midiaHtml}</div>`
+      : `<div class="tpl-midia"><i class="ti ${ico}" style="font-size:22px;"></i>${cab.formato.toLowerCase()}</div>`;
+  }
+  h += `<div>${_waFmt(_subst(est.corpo, v.corpo)) || '<span class="muted">(escreva o corpo da mensagem)</span>'}</div>`;
+  if(est.rodape) h += `<div class="muted" style="margin-top:5px;font-size:11px;">${escapeHtml(est.rodape)}</div>`;
+  if((est.botoes||[]).length) h += `<div class="tpl-bts">${est.botoes.map(b=>{
+    const rot = b.tipo==='COPY_CODE' ? 'Copiar código' : (b.texto||'…');
+    const tip = b.tipo==='URL' ? _subst(b.url,[ (v.botoes||{})[b.index] ]) : (b.tipo==='PHONE_NUMBER' ? b.telefone : (b.tipo==='COPY_CODE' ? (v.botoes||{})[b.index]||'' : ''));
+    return `<div class="tpl-bt" title="${escapeHtml(tip||'')}"><i class="ti ${TPL_BT_ICO[b.tipo]||'ti-point'}"></i>${escapeHtml(rot)}</div>`;}).join('')}</div>`;
+  return h;
+}
+
+// ---- criador
+let TPL_BOTOES = [], TPL_MIDIA = null;   // TPL_MIDIA = {mime, base64, url (objectURL p/ prévia)}
 function tplVars(){
   const c = ($('#tplCorpo')||{}).value || '';
   return [...new Set((c.match(/\{\{\s*\d+\s*\}\}/g)||[]).map(v=>v.replace(/\D/g,'')))].sort((a,b)=>a-b);
 }
+function tplInserirVar(){
+  const ta = $('#tplCorpo'), n = tplVars().length + 1, s = ta.selectionStart ?? ta.value.length;
+  ta.value = ta.value.slice(0,s) + `{{${n}}}` + ta.value.slice(ta.selectionEnd ?? s);
+  ta.focus(); tplPreview();
+}
+function tplHeadFmt(){
+  const f = $('#tplHeadFmt').value, box = $('#tplHeadCampos');
+  TPL_MIDIA = null;
+  const aceita = {IMAGE:'image/jpeg,image/png', VIDEO:'video/mp4,video/3gpp', DOCUMENT:'application/pdf'}[f];
+  box.innerHTML = f==='TEXT'
+    ? `<label class="tpl-campo"><span class="muted">Texto do cabeçalho (até 60; aceita uma variável {{1}})</span>
+         <input id="tplHead" maxlength="60" placeholder="Inscrições abertas — {{1}}" oninput="tplPreview()"></label>
+       <label class="tpl-campo" id="tplHeadExBox" style="display:none;"><span class="muted">Exemplo para {{1}} do cabeçalho</span>
+         <input id="tplHeadEx" placeholder="FEQ-0480" oninput="tplPreview()"></label>`
+    : aceita ? `<label class="tpl-campo"><span class="muted">Arquivo — vai como exemplo para a Meta e é o padrão dos envios</span>
+         <input type="file" id="tplHeadArq" accept="${aceita}" onchange="tplLerMidia(this)"></label>` : '';
+  tplPreview();
+}
+function tplLerMidia(inp){
+  const f = inp.files && inp.files[0]; if(!f){ TPL_MIDIA=null; tplPreview(); return; }
+  const rd = new FileReader();
+  rd.onload = () => { TPL_MIDIA = {mime: f.type, base64: String(rd.result).split(',')[1], url: URL.createObjectURL(f), nome: f.name}; tplPreview(); };
+  rd.readAsDataURL(f);
+}
+function tplAddBotao(tipo){
+  if(TPL_BOTOES.length >= 10){ alert('A Meta aceita no máximo 10 botões.'); return; }
+  const lim = {URL:2, PHONE_NUMBER:1, COPY_CODE:1}[tipo];
+  if(lim && TPL_BOTOES.filter(b=>b.tipo===tipo).length >= lim){ alert(`No máximo ${lim} botão(ões) deste tipo.`); return; }
+  if(tipo==='COPY_CODE' && $('#tplCat').value!=='MARKETING'){ alert('Copiar cupom só existe em template de Marketing — troque a categoria.'); return; }
+  TPL_BOTOES.push({tipo, texto: tipo==='PHONE_NUMBER' ? 'Falar com a secretaria' : '', url:'https://', telefone:'+55 19 3521-3911', exemplo:''});
+  tplBotoesRender();
+}
+function tplBotao(i, campo, v){ TPL_BOTOES[i][campo] = v; tplPreview(); }
+function tplBotaoX(i){ TPL_BOTOES.splice(i,1); tplBotoesRender(); }
+function tplBotoesRender(){
+  const ROT = {QUICK_REPLY:'Resposta rápida', URL:'Link', PHONE_NUMBER:'Ligar', COPY_CODE:'Copiar cupom'};
+  const inp = (i,campo,ph,max) => `<input value="${escapeHtml(TPL_BOTOES[i][campo]||'')}" ${max?`maxlength="${max}"`:''} placeholder="${ph}" oninput="tplBotao(${i},'${campo}',this.value)">`;
+  $('#tplBotoes').innerHTML = TPL_BOTOES.map((b,i)=>`<div class="tpl-botao-ed">
+    <span class="chip" style="margin:0;"><i class="ti ${TPL_BT_ICO[b.tipo]}"></i> ${ROT[b.tipo]}</span>
+    ${b.tipo==='COPY_CODE' ? inp(i,'exemplo','Código do cupom (ex.: FEQ15)',15)+'<span></span><span></span>'
+      : inp(i,'texto','Texto do botão',25)
+        + (b.tipo==='URL' ? inp(i,'url','https://… (termine com {{1}} p/ link dinâmico)') + inp(i,'exemplo','exemplo do final do link')
+          : b.tipo==='PHONE_NUMBER' ? inp(i,'telefone','+55 19 3521-3911') + '<span></span>' : '<span></span><span></span>')}
+    <button class="btn btn-g" style="padding:5px 9px;" onclick="tplBotaoX(${i})" title="Remover"><i class="ti ti-x"></i></button></div>`).join('');
+  tplPreview();
+}
+// ordem que a Meta exige (e que o servidor aplica): respostas rápidas antes das ações
+function _tplBotoesOrdenados(){ return [...TPL_BOTOES].sort((a,b)=>(a.tipo!=='QUICK_REPLY')-(b.tipo!=='QUICK_REPLY')); }
 function tplPreview(){
   const vars = tplVars(); const box = $('#tplExemplos');
   if(box && box.dataset.n !== String(vars.length)){    // campos de exemplo seguem as variáveis
     const antes = [...box.querySelectorAll('input')].map(i=>i.value);
-    box.innerHTML = vars.map((v,i)=>`<label class="tpl-campo"><span class="muted">Exemplo para {{${v}}}</span>
+    box.innerHTML = vars.map((v,i)=>`<label class="tpl-campo"><span class="muted">Exemplo para {{${v}}} (a Meta exige)</span>
       <input id="tplEx${i}" value="${escapeHtml(antes[i]||'')}" oninput="tplPreview()"></label>`).join('');
     box.dataset.n = String(vars.length);
   }
-  const ex = vars.map((v,i)=>(($('#tplEx'+i)||{}).value||'').trim() || '…');
-  let corpo = (($('#tplCorpo')||{}).value||'');
-  vars.forEach((v,i)=>{ corpo = corpo.split('{{'+v+'}}').join(ex[i]); });
-  const head = (($('#tplHead')||{}).value||'').trim(), foot = (($('#tplFoot')||{}).value||'').trim();
-  const btns = (($('#tplBtns')||{}).value||'').split(',').map(s=>s.trim()).filter(Boolean).slice(0,3);
+  const corpo = (($('#tplCorpo')||{}).value||'');
+  const cnt = $('#tplContador'); if(cnt) cnt.textContent = `${corpo.length}/1024`;
+  const fmt = ($('#tplHeadFmt')||{}).value || '';
+  const headTxt = (($('#tplHead')||{}).value||'');
+  const hx = $('#tplHeadExBox'); if(hx) hx.style.display = /\{\{\s*1\s*\}\}/.test(headTxt) ? '' : 'none';
+  const bts = _tplBotoesOrdenados();
+  const est = {cabecalho: fmt ? {formato: fmt, texto: headTxt} : null, corpo, rodape: (($('#tplFoot')||{}).value||'').trim(),
+               botoes: bts.map((b,i)=>({...b, index:i}))};
+  const midiaHtml = TPL_MIDIA ? (fmt==='IMAGE' ? `<img src="${TPL_MIDIA.url}">` : fmt==='VIDEO' ? `<video src="${TPL_MIDIA.url}" muted></video>`
+                                : `<i class="ti ti-file-type-pdf" style="font-size:22px;"></i>${escapeHtml(TPL_MIDIA.nome||'')}`) : '';
   const p = $('#tplPrevia'); if(!p) return;
-  p.innerHTML = (head?`<div style="font-weight:700;margin-bottom:4px;">${escapeHtml(head)}</div>`:'')
-    + `<div>${escapeHtml(corpo).replace(/\n/g,'<br>') || '<span class="muted">(escreva o corpo da mensagem)</span>'}</div>`
-    + (foot?`<div class="muted" style="margin-top:5px;font-size:11px;">${escapeHtml(foot)}</div>`:'')
-    + (btns.length?`<div style="margin-top:7px;display:flex;gap:5px;flex-wrap:wrap;">${btns.map(b=>`<span class="chip" style="margin:0;background:var(--surface-solid);">${escapeHtml(b)}</span>`).join('')}</div>`:'');
+  p.innerHTML = tplBolha(est, {corpo: vars.map((v,i)=>(($('#tplEx'+i)||{}).value||'').trim()),
+    cabecalho: (($('#tplHeadEx')||{}).value||'').trim(), midiaHtml,
+    botoes: Object.fromEntries(bts.map((b,i)=>[i, b.tipo==='COPY_CODE' ? b.exemplo : b.exemplo]))});
 }
 async function criarTemplate(){
-  const vars = tplVars();
+  const vars = tplVars(), fmt = ($('#tplHeadFmt')||{}).value || '';
+  if(['IMAGE','VIDEO','DOCUMENT'].includes(fmt) && !TPL_MIDIA){ alert('Escolha o arquivo do cabeçalho.'); return; }
+  const cabecalho = !fmt ? null : fmt==='TEXT'
+    ? {formato:'TEXT', texto: (($('#tplHead')||{}).value||'').trim(), exemplo: (($('#tplHeadEx')||{}).value||'').trim()}
+    : {formato: fmt, midia: {mime: TPL_MIDIA.mime, base64: TPL_MIDIA.base64}};
   const body = {
     nome: (($('#tplNome')||{}).value||'').trim().toLowerCase(),
     categoria: (($('#tplCat')||{}).value||''),
     corpo: (($('#tplCorpo')||{}).value||'').trim(),
     exemplos: vars.map((v,i)=>(($('#tplEx'+i)||{}).value||'').trim()),
-    cabecalho: (($('#tplHead')||{}).value||'').trim(),
-    rodape: (($('#tplFoot')||{}).value||'').trim(),
-    botoes: (($('#tplBtns')||{}).value||'').split(',').map(s=>s.trim()).filter(Boolean)
+    cabecalho, rodape: (($('#tplFoot')||{}).value||'').trim(),
+    botoes: _tplBotoesOrdenados()
   };
   $('#tplOut').innerHTML = '<span class="chip t-acc"><i class="ti ti-loader"></i> enviando para a Meta…</span>';
   const r = await api('/api/templates',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
   if(!r.ok){ $('#tplOut').innerHTML = `<div class="row t-bad" style="background:var(--bad-bg);"><i class="ti ti-ban"></i><span>${escapeHtml(r.erro||'falhou')}</span></div>`; return; }
   if(r.status==='dry_run'){ $('#tplOut').innerHTML = `<div class="row t-warn" style="background:var(--warn-bg);"><i class="ti ti-flask"></i><span>Validado, mas <strong>nada foi criado</strong>: ${escapeHtml(r.aviso||'')}</span></div>`; return; }
   $('#tplOut').innerHTML = `<div class="row t-ok" style="background:var(--ok-bg);"><i class="ti ti-circle-check"></i><span><strong>${escapeHtml(r.nome)}</strong> enviado — status <strong>${escapeHtml(r.status)}</strong>. A Meta costuma revisar em minutos; atualize a lista para ver.</span></div>`;
-  ['#tplNome','#tplCorpo','#tplHead','#tplFoot','#tplBtns'].forEach(s=>{ const e=$(s); if(e) e.value=''; });
+  ['#tplNome','#tplCorpo','#tplFoot'].forEach(s=>{ const e=$(s); if(e) e.value=''; });
+  $('#tplHeadFmt').value=''; tplHeadFmt(); TPL_BOTOES=[]; tplBotoesRender();
   const bx = $('#tplExemplos'); if(bx){ bx.innerHTML=''; bx.dataset.n=''; }
   tplCarregar(1);
 }
@@ -1257,12 +1390,81 @@ async function campCarregar(){
       window.CURSOS_ALL.map(c=>`<option value="${c}">${c}</option>`).join('');
   const tsel = $('#campTemplate');
   if(tsel && !tsel.options.length){
-    const ts = await api('/api/campanhas/templates');
-    tsel.innerHTML = ts.length ? ts.map(t=>`<option value="${t.nome}" data-idioma="${t.idioma}">${escapeHtml(t.titulo)} (${t.nome})</option>`).join('')
+    const d = await api('/api/campanhas/templates');
+    CAMP_TPLS = d.templates || []; CAMP_FONTES = d.fontes || [];
+    tsel.innerHTML = CAMP_TPLS.length ? CAMP_TPLS.map(t=>`<option value="${t.nome}" data-idioma="${t.idioma}">${escapeHtml(t.titulo)} (${t.nome})</option>`).join('')
       : '<option value="">Nenhum template aprovado</option>';
   }
   await campPreview();
+  campConteudo();
   await campListar();
+}
+let CAMP_TPLS = [], CAMP_FONTES = [], CAMP_AMOSTRA = null;
+const _campTpl = () => CAMP_TPLS.find(t=>t.nome===($('#campTemplate')||{}).value);
+// variável do corpo -> fonte padrão: a chave conhecida do rol, senão nome, curso, fixo
+function _fontePadrao(t, i){
+  const k = ((t.params||[])[i]||{}).k;
+  if(['nome','curso','prazo','codigo'].includes(k)) return k;
+  return i===0 ? 'nome' : (i===1 ? 'curso' : 'fixo');
+}
+function _seletorFonte(id, fonte, valor, rotulo){
+  return `<div class="camp-var"><span class="muted">${rotulo}</span>
+    <select id="${id}F" onchange="campConteudoMudou()">${CAMP_FONTES.map(([k,r])=>`<option value="${k}" ${k===fonte?'selected':''}>${escapeHtml(r)}</option>`).join('')}</select>
+    <input id="${id}V" value="${escapeHtml(valor||'')}" placeholder="texto fixo" oninput="campPreviaRender()" style="${fonte==='fixo'?'':'display:none;'}"></div>`;
+}
+function campConteudo(){
+  const t = _campTpl(), box = $('#campConteudo'); if(!box) return;
+  if(!t){ box.innerHTML = ''; $('#campPrevia').innerHTML=''; return; }
+  const est = t.estrutura || {n_vars:(t.params||[]).length, botoes:[]}, pad = t.padrao || {};
+  let h = '';
+  for(let i=0;i<(est.n_vars||0);i++) h += _seletorFonte('campVar'+i, _fontePadrao(t,i), '', `Corpo {{${i+1}}}`);
+  const cab = est.cabecalho;
+  if(cab && cab.formato==='TEXT' && cab.n_vars) h += _seletorFonte('campCab', pad.cabecalho?'fixo':'curso', pad.cabecalho, 'Cabeçalho {{1}}');
+  if(cab && ['IMAGE','VIDEO','DOCUMENT'].includes(cab.formato))
+    h += `<div class="camp-var"><span class="muted">${{IMAGE:'Imagem',VIDEO:'Vídeo',DOCUMENT:'Documento'}[cab.formato]} do cabeçalho</span>
+      <input id="campMidia" value="${escapeHtml(pad.midia||'')}" placeholder="https://… (link público do arquivo)" oninput="campPreviaRender()"></div>`;
+  (est.botoes||[]).filter(b=>b.dinamico).forEach(b=>{
+    const v = (pad.botoes||{})[b.index];
+    h += _seletorFonte('campBt'+b.index, v?'fixo':(b.tipo==='URL'?'codigo':'fixo'), v,
+      b.tipo==='URL' ? `Final do link "${escapeHtml(b.texto)}"` : 'Código do cupom');
+  });
+  box.innerHTML = h || '<div class="muted">Este template não tem variáveis — sai igual para todos.</div>';
+  campPreviaRender();
+}
+function campConteudoMudou(){
+  document.querySelectorAll('#campConteudo select').forEach(s=>{
+    const v = document.getElementById(s.id.slice(0,-1)+'V'); if(v) v.style.display = s.value==='fixo' ? '' : 'none';
+  });
+  campPreviaRender();
+}
+function _fonteDe(id){ const f = $('#'+id+'F'); return f ? {fonte: f.value, valor: ($('#'+id+'V')||{}).value||''} : null; }
+function campValores(){
+  const t = _campTpl(); if(!t) return {};
+  const est = t.estrutura || {n_vars:(t.params||[]).length, botoes:[]};
+  const v = {corpo: [...Array(est.n_vars||0).keys()].map(i=>_fonteDe('campVar'+i)), botoes:{}};
+  const c = _fonteDe('campCab'); if(c) v.cabecalho = c;
+  const m = $('#campMidia'); if(m) v.midia = m.value.trim();
+  (est.botoes||[]).filter(b=>b.dinamico).forEach(b=>{ v.botoes[b.index] = _fonteDe('campBt'+b.index); });
+  return v;
+}
+function _valorAmostra(f){
+  const l = CAMP_AMOSTRA || {};
+  if(!f) return '';
+  if(f.fonte==='fixo') return f.valor;
+  if(f.fonte==='nome') return (l.nome||'Ana').split(' ')[0];
+  if(f.fonte==='codigo') return l.curso || 'FEQ-0480';
+  if(f.fonte==='curso') return (l.curso ? `(nome do curso) (${l.curso})` : 'Curso (FEQ-0480)');
+  if(f.fonte==='prazo') return 'dd/mm/aaaa';
+  return '';
+}
+function campPreviaRender(){
+  const t = _campTpl(), p = $('#campPrevia'); if(!t || !p) return;
+  const est = t.estrutura || {corpo: t.titulo, botoes: []}, v = campValores();
+  const midia = v.midia;
+  const cab = est.cabecalho || {};
+  p.innerHTML = tplBolha(est, {corpo: (v.corpo||[]).map(_valorAmostra), cabecalho: _valorAmostra(v.cabecalho),
+    midiaHtml: midia && cab.formato==='IMAGE' ? `<img src="${escapeHtml(midia)}">` : '',
+    botoes: Object.fromEntries(Object.entries(v.botoes||{}).map(([k,f])=>[k,_valorAmostra(f)]))});
 }
 async function campPreview(){
   const qs = new URLSearchParams();
@@ -1272,6 +1474,7 @@ async function campPreview(){
   if(fase) qs.set('fase', fase);
   if(ec) qs.set('estado_conversa', ec);
   const r = await api('/api/campanhas/preview?'+qs.toString());
+  CAMP_AMOSTRA = (r.amostra||[])[0] || null; campPreviaRender();
   $('#campPreviewOut').innerHTML =
     `<span class="chip ${r.total?'t-ok':'t-warn'}"><i class="ti ti-users"></i> ${r.total} lead(s) correspondem a este filtro</span>` +
     (r.aviso_tier?`<div class="row t-warn" style="background:var(--warn-bg);margin-top:8px;"><i class="ti ti-alert-triangle"></i><span>${escapeHtml(r.aviso_tier)}</span></div>`:'');
@@ -1285,7 +1488,7 @@ async function campDisparar(){
   const titulo = tsel.options[tsel.selectedIndex].textContent;
   if(!confirm(`Disparar "${titulo}" para ${total} lead(s) agora? Isto manda WhatsApp de verdade.`)) return;
   const body = {
-    nome: ($('#campNome')||{}).value||'', template_nome: tpl,
+    nome: ($('#campNome')||{}).value||'', template_nome: tpl, valores: campValores(),
     filtro: { curso: ($('#campCurso')||{}).value||null, fase: ($('#campFase')||{}).value||null,
              estado_conversa: ($('#campEstadoConv')||{}).value||null }
   };

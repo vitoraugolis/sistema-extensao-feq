@@ -143,7 +143,7 @@ def test_disparar_campanha_envia_registra_e_conclui():
     cid = A.EST.criar_campanha("Camp direta", "feq_teste", "pt_BR", {"curso": "FEQ-0331"},
                                len(leads), "operador")
     antigo = A.WA.enviar_template
-    A.WA.enviar_template = lambda tel, nome, idioma="pt_BR", params=None: {"ok": True, "wamid": "w-" + tel}
+    A.WA.enviar_template = lambda tel, nome, idioma="pt_BR", params=None, componentes=None: {"ok": True, "wamid": "w-" + tel}
     try:
         A._disparar_campanha(cid, leads, _tpl())
     finally:
@@ -159,7 +159,7 @@ def test_disparar_campanha_registra_falha_sem_derrubar_o_lote():
     leads = A.EST.filtrar_leads(curso="FEQ-0333")
     cid = A.EST.criar_campanha("Camp falha", "feq_teste", "pt_BR", {}, len(leads), "operador")
     antigo = A.WA.enviar_template
-    A.WA.enviar_template = lambda tel, nome, idioma="pt_BR", params=None: {"ok": False, "motivo": "bloqueado"}
+    A.WA.enviar_template = lambda tel, nome, idioma="pt_BR", params=None, componentes=None: {"ok": False, "motivo": "bloqueado"}
     try:
         A._disparar_campanha(cid, leads, _tpl())
     finally:
@@ -176,7 +176,7 @@ def test_cancelamento_interrompe_lotes_futuros():
     cid = A.EST.criar_campanha("Camp cancel", "feq_teste", "pt_BR", {}, len(leads), "operador")
     A.EST.cancelar_campanha(cid)          # já cancelada ANTES de disparar
     antigo = A.WA.enviar_template
-    A.WA.enviar_template = lambda tel, nome, idioma="pt_BR", params=None: {"ok": True, "wamid": "w-" + tel}
+    A.WA.enviar_template = lambda tel, nome, idioma="pt_BR", params=None, componentes=None: {"ok": True, "wamid": "w-" + tel}
     try:
         A._disparar_campanha(cid, leads, _tpl())
     finally:
@@ -197,7 +197,7 @@ def test_lote_e_pausa_respeitam_CAMPANHA_LOTE():
     A.CAMPANHA_LOTE = 2
     A.time.sleep = lambda s: sleeps.append(s)        # não espera de verdade (restaurado no finally)
     antigo = A.WA.enviar_template
-    A.WA.enviar_template = lambda tel, nome, idioma="pt_BR", params=None: {"ok": True, "wamid": "w-" + tel}
+    A.WA.enviar_template = lambda tel, nome, idioma="pt_BR", params=None, componentes=None: {"ok": True, "wamid": "w-" + tel}
     try:
         A._disparar_campanha(cid, leads, _tpl())
     finally:
@@ -227,6 +227,61 @@ def test_webhook_button_correlaciona_clique_pelo_context_id():
     out = wa.receber(payload)
     assert any(o.get("acao") == "campanha_clique" and o["card_id"] == "c1" for o in out), out
     assert est.campanha_contagens(1)["clicado"] == 1
+
+
+# ------------------------------------------------- template completo (19/10/2026)
+def _tpl_completo():
+    from atena.transporte.whatsapp import estrutura_template, montar_componentes
+    comps = montar_componentes(
+        "Oi {{1}}, as inscrições do {{2}} estão abertas!", ["Ana", "FEQ-0480"],
+        {"formato": "IMAGE", "handle": "h"}, "Extensão FEQ",
+        ["Tenho dúvidas", {"tipo": "URL", "texto": "Inscrever", "url": "https://feq.x/{{1}}",
+                           "exemplo": "feq-0480"}, {"tipo": "COPY_CODE", "exemplo": "FEQ15"}])
+    return {**_tpl("feq_completo", n_params=2), "estrutura": estrutura_template({"components": comps}),
+            "padrao": {"midia": "https://feq.x/tplmidia/feq_completo.png", "botoes": {"2": "FEQ15"}}}
+
+
+def test_campanha_monta_cabecalho_link_e_cupom_por_lead():
+    _lead("tc1", nome="Ana Souza", curso="FEQ-0655")
+    lead = A.EST.get_lead("tc1")
+    cfg = {"corpo": [{"fonte": "nome"}, {"fonte": "codigo"}],
+           "botoes": {"1": {"fonte": "fixo", "valor": "feq-0480"}}}
+    comps, corpo, erro = A._componentes_para(_tpl_completo(), lead, cfg)
+    assert erro is None and corpo == ["Ana", "FEQ-0655"], (erro, corpo)
+    por = {(c["type"], c.get("index")): c for c in comps}
+    assert por[("header", None)]["parameters"][0]["image"]["link"].endswith("feq_completo.png")
+    assert por[("button", "1")]["parameters"][0]["text"] == "feq-0480"
+    assert por[("button", "2")]["parameters"][0]["coupon_code"] == "FEQ15"      # padrão da criação
+
+
+def test_campanha_recusa_disparo_com_variavel_vazia():
+    _lead("tc2", curso="FEQ-0655")
+    antigo = A._templates_enviaveis
+    A._templates_enviaveis = lambda: [_tpl_completo()]
+    try:
+        r = _cliente().post("/api/campanhas", json={
+            "template_nome": "feq_completo", "filtro": {"curso": "FEQ-0655"},
+            "valores": {"corpo": [{"fonte": "nome"}, {"fonte": "fixo", "valor": ""}]}})
+    finally:
+        A._templates_enviaveis = antigo
+    assert r.status_code == 400 and "vazia" in r.get_json()["erro"], r.get_json()
+
+
+def test_criar_template_com_imagem_guarda_midia_e_padrao():
+    import base64
+    png = base64.b64encode(b"\x89PNG\r\n\x1a\nfake").decode()
+    r = _cliente().post("/api/templates", json={
+        "nome": "feq_teste_imagem", "categoria": "MARKETING", "corpo": "Oi {{1}}, novidade!",
+        "exemplos": ["Ana"], "cabecalho": {"formato": "IMAGE", "midia": {"mime": "image/png", "base64": png}},
+        "botoes": [{"tipo": "URL", "texto": "Ver", "url": "https://feq.x/{{1}}", "exemplo": "a"}]}).get_json()
+    assert r["ok"] and r["status"] == "dry_run", r
+    assert r["enviado"]["components"][0] == {"type": "HEADER", "format": "IMAGE",
+                                             "example": {"header_handle": ["dry-run-handle"]}}
+    pad = A._tpl_padrao("feq_teste_imagem")
+    assert pad["midia"].endswith("/tplmidia/feq_teste_imagem.png") and pad["botoes"] == {"0": "a"}, pad
+    assert (A.TPL_MIDIA_DIR / "feq_teste_imagem.png").exists()
+    assert A.app.test_client().get("/tplmidia/feq_teste_imagem.png").status_code == 200   # público
+    (A.TPL_MIDIA_DIR / "feq_teste_imagem.png").unlink()
 
 
 if __name__ == "__main__":

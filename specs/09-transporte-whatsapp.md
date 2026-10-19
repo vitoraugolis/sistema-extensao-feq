@@ -33,6 +33,10 @@ atribuir o app (Controle total) → Gerar token com `whatsapp_business_messaging
 
 > As variáveis de data nos templates devem passar pelo Revisor antes do envio.
 
+Templates novos (cabeçalho de mídia, links, telefone, cupom) são criados pela Central — ver
+`specs/14` § "Templates e campanhas completos". Envio com cabeçalho/botões dinâmicos:
+`WhatsApp.enviar_template(..., componentes=componentes_envio(estrutura, ...))`.
+
 ## Arquitetura sugerida
 ```
 WhatsApp ──► webhook (novo serviço :8091) ──► POST /converse (:8090)
