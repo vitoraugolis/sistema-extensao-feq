@@ -96,7 +96,7 @@ a cada envio). Os exemplos de cabeçalho/link/cupom viram o **padrão de envio**
 (`config tpl_padrao:<nome>`). Na aba Campanhas, ao escolher o template, cada variável do corpo/
 cabeçalho e cada botão dinâmico ganha uma fonte (primeiro nome, curso, código, fim das
 inscrições ou texto fixo), a mídia do cabeçalho vem preenchida com o padrão, e a prévia usa o
-1º lead do público. O disparo é recusado (400) se algum valor sair vazio para esse lead
+1º lead do público. A mídia do cabeçalho pode ser trocada por campanha com **Escolher no computador** (`POST /api/campanhas/midia`: mesmo tipo/tamanho da criação, grava `tpl_midia/camp_<sha256>.<ext>` — mesmo arquivo, mesmo link; nunca sobrescreve o de outra campanha) ou colando um link https://. O disparo é recusado (400) se algum valor sair vazio para esse lead
 (`_componentes_para`) — antes, template criado na Central saía com variável vazia e a Meta
 recusava o lote inteiro. A configuração fica em `campanhas.config_json`. O envio avulso pela
 conversa usa o mesmo caminho, com os padrões da criação.

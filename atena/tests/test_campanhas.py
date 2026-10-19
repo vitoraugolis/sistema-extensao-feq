@@ -284,6 +284,22 @@ def test_criar_template_com_imagem_guarda_midia_e_padrao():
     (A.TPL_MIDIA_DIR / "feq_teste_imagem.png").unlink()
 
 
+def test_midia_da_campanha_vem_do_computador():
+    """Arquivo escolhido na campanha vira link público próprio (hash do conteúdo):
+    mesmo arquivo -> mesmo link; tipo errado é recusado antes de gravar."""
+    import base64
+    png = base64.b64encode(b"\x89PNG\r\n\x1a\ncampanha").decode()
+    c = _cliente()
+    r1 = c.post("/api/campanhas/midia", json={"formato": "IMAGE", "midia": {"mime": "image/png", "base64": png}}).get_json()
+    r2 = c.post("/api/campanhas/midia", json={"formato": "IMAGE", "midia": {"mime": "image/png", "base64": png}}).get_json()
+    assert r1["ok"] and r1["url"] == r2["url"] and "/tplmidia/camp_" in r1["url"], (r1, r2)
+    arq = A.TPL_MIDIA_DIR / r1["url"].rsplit("/", 1)[-1]
+    assert A.app.test_client().get("/tplmidia/" + arq.name).status_code == 200   # público p/ a Meta
+    ruim = c.post("/api/campanhas/midia", json={"formato": "IMAGE", "midia": {"mime": "application/pdf", "base64": png}})
+    assert ruim.status_code == 400 and "não aceito" in ruim.get_json()["erro"]
+    arq.unlink()
+
+
 if __name__ == "__main__":
     casos = [v for k, v in sorted(globals().items()) if k.startswith("test_") and callable(v)]
     falhas = 0

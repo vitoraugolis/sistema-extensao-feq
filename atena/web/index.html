@@ -1399,7 +1399,7 @@ async function campCarregar(){
   campConteudo();
   await campListar();
 }
-let CAMP_TPLS = [], CAMP_FONTES = [], CAMP_AMOSTRA = null;
+let CAMP_TPLS = [], CAMP_FONTES = [], CAMP_AMOSTRA = null, CAMP_MIDIA_LOCAL = null;
 const _campTpl = () => CAMP_TPLS.find(t=>t.nome===($('#campTemplate')||{}).value);
 // variável do corpo -> fonte padrão: a chave conhecida do rol, senão nome, curso, fixo
 function _fontePadrao(t, i){
@@ -1422,13 +1422,34 @@ function campConteudo(){
   if(cab && cab.formato==='TEXT' && cab.n_vars) h += _seletorFonte('campCab', pad.cabecalho?'fixo':'curso', pad.cabecalho, 'Cabeçalho {{1}}');
   if(cab && ['IMAGE','VIDEO','DOCUMENT'].includes(cab.formato))
     h += `<div class="camp-var"><span class="muted">${{IMAGE:'Imagem',VIDEO:'Vídeo',DOCUMENT:'Documento'}[cab.formato]} do cabeçalho</span>
-      <input id="campMidia" value="${escapeHtml(pad.midia||'')}" placeholder="https://… (link público do arquivo)" oninput="campPreviaRender()"></div>`;
+      <span style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+        <label class="btn btn-g" style="padding:5px 10px;cursor:pointer;"><i class="ti ti-folder-open"></i> Escolher no computador
+          <input type="file" id="campMidiaArq" accept="${{IMAGE:'image/jpeg,image/png',VIDEO:'video/mp4,video/3gpp',DOCUMENT:'application/pdf'}[cab.formato]}"
+                 style="display:none;" onchange="campSubirMidia(this,'${cab.formato}')"></label>
+        <span class="muted" id="campMidiaSt" style="font-size:11.5px;">${pad.midia ? 'usando o arquivo padrão do template' : 'nenhum arquivo'}</span>
+      </span>
+      <input id="campMidia" value="${escapeHtml(pad.midia||'')}" placeholder="…ou cole um link https:// público" oninput="campPreviaRender()"></div>`;
   (est.botoes||[]).filter(b=>b.dinamico).forEach(b=>{
     const v = (pad.botoes||{})[b.index];
     h += _seletorFonte('campBt'+b.index, v?'fixo':(b.tipo==='URL'?'codigo':'fixo'), v,
       b.tipo==='URL' ? `Final do link "${escapeHtml(b.texto)}"` : 'Código do cupom');
   });
   box.innerHTML = h || '<div class="muted">Este template não tem variáveis — sai igual para todos.</div>';
+  campPreviaRender();
+}
+// Sobe o arquivo escolhido e troca o link da mídia por ele — a Meta busca a mídia
+// por link no envio, então o servidor guarda e publica o arquivo (/tplmidia).
+async function campSubirMidia(inp, formato){
+  const f = inp.files && inp.files[0], st = $('#campMidiaSt'); if(!f) return;
+  st.textContent = 'enviando ' + f.name + '…';
+  const b64 = await new Promise((ok, erro) => { const rd = new FileReader();
+    rd.onload = () => ok(String(rd.result).split(',')[1]); rd.onerror = erro; rd.readAsDataURL(f); });
+  const r = await api('/api/campanhas/midia',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({formato, midia:{mime:f.type, base64:b64}})});
+  inp.value = '';
+  if(!r.ok){ st.textContent = ''; alert(r.erro || 'falha ao enviar o arquivo'); return; }
+  $('#campMidia').value = r.url; st.textContent = '✓ ' + f.name;
+  CAMP_MIDIA_LOCAL = {url: r.url, obj: URL.createObjectURL(f)};   // prévia na hora, sem rede
   campPreviaRender();
 }
 function campConteudoMudou(){
@@ -1460,7 +1481,7 @@ function _valorAmostra(f){
 function campPreviaRender(){
   const t = _campTpl(), p = $('#campPrevia'); if(!t || !p) return;
   const est = t.estrutura || {corpo: t.titulo, botoes: []}, v = campValores();
-  const midia = v.midia;
+  const midia = CAMP_MIDIA_LOCAL && CAMP_MIDIA_LOCAL.url === v.midia ? CAMP_MIDIA_LOCAL.obj : v.midia;
   const cab = est.cabecalho || {};
   p.innerHTML = tplBolha(est, {corpo: (v.corpo||[]).map(_valorAmostra), cabecalho: _valorAmostra(v.cabecalho),
     midiaHtml: midia && cab.formato==='IMAGE' ? `<img src="${escapeHtml(midia)}">` : '',

@@ -1347,6 +1347,48 @@ def _tpl_padrao(nome):
         return {}
 
 
+def _decodificar_midia(formato, m):
+    """{mime, base64} do navegador -> (bytes, mime, ext, erro), com o tipo e o tamanho
+    que a Meta aceita para esse formato de cabeçalho."""
+    m = m or {}
+    mime = (m.get("mime") or "").lower()
+    ext = _TPL_MIDIA_EXT.get(formato, {}).get(mime)
+    if not ext:
+        return None, mime, None, (f"arquivo do cabeçalho: tipo {mime or '?'} não aceito para "
+                                  f"{formato.lower()} ({', '.join(_TPL_MIDIA_EXT.get(formato, {}))})")
+    try:
+        conteudo = base64.b64decode(m.get("base64") or "", validate=True)
+    except (ValueError, TypeError):
+        return None, mime, ext, "arquivo do cabeçalho corrompido"
+    if not conteudo or len(conteudo) > _TPL_MIDIA_MB[formato] * 1024 * 1024:
+        return None, mime, ext, f"arquivo do cabeçalho vazio ou acima de {_TPL_MIDIA_MB[formato]} MB"
+    return conteudo, mime, ext, None
+
+
+def _publicar_midia(arquivo, conteudo):
+    """Grava em data/tpl_midia e devolve o link público que a Meta busca no envio."""
+    TPL_MIDIA_DIR.mkdir(parents=True, exist_ok=True)
+    (TPL_MIDIA_DIR / arquivo).write_bytes(conteudo)
+    base = (os.environ.get("ATENA_PUBLIC_URL") or request.url_root).rstrip("/")
+    return f"{base}/tplmidia/{arquivo}"
+
+
+@app.route("/api/campanhas/midia", methods=["POST"])
+def campanhas_midia():
+    """Arquivo do cabeçalho escolhido no computador para UMA campanha (troca a mídia
+    padrão do template). Nome pelo hash do conteúdo: reenviar o mesmo arquivo não
+    duplica, e um arquivo novo nunca sobrescreve o de outra campanha em andamento."""
+    b = request.get_json(silent=True) or {}
+    formato = (b.get("formato") or "").upper()
+    conteudo, _, ext, erro = _decodificar_midia(formato, b.get("midia"))
+    if erro:
+        return jsonify({"ok": False, "erro": erro}), 400
+    import hashlib
+    url = _publicar_midia(f"camp_{hashlib.sha256(conteudo).hexdigest()[:16]}.{ext}", conteudo)
+    EST.log_acao(session.get("usuario", "operador"), f"subiu mídia de campanha {url.rsplit('/', 1)[-1]}")
+    return jsonify({"ok": True, "url": url})
+
+
 @app.route("/api/templates", methods=["POST"])
 def templates_criar():
     """Cria o template na Meta e submete para aprovação (ação externa — o operador
@@ -1361,29 +1403,16 @@ def templates_criar():
     cab = normalizar_cabecalho(b.get("cabecalho"))
     midia_url = None
     if cab and cab["formato"] in _TPL_MIDIA_EXT:
-        m = cab.pop("midia", None) or {}
-        mime = (m.get("mime") or "").lower()
-        ext = _TPL_MIDIA_EXT[cab["formato"]].get(mime)
-        if not ext:
-            return jsonify({"ok": False, "erro": f"arquivo do cabeçalho: tipo {mime or '?'} não aceito para "
-                            f"{cab['formato'].lower()} ({', '.join(_TPL_MIDIA_EXT[cab['formato']])})"}), 400
-        try:
-            conteudo = base64.b64decode(m.get("base64") or "", validate=True)
-        except (ValueError, TypeError):
-            return jsonify({"ok": False, "erro": "arquivo do cabeçalho corrompido"}), 400
-        if not conteudo or len(conteudo) > _TPL_MIDIA_MB[cab["formato"]] * 1024 * 1024:
-            return jsonify({"ok": False, "erro": f"arquivo do cabeçalho vazio ou acima de "
-                            f"{_TPL_MIDIA_MB[cab['formato']]} MB"}), 400
+        conteudo, mime, ext, erro = _decodificar_midia(cab["formato"], cab.pop("midia", None))
+        if erro:
+            return jsonify({"ok": False, "erro": erro}), 400
         if not re.fullmatch(r"[a-z0-9_]{1,512}", nome):
             return jsonify({"ok": False, "erro": "nome inválido: use só letras minúsculas, números e _"}), 400
         up = WA.subir_exemplo_midia(conteudo, mime, f"{nome}.{ext}")
         if not up.get("ok"):
             return jsonify({"ok": False, "erro": up.get("erro")}), 400
         cab["handle"] = up["handle"]
-        TPL_MIDIA_DIR.mkdir(parents=True, exist_ok=True)
-        (TPL_MIDIA_DIR / f"{nome}.{ext}").write_bytes(conteudo)
-        base = (os.environ.get("ATENA_PUBLIC_URL") or request.url_root).rstrip("/")
-        midia_url = f"{base}/tplmidia/{nome}.{ext}"
+        midia_url = _publicar_midia(f"{nome}.{ext}", conteudo)
     botoes = normalizar_botoes(b.get("botoes"))
     r = WA.criar_template(
         nome=nome, categoria=(b.get("categoria") or "").strip(),
