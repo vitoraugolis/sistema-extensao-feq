@@ -119,13 +119,31 @@ def test_caixa_de_entrada_nao_duplica_a_mesma_ficha():
 
 
 def test_alerta_marcado_como_lido_sai_da_caixa():
-    A.EST.add_alerta("pacing_atrasado", "FEQ-0480 atrasado", None)
+    A.EST.add_alerta("envio_falhou", "Mensagem ao lead X NÃO foi entregue", None)
     c = _cliente()
     antes = c.get("/api/notificacoes").get_json()
     alerta = next(i for i in antes["itens"] if i["fonte"] == "alerta")
     c.post("/api/notificacoes/ler", json={"id": alerta["id"]})
     depois = c.get("/api/notificacoes").get_json()
     assert not any(i["fonte"] == "alerta" and i["id"] == alerta["id"] for i in depois["itens"])
+
+
+def test_pacing_atrasado_nao_polui_a_caixa():
+    """Era um alerta por curso por dia — ~90% da caixa em produção (19/10/2026)."""
+    A.EST.add_alerta("pacing_atrasado", "FEQ-0480 atrasado", None)
+    d = _cliente().get("/api/notificacoes").get_json()
+    assert not any(i["tipo"] == "pacing_atrasado" for i in d["itens"])
+
+
+def test_caixa_unica_traz_duvida_acionavel():
+    """Sem a aba Dúvidas, a caixa precisa trazer o id da dúvida (para responder ali)."""
+    A.EST.upsert_lead("meta-19900000017", nome="Lia", telefone="19900000017", curso="FEQ-0480",
+                      fase="Lead", estado_conversa="aguardando_resposta")
+    did = A.EST.add_duvida("meta-19900000017", "Tem certificado?", "vale como pós?")
+    d = _cliente().get("/api/notificacoes").get_json()
+    it = next(i for i in d["itens"] if i["tipo"] == "duvida" and i["card_id"] == "meta-19900000017")
+    assert it["categoria"] == "duvida" and it["ref"] and it["contexto"] == "vale como pós?", it
+    assert d["por_fonte"].get("duvida", 0) >= 1
 
 
 def test_otimizacao_nao_finge_cpl_sem_dado_de_gasto():

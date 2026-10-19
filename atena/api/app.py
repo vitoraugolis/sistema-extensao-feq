@@ -688,6 +688,11 @@ def inscricao_transcrita(card_id):
 
 
 # ------------------------------------------------------ Central de Notificações
+# 'inscricao': a fila de fichas já representa o mesmo fato (ver abaixo).
+# 'pacing_atrasado': era ~90% da caixa (um por curso por dia) e não pede ação — o
+# ritmo está no Painel/Medição. pacing.py não grava mais; o filtro esconde o legado.
+ALERTAS_FORA_DA_CAIXA = {"inscricao", "pacing_atrasado"}
+
 @app.route("/api/notificacoes")
 def notificacoes():
     """Uma caixa de entrada só, em vez de o agente varrer 5 abas atrás de trabalho.
@@ -702,14 +707,14 @@ def notificacoes():
         # feito, em vez de depender de alguém marcar como lido). O alerta continua
         # existindo para o disparo externo ao operador (`alertas_nao_notificados`) —
         # o que não pode é a mesma ficha ocupar duas linhas da caixa de entrada.
-        if a["tipo"] == "inscricao":
+        if a["tipo"] in ALERTAS_FORA_DA_CAIXA:
             continue
-        itens.append({"fonte": "alerta", "id": a["id"], "tipo": a["tipo"],
+        itens.append({"fonte": "alerta", "categoria": "alerta", "id": a["id"], "tipo": a["tipo"],
                       "texto": a["texto"], "card_id": a.get("card_id"),
                       "ts": a["criado"], "lido": False})
     for i in GRW.inscricoes(status="recebida"):
         lead = EST.get_lead(i["card_id"]) or {}
-        itens.append({"fonte": "inscricao", "id": i["id"], "tipo": "ficha_nova",
+        itens.append({"fonte": "inscricao", "categoria": "ficha", "id": i["id"], "tipo": "ficha_nova",
                       "texto": f"Ficha completa de {lead.get('nome') or i['card_id']} "
                                f"({i['curso']}) aguardando transcrição na Extecamp",
                       "card_id": i["card_id"], "ts": i["criado"], "lido": False,
@@ -718,28 +723,29 @@ def notificacoes():
     # A fila de aprovações mede idade em HORAS; alertas e fichas têm timestamp. Para
     # ordenar tudo junto, converto horas -> ts (não o contrário): timestamp é o dado
     # mais preciso e o único que sobrevive a um reload da página.
-    ABAS = {"abrir": "conversas", "duvidas": "duvidas", "injetor": "injetor"}
     try:
-        # só o que EXIGE decisão humana (prioridade <=3); captabilidade e afins são
-        # informativos e já têm lugar próprio — repetir aqui vira ruído na caixa.
+        # Caixa ÚNICA (19/10/2026): as abas Aprovações e Dúvidas foram absorvidas —
+        # cada item traz o que é preciso para agir AQUI (texto da proposta, contexto
+        # da dúvida). Captabilidade (prioridade 4) entra também: sem a aba antiga, este
+        # é o único lugar onde o operador a veria fora do painel.
         for p in _aprovacoes_payload()["itens"]:
-            if p.get("prioridade", 9) > 3:
-                continue
             h = p.get("horas")
             ts = ((agora - datetime.timedelta(hours=h)).isoformat()
                   if isinstance(h, (int, float)) else agora.isoformat())
             itens.append({"fonte": "aprovacao", "id": p.get("card_id") or p.get("pid"),
+                          "categoria": "duvida" if p.get("tipo") == "duvida" else "aprovacao",
+                          "prioridade": p.get("prioridade"), "ref": p.get("ref") or p.get("pid"),
+                          "mensagem": p.get("mensagem"), "contexto": p.get("contexto"),
                           "tipo": p.get("tipo") or "aprovacao",
                           "texto": f"{p.get('nome') or p.get('curso') or ''}: {p.get('motivo') or ''}".strip(": "),
                           "card_id": p.get("card_id"), "ts": ts, "lido": False,
-                          "chave": p["chave"],
-                          "acao": ABAS.get(p.get("acao"), "aprovacoes")})
+                          "chave": p["chave"], "acao": p.get("acao")})
     except Exception as e:      # a caixa de entrada nunca pode cair por causa de uma fonte
         print(f"[notificacoes] aprovações indisponíveis: {e}", flush=True)
     itens.sort(key=lambda x: x.get("ts") or "", reverse=True)
     por_tipo = {}
     for i in itens:
-        por_tipo[i["fonte"]] = por_tipo.get(i["fonte"], 0) + 1
+        por_tipo[i["categoria"]] = por_tipo.get(i["categoria"], 0) + 1
     return jsonify({"itens": itens, "total": len(itens), "por_fonte": por_tipo})
 
 
@@ -1636,6 +1642,7 @@ def _aprovacoes_payload(incluir_dispensadas=False):
             itens.append({"tipo": "proposta", "prioridade": 3, "card_id": l["card_id"],
                           "nome": l.get("nome") or l["card_id"], "curso": l.get("curso"),
                           "motivo": (prop.get("mensagem") or "")[:120],
+                          "mensagem": prop.get("mensagem"),
                           "horas": _ha_h(prop.get("ts")), "acao": "abrir",
                           "marca": prop.get("id")})
     # 4) dúvidas abertas para a coordenação
@@ -1644,6 +1651,7 @@ def _aprovacoes_payload(incluir_dispensadas=False):
         itens.append({"tipo": "duvida", "prioridade": 2, "card_id": d["card_id"],
                       "nome": l.get("nome") or d["card_id"], "curso": l.get("curso"),
                       "motivo": d.get("pergunta") or "", "horas": _ha_h(d.get("criado")),
+                      "contexto": d.get("contexto"),
                       "acao": "duvidas", "ref": d["id"], "marca": d["id"]})
     # 5) curso encerrado com leads ativos (decisão de negócio, não de conversa)
     ativos = {}

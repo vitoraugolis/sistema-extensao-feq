@@ -155,11 +155,9 @@ def passada(g, ads, ont=None, est=None, agora=None):
         prazo = datetime.date.fromisoformat(c["prazo"]) if c.get("prazo") else None
         ritmos[c["curso"]] = calcular(c["meta_seg"], g.inscritos(c["curso"]), prazo,
                                       g.vel_7d(c["curso"], agora), agora.date())
-        if ritmos[c["curso"]]["status"] == "atrasado":
-            r = ritmos[c["curso"]]
-            _alerta(est, "pacing_atrasado",
-                    f"{c['curso']}/{c['turma']}: faltam {r['faltam']} p/ meta {r['meta_seg']} "
-                    f"em {r['dias']}d — precisa {r['vel_necessaria']}/dia, faz {r['vel_7d']}/dia")
+        # curso atrasado NÃO vira alerta (poluía a caixa de notificações, um por curso
+        # por dia): o ritmo aparece no Painel/Medição. CPL e realocação seguem alertando —
+        # são decisões de verba.
     return {"insights": n_ins, "ritmos": ritmos,
             "cpl": regra_cpl(g, ads, est, agora=agora),
             "realocacao": realocar(g, ads, ritmos, est, agora=agora)}

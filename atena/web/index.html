@@ -431,8 +431,6 @@ try{ const t = localStorage.getItem('tema'); if(t) document.documentElement.data
       <button class="navi" data-sec="coleta"><i class="ti ti-cloud-download"></i> Coleta de Dados</button>
       <button class="navi" data-sec="kanban"><i class="ti ti-layout-columns"></i> Funil</button>
       <button class="navi" data-sec="conversas"><i class="ti ti-messages"></i> Conversas <span class="tag t-ok" id="cvCount" style="display:none;margin-left:auto;"></span></button>
-      <button class="navi" data-sec="aprovacoes"><i class="ti ti-inbox"></i> Aprovações <span class="tag t-bad" id="apCount" style="display:none;margin-left:auto;"></span></button>
-      <button class="navi" data-sec="duvidas"><i class="ti ti-help-circle"></i> Dúvidas <span class="tag t-warn" id="dvCount" style="display:none;margin-left:auto;"></span></button>
       <button class="navi" data-sec="injetor"><i class="ti ti-database-import"></i> Injetor</button>
       <button class="navi" data-sec="medicao"><i class="ti ti-chart-arrows-vertical"></i> Medição</button>
       <button class="navi" data-sec="lps"><i class="ti ti-browser"></i> LPs</button>
@@ -489,32 +487,6 @@ try{ const t = localStorage.getItem('tema'); if(t) document.documentElement.data
         </div>
       </section>
 
-      <section id="aprovacoes" class="hidden">
-        <div class="g sec">
-          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-            <h2 style="margin:0;"><i class="ti ti-inbox"></i> Fila de intervenção humana</h2>
-            <button class="btn btn-g" style="margin-left:auto;" onclick="dispensarAprov()" title="Limpa a fila. Um item volta sozinho se o lead falar de novo ou surgir proposta nova."><i class="ti ti-trash"></i> Limpar tudo</button>
-          </div>
-          <p class="muted" style="margin:0 0 10px;">O que o agente <strong>não resolveu sozinho</strong> — em ordem de urgência. Cada vez que você resolve um destes, o curador transforma a sua resposta em lição para o sistema não precisar perguntar de novo.</p>
-          <div id="aprov"></div>
-        </div>
-        <div class="g sec">
-          <div style="display:flex;align-items:center;gap:10px;">
-            <h3 style="margin:0 0 8px;"><i class="ti ti-bell"></i> Alertas do sistema</h3>
-            <button class="btn btn-g" style="margin-left:auto;" onclick="ntLerTudo(true)"><i class="ti ti-checks"></i> Limpar</button>
-          </div>
-          <div id="aprovAlertas"></div>
-        </div>
-      </section>
-
-      <section id="duvidas" class="hidden">
-        <div class="g sec">
-          <h2><i class="ti ti-help-circle"></i> Dúvidas para a coordenação</h2>
-          <p class="muted" style="margin:0 0 10px;">Quando o Vinícius não tem a informação, ele avisa o lead ("vou consultar a coordenação"), a dúvida cai aqui, e a sua resposta vira a fonte autorizada da mensagem que ele elabora de volta.</p>
-          <div id="dvs"></div>
-        </div>
-      </section>
-
       <section id="notificacoes" class="hidden">
         <div class="g sec">
           <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
@@ -522,8 +494,10 @@ try{ const t = localStorage.getItem('tema'); if(t) document.documentElement.data
             <span class="muted" id="ntResumo" style="margin-left:auto;"></span>
             <button class="btn btn-g" onclick="ntLerTudo()"><i class="ti ti-checks"></i> Limpar tudo</button>
           </div>
-          <p class="muted" style="margin:6px 2px 10px;">Tudo que espera por você, numa fila só. As fichas saem daqui quando são
-            transcritas; alertas e aprovações podem ser limpos (o ✕) — uma aprovação dispensada volta se o lead falar de novo.</p>
+          <p class="muted" style="margin:6px 2px 10px;">Tudo que espera por você, numa fila só — aprove, responda e resolva daqui mesmo.
+            As fichas saem quando são transcritas; o resto pode ser limpo (o ✕) — um item dispensado volta se o lead falar de novo.
+            Cada resposta humana vira lição para o agente não precisar perguntar de novo.</p>
+          <div id="ntFiltros" style="display:flex;gap:6px;flex-wrap:wrap;margin:0 0 10px;"></div>
           <div id="ntLista"></div>
         </div>
       </section>
@@ -1019,81 +993,10 @@ async function carregar(){
   if(CONV_ABERTA) refrescarAberta();
   if(!$('#kanban').classList.contains('hidden')) renderKanban();
 
-  const dv = await api('/api/duvidas');
-  const dc = document.getElementById('dvCount');
-  if(Array.isArray(dv)){
-    dc.style.display = dv.length ? 'inline-flex' : 'none'; dc.textContent = dv.length;
-    // O polling de 5s NÃO pode recriar os <textarea> enquanto o operador digita
-    // (mesmo bug das mensagens): re-renderiza só quando o conjunto de dúvidas muda
-    // E ninguém está com foco dentro da lista. Preserva foco/cursor/texto digitado.
-    const dvsBox = $('#dvs'); const dvSig = dv.map(d=>d.id).join(',');
-    const digitando = dvsBox.contains(document.activeElement);
-    if(!digitando && dvsBox.dataset.sig !== dvSig){
-     dvsBox.dataset.sig = dvSig;
-     dvsBox.innerHTML = dv.length ? dv.map(d=>`
-      <div class="g" style="padding:12px 14px;margin-bottom:10px;">
-        <div style="display:flex;align-items:center;gap:8px;font-size:13px;">
-          <i class="ti ti-help-circle" style="color:var(--warn);"></i>
-          <strong>${d.pergunta}</strong>
-          <span class="muted" style="margin-left:auto;">${d.lead} · ${d.curso} · ${(d.criado||'').slice(11,16)}</span>
-        </div>
-        ${d.contexto?`<div class="muted" style="margin:5px 0 0 24px;">lead perguntou: "${d.contexto}"</div>`:''}
-        <textarea id="dvr-${d.id}" rows="2" placeholder="Escreva a informação da coordenação…" style="margin-top:9px;"></textarea>
-        <div style="display:flex;gap:8px;margin-top:8px;align-items:center;">
-          <button class="btn btn-p" onclick="responderDuvida(${d.id})"><i class="ti ti-send"></i> Responder e enviar ao lead</button>
-          <button class="btn btn-g" onclick="paraInjetor(${d.id})" title="Dado de catálogo (preço/data/carga)? Atualize a ontologia.">É dado de catálogo → Injetor</button>
-          <button class="btn btn-g" style="margin-left:auto;" onclick="descartarDuvida(${d.id})" title="Não faz sentido responder — arquiva a dúvida (fica no histórico)"><i class="ti ti-trash"></i> Descartar</button>
-        </div>
-      </div>`).join('') : '<div class="muted">Nenhuma dúvida aberta. 🎉</div>';
-    }
-  }
-
   await inCarregar();          // fila de fichas (substituiu a Verificação)
   await ntCarregar();          // caixa de entrada única
-
-  const ap = await api('/api/aprovacoes');
-  renderAprovacoes(ap);
 }
 
-const AP_ESTILO = {
-  escalonamento: {rot:'o agente pediu ajuda', cls:'t-bad',  ico:'ti-hand-stop'},
-  manual:        {rot:'modo manual',          cls:'t-warn', ico:'ti-user-edit'},
-  proposta:      {rot:'resposta aguardando aprovação', cls:'t-acc', ico:'ti-robot'},
-  duvida:        {rot:'dúvida p/ coordenação', cls:'t-warn', ico:'ti-help-circle'},
-  injetor:       {rot:'ontologia',            cls:'t-acc',  ico:'ti-database-import'},
-  captabilidade: {rot:'curso encerrado',      cls:'t-bad',  ico:'ti-calendar-x'},
-};
-function _idade(h){
-  if(h===null||h===undefined) return '';
-  return h < 1 ? `há ${Math.round(h*60)} min` : (h < 48 ? `há ${Math.round(h)} h` : `há ${Math.round(h/24)} d`);
-}
-function renderAprovacoes(ap){
-  const itens = ap.itens||[], badge = document.getElementById('apCount');
-  if(badge){ badge.style.display = ap.agir ? 'inline-flex' : 'none'; badge.textContent = ap.agir; }
-  $('#aprov').innerHTML = itens.length ? itens.map(i=>{
-    const e = AP_ESTILO[i.tipo] || {rot:i.tipo, cls:'t-acc', ico:'ti-point'};
-    const acao = i.acao==='abrir' && i.card_id
-      ? `<button class="btn btn-p" style="padding:5px 10px;" onclick="abrirDoKanban('${i.card_id}')"><i class="ti ti-message"></i> Abrir conversa</button>`
-        + (i.tipo==='escalonamento'
-            ? `<button class="btn btn-g" style="padding:5px 10px;" onclick="resolverEscalonamento('${i.card_id}')" title="Já tratei — devolver ao fluxo do agente"><i class="ti ti-check"></i> Resolvido</button>` : '')
-      : i.acao==='duvidas'
-        ? `<button class="btn btn-p" style="padding:5px 10px;" onclick="document.querySelector('.navi[data-sec=&quot;duvidas&quot;]').click()"><i class="ti ti-arrow-right"></i> Responder</button>`
-        : `<button class="btn btn-g" style="padding:5px 10px;" onclick="document.querySelector('.navi[data-sec=&quot;injetor&quot;]').click()"><i class="ti ti-arrow-right"></i> Injetor</button>`;
-    return `<div class="row" style="align-items:flex-start;">
-      <i class="ti ${e.ico}"></i>
-      <span style="min-width:0;">
-        <strong>${escapeHtml(i.nome || i.curso || '—')}</strong>
-        <span class="muted">${i.curso && i.nome ? '· '+i.curso : ''} ${_idade(i.horas)}</span>
-        <div class="muted" style="font-size:11.5px;">${escapeHtml((i.motivo||'').slice(0,150))}</div>
-      </span>
-      <span class="tag ${e.cls}" style="margin-left:auto;">${e.rot}</span>
-      <span style="display:flex;gap:6px;">${acao}<button class="btn btn-g" style="padding:5px 10px;" onclick="dispensarAprov('${i.chave}')" title="Dispensar — volta se houver novidade"><i class="ti ti-x"></i></button></span>
-    </div>`;}).join('')
-    : '<div class="muted">Nada esperando por você. O agente está dando conta sozinho. 🎉</div>';
-  $('#aprovAlertas').innerHTML = (ap.alertas||[]).length
-    ? ap.alertas.map(a=>`<div class="row"><i class="ti ti-alert-circle"></i><span>${escapeHtml(a.motivo)}</span><span class="muted" style="margin-left:auto;">${_idade(a.horas)}</span></div>`).join('')
-    : '<div class="muted">Sem alertas.</div>';
-}
 async function dispensarAprov(chave){
   if(!chave && !confirm('Limpar TODA a fila de intervenção? Nada é apagado: um item volta sozinho quando o lead falar de novo ou surgir proposta nova.')) return;
   await api('/api/aprovacoes/dispensar',{method:'POST',headers:{'Content-Type':'application/json'},
@@ -1573,43 +1476,98 @@ async function inTranscrita(id){
 
 // ------------------------------------------------------------- Notificações
 const NT_ICONE = {
-  ficha_nova: {i:'ti-file-text', c:'t-ok'},
-  escalonamento: {i:'ti-hand-stop', c:'t-bad'},
-  manual: {i:'ti-user-edit', c:'t-warn'},
-  proposta: {i:'ti-robot', c:'t-acc'},
-  duvida: {i:'ti-help-circle', c:'t-warn'},
-  inscricao: {i:'ti-file-text', c:'t-ok'},
+  ficha_nova:    {i:'ti-file-text',       c:'t-ok',   rot:'ficha nova'},
+  escalonamento: {i:'ti-hand-stop',       c:'t-bad',  rot:'o agente pediu ajuda'},
+  manual:        {i:'ti-user-edit',       c:'t-warn', rot:'modo manual'},
+  proposta:      {i:'ti-robot',           c:'t-acc',  rot:'resposta aguardando aprovação'},
+  duvida:        {i:'ti-help-circle',     c:'t-warn', rot:'dúvida p/ coordenação'},
+  injetor:       {i:'ti-database-import', c:'t-acc',  rot:'ontologia'},
+  captabilidade: {i:'ti-calendar-x',      c:'t-bad',  rot:'curso encerrado'},
 };
+const NT_CATS = [['','Tudo'],['aprovacao','Aprovações'],['duvida','Dúvidas'],['ficha','Fichas'],['alerta','Alertas']];
+let NT_FILTRO = '', NT_DADOS = {itens:[], por_fonte:{}};
+
+function _idade(h){
+  if(h===null||h===undefined) return '';
+  return h < 1 ? `há ${Math.round(h*60)} min` : (h < 48 ? `há ${Math.round(h)} h` : `há ${Math.round(h/24)} d`);
+}
+function ntFiltrar(cat){ NT_FILTRO = cat; $('#ntLista').dataset.sig = ''; ntRender(); }
 
 async function ntCarregar(){
   const r = await api('/api/notificacoes');
-  const itens = (r && r.itens) || [];
-  const c = document.getElementById('ntCount');
-  if(c){ c.style.display = itens.length ? 'inline-flex' : 'none'; c.textContent = itens.length || ''; }
-  const res = $('#ntResumo');
-  if(res) res.textContent = itens.length
-    ? Object.entries(r.por_fonte||{}).map(([k,v])=>`${v} ${k}`).join(' · ')
-    : '';
+  NT_DADOS = (r && r.itens) ? r : {itens:[], por_fonte:{}};
+  const n = NT_DADOS.itens.length, c = document.getElementById('ntCount');
+  if(c){ c.style.display = n ? 'inline-flex' : 'none'; c.textContent = n || ''; }
+  ntRender();
+}
+
+// Ações de cada tipo, na própria linha — a caixa substituiu as abas Aprovações e
+// Dúvidas, então o que se fazia lá tem de dar para fazer aqui.
+function _ntAcoes(n){
+  const b = (cls, onclick, ico, txt, title='') =>
+    `<button class="btn ${cls}" style="padding:5px 10px;" onclick="${onclick}" title="${title}"><i class="ti ${ico}"></i>${txt?' '+txt:''}</button>`;
+  const abrir = n.card_id ? b('btn-g', `abrirConversa('${n.card_id}')`, 'ti-messages', 'abrir') : '';
+  if(n.fonte==='inscricao') return b('btn-p', "irPara('inscricoes')", 'ti-arrow-right', 'ficha') + abrir;
+  if(n.fonte==='alerta') return abrir + b('btn-g', `ntLer(${n.id})`, 'ti-check', '', 'Marcar como lido');
+  const x = b('btn-g', `dispensarAprov('${n.chave}')`, 'ti-x', '', 'Dispensar — volta se houver novidade');
+  if(n.tipo==='proposta') return b('btn-p', `ntAprovar('${n.card_id}')`, 'ti-send', 'Aprovar e enviar')
+    + b('btn-g', `ntEditar('${n.card_id}')`, 'ti-pencil', 'Editar') + abrir + x;
+  if(n.tipo==='escalonamento') return abrir + b('btn-g', `resolverEscalonamento('${n.card_id}')`, 'ti-check', 'Resolvido', 'Já tratei — devolver ao fluxo do agente') + x;
+  if(n.tipo==='duvida') return abrir + x;
+  if(n.tipo==='injetor' || n.tipo==='captabilidade') return b('btn-g', "irPara('injetor')", 'ti-arrow-right', 'Injetor') + x;
+  return abrir + x;
+}
+
+function ntRender(){
+  const itens = NT_DADOS.itens.filter(n => !NT_FILTRO || n.categoria===NT_FILTRO);
+  const pf = NT_DADOS.por_fonte || {};
+  $('#ntFiltros').innerHTML = NT_CATS.map(([k,rot]) => {
+    const q = k ? (pf[k]||0) : NT_DADOS.itens.length;
+    return `<button class="btn ${NT_FILTRO===k?'btn-p':'btn-g'}" style="padding:4px 10px;" onclick="ntFiltrar('${k}')">${rot}${q?` <span class="tag">${q}</span>`:''}</button>`;
+  }).join('');
+  const res = $('#ntResumo'); if(res) res.textContent = '';
   const cx = $('#ntLista'); if(!cx) return;
+  // O polling de 5s NÃO pode recriar os <textarea> enquanto alguém digita a resposta
+  // de uma dúvida: re-renderiza só quando a fila muda E ninguém está com foco nela.
+  const sig = NT_FILTRO + '|' + itens.map(n=>`${n.fonte}:${n.chave||n.id}:${n.ts}`).join(',');
+  if(cx.contains(document.activeElement) || cx.dataset.sig === sig) return;
+  cx.dataset.sig = sig;
   cx.innerHTML = itens.length ? itens.map(n=>{
-    const est = NT_ICONE[n.tipo] || {i:'ti-bell', c:'t-acc'};
-    const acao = n.card_id
-      ? `<button class="btn btn-g" onclick="abrirConversa('${n.card_id}')"><i class="ti ti-messages"></i> abrir</button>`
-      : (n.acao ? `<button class="btn btn-g" onclick="irPara('${n.acao}')"><i class="ti ti-arrow-right"></i> ver</button>` : '');
+    const e = NT_ICONE[n.tipo] || {i:'ti-bell', c:'t-acc', rot:n.tipo};
+    const extra = n.tipo==='duvida' ? `
+        ${n.contexto?`<div class="muted" style="margin:4px 0 0;">lead perguntou: "${escapeHtml(n.contexto)}"</div>`:''}
+        <textarea id="dvr-${n.ref}" rows="2" placeholder="Escreva a informação da coordenação…" style="margin-top:8px;"></textarea>
+        <div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap;">
+          <button class="btn btn-p" style="padding:5px 10px;" onclick="responderDuvida(${n.ref})"><i class="ti ti-send"></i> Responder e enviar ao lead</button>
+          <button class="btn btn-g" style="padding:5px 10px;" onclick="paraInjetor(${n.ref})" title="Dado de catálogo (preço/data/carga)? Atualize a ontologia.">É dado de catálogo → Injetor</button>
+          <button class="btn btn-g" style="padding:5px 10px;" onclick="descartarDuvida(${n.ref})"><i class="ti ti-trash"></i> Descartar</button>
+        </div>`
+      : n.tipo==='proposta' && n.mensagem ? `<div class="g" style="padding:8px 10px;margin-top:6px;white-space:pre-wrap;font-size:12.5px;">${escapeHtml(n.mensagem)}</div>` : '';
     return `
-    <div class="row">
-      <i class="ti ${est.i}"></i>
-      <span><span class="chip ${est.c}">${escapeHtml(n.tipo||'')}</span>
+    <div class="row" style="align-items:flex-start;">
+      <i class="ti ${e.i}"></i>
+      <span style="min-width:0;flex:1;">
+        <span class="chip ${e.c}">${escapeHtml(e.rot||n.tipo||'')}</span>
         ${escapeHtml(n.texto||'')}
-        <span class="muted">${(n.ts||'').slice(0,16).replace('T',' ')}</span></span>
-      <span style="margin-left:auto;display:flex;gap:6px;">
-        ${n.fonte==='inscricao' ? `<button class="btn btn-g" onclick="irPara('inscricoes')"><i class="ti ti-arrow-right"></i> ficha</button>` : ''}
-        ${acao}
-        ${n.fonte==='alerta' ? `<button class="btn btn-g" onclick="ntLer(${n.id})"><i class="ti ti-check"></i></button>` : ''}
-        ${n.fonte==='aprovacao' ? `<button class="btn btn-g" onclick="dispensarAprov('${n.chave}')" title="Dispensar — volta se houver novidade"><i class="ti ti-x"></i></button>` : ''}
+        <span class="muted">${(n.ts||'').slice(0,16).replace('T',' ')}</span>
+        ${extra}
       </span>
+      <span style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;">${_ntAcoes(n)}</span>
     </div>`;
   }).join('') : '<div class="muted">Nada esperando por você. 🎉</div>';
+}
+
+async function ntAprovar(id, texto){
+  const r = await api('/api/conversas/'+id+'/aprovar',{method:'POST',
+    headers:{'Content-Type':'application/json'}, body:JSON.stringify(texto ? {texto} : {})});
+  if(r.erro){ alert(r.erro); return; }
+  if(r.envio && !r.envio.ok){ alert('Não enviado: ' + (r.envio.motivo || r.envio.status)); return; }
+  $('#ntLista').dataset.sig = ''; carregar();
+}
+function ntEditar(id){
+  const n = NT_DADOS.itens.find(x=>x.tipo==='proposta' && x.card_id===id);
+  const novo = prompt('Editar mensagem (passa pelo Revisor):', (n && n.mensagem) || '');
+  if(novo) ntAprovar(id, novo);
 }
 
 function irPara(sec){
@@ -2802,7 +2760,7 @@ async function responderDuvida(id){
   if(r.erro){ alert(r.erro); return; }
   alert(r.envio ? 'Resposta elaborada e enviada ao lead ✓' : 'Resposta elaborada — proposta aguardando aprovação na aba Conversas.');
   if(document.activeElement && document.activeElement.blur) document.activeElement.blur();  // libera o guard de foco
-  const dvsBox = $('#dvs'); if(dvsBox) dvsBox.dataset.sig = '';                              // força re-render da lista
+  $('#ntLista').dataset.sig = '';                                                             // força re-render da lista
   carregar();
 }
 async function descartarDuvida(id){
@@ -2812,7 +2770,7 @@ async function descartarDuvida(id){
     headers:{'Content-Type':'application/json'}, body:JSON.stringify({motivo})});
   if(r.erro){ alert(r.erro); return; }
   if(document.activeElement && document.activeElement.blur) document.activeElement.blur();
-  const dvsBox = $('#dvs'); if(dvsBox) dvsBox.dataset.sig = '';   // força re-render da lista
+  $('#ntLista').dataset.sig = '';                                 // força re-render da lista
   carregar();
 }
 function paraInjetor(id){
