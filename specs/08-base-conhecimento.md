@@ -33,6 +33,14 @@ O catálogo não é exclusivo da Extensão FEQ: **ECO-1100** ("Desvendando a Eco
 - **`requisito/nivelMinimo = feq:nenhum`** — sem gate acadêmico; o orquestrador não pergunta
   "você concluiu o ensino superior?" para este curso (mesmo mecanismo do teste
   `test_lead_com_medio_e_elegivel_no_curso_de_medio`).
+- **Leads chegam pelo BigQuery, não pelo Meta Lead Ads** (19/10/2026) — a LP no Vercel grava
+  cada formulário em `guara-db.eco1100.leads_eco_1100`. `reconciliacao.poll_bigquery_eco` lê a
+  tabela no tick de ~5 min (junto do `poll_meta`), descarta `utm_source = 'seed_teste'`, deduplica
+  por `event_id` (ou telefone+`criado_em` quando falta) e entra pelo mesmo `Ingestao.ingest`
+  (dedupe por telefone, `optin_fonte = lp_eco1100`). 1º contato automático só se houver
+  consentimento LGPD e o lead tiver menos de `BQ_CONTATO_MAX_H` (24h); mais velho vira só card.
+  Credencial: `GOOGLE_BQ_SA_FILE` (JSON da service account, fora do repo); sem ela o poller é
+  inerte. Inscrições do ECO-1100 ainda não têm fonte.
 
 **Identidade institucional**: o agente se apresenta como "Vinícius, atendente do Instituto de
 Economia" (não da FEQ) quando o curso do lead é ECO-1100 — `atena.ontologia.servico

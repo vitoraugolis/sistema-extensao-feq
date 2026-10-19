@@ -2353,6 +2353,7 @@ def _operacoes():
             if _t.time() - float(EST.get_config("op_meta_poll") or 0) > 300:
                 EST.set_config("op_meta_poll", str(_t.time()))
                 reconciliacao.poll_meta(EST, ONTO.ont, ING, _primeiro_contato)
+                reconciliacao.poll_bigquery_eco(EST, ING, _primeiro_contato)   # LP ECO-1100 (Vercel)
             # degradação: 3+ fallbacks determinísticos em 15 min -> alerta (máx. 1 a cada 30 min)
             recentes = [t for t in _cer.FALLBACKS if _t.time() - t < 900]
             ultimo = float(EST.get_config("op_fb_alerta") or 0)

@@ -99,6 +99,7 @@ ATENA_USERS=nome:senha:supervisor,...   # Central v2 (sem isto: operador/operado
 ATENA_SECRET=...                # chave de sessão da Central v2
 ATENA_MASTER=vitor              # dono dos módulos restritos (spec 19) — só ele concede acesso
 OPENAI_API_KEY=sk-...           # Whisper: transcrição dos áudios do lead (spec 09)
+GOOGLE_BQ_SA_FILE=/caminho/sa.json  # leads da LP ECO-1100 no BigQuery guara-db (specs/08); sem isto, inerte
 PORT=8080                       # 8090 cérebro v1 · 8095 Central v2
 # Growth Engine (spec 15) — sem estes tokens, tudo roda em dry-run:
 META_ADS_TOKEN=... META_AD_ACCOUNT_ID=act_... META_PIXEL_ID=... META_CAPI_TOKEN=...
@@ -215,6 +216,11 @@ Reescrita **v2** (monólito modular `atena/`, ancoragem ontológica) implementad
   WhatsApp (19) 98262-0072 foi removido de tudo.
 
 ## 10. Riscos e pendências abertas
+
+- **Service account do BigQuery (`agente-guara-bq@guara-db`) enxerga o projeto `guara-db`
+  inteiro** (dados de outros clientes, transcrições de reunião), não só `eco1100`. Restringir a
+  `BigQuery Data Viewer` no dataset `eco1100` + `BigQuery Job User` no projeto. A chave circulou
+  em texto em 19/10/2026: rotacionar.
 
 - ✅ FEQ-0499 confirmado em inscrição (turma **006**, até 06/02/2027) na coleta de
   30/08/2026 — mas `cursos_metas` ainda diz turma `001`: corrigir o cadastro.
