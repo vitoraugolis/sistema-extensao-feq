@@ -250,6 +250,17 @@ declara — nunca é derivada do prazo de inscrição.
 5. Idempotente por slug (`inscricao-feq-XXXX-turma`); dry-run sem credenciais.
 6. **Fallback sem acesso WP**: as LPs continuam servidas pelo hub em
    `/ponte?curso=...` — basta apontar DNS/proxy (ex.: lp.feq…) para o VPS.
+7. **Páginas antigas → LP (21/10/2026)**: as páginas e formulários antigos de cada
+   curso com LP (achadas pelo Google, guardadas em favoritos) redirecionam para a LP
+   atual, para nenhum lead ficar num formulário fora do sistema. A lista é
+   `wp_deploy_bridge.REDIRECIONAR` (feita à mão); o destino sai de `ponte.slug_lp`.
+   As regras ficam no plugin **Redirection**, num grupo próprio
+   (`Atena: paginas antigas -> LP`), sincronizadas a cada deploy
+   (`--so-redirecionar` para só elas). **302, não 301**: a LP é noindex, então um 301
+   tiraria o curso do Google; com 302 a página antiga segue indexada e o clique cai
+   na LP. `flag_query=pass` leva utm/gclid/fbclid. Fonte com regra manual ativa não é
+   tocada (aparece em `conflitos_com_regra_manual`). O deploy confere cada fonte no
+   ar sem seguir o redirect. Curso sem LP e thank-you pages ficam de fora.
 
 ## 5. Telemetria de sessão (inteligência da LP)
 

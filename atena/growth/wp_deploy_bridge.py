@@ -20,6 +20,7 @@ import sys
 import json
 import pathlib
 import argparse
+import urllib.parse
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2]))
 
@@ -75,10 +76,10 @@ def renderizar(g, ont, cursos, saida, est=None):
     return paginas
 
 
-def _wp(sessao, base, metodo, rota, **kw):
+def _wp(sessao, base, metodo, rota, ns="wp/v2", **kw):
     """None = falha (HTTP>=400, rede ou corpo não-JSON) — nunca confundir com 'não existe'."""
     try:
-        r = sessao.request(metodo, f"{base}/wp-json/wp/v2/{rota}", timeout=30, **kw)
+        r = sessao.request(metodo, f"{base}/wp-json/{ns}/{rota}", timeout=30, **kw)
     except Exception as e:
         print(f"[wp-deploy] {rota}: {e}", flush=True)
         return None
@@ -351,6 +352,140 @@ def publicar_home_cursos(g, ont, backup_dir=None):
                      "falhou) — abra a home no Elementor e clique em Update")}
 
 
+# Páginas antigas do site (Google, favoritos, anúncio velho) -> LP atual do curso, para
+# nenhum lead ficar num formulário que não entra no sistema. Lista feita à mão a partir
+# das páginas do WP em 21/10/2026: só cursos com LP; curso sem LP fica como está.
+# Thank-you pages ficam de fora (ninguém chega nelas sem ter enviado formulário).
+REDIRECIONAR = {
+    "/cursos-longa-duracao/engenharia-processos-quimicos-feq-1000/": "FEQ-1000",
+    "/cursos-longa-duracao/engenharia-de-processos-quimicos/": "FEQ-1000",
+    "/cursos-longa-duracao/formulario-feq-1000/": "FEQ-1000",
+    "/cursos-longa-duracao/formulario-feq-1000-2/": "FEQ-1000",
+    "/cursos-longa-duracao/formulario-feq-1000-etapa2/": "FEQ-1000",
+    "/cursos-longa-duracao/formulario-feq-1000-etapa2-2/": "FEQ-1000",
+    "/consertando-480/": "FEQ-0480",
+    "/cursos-longa-duracao/nova-pagina-tecnicas-de-inteligencia-artificial-aplicadas-as-engenharias-de-processos-0480/": "FEQ-0480",
+    "/cursos-longa-duracao/tecnicas-de-inteligencia-artificial-aplicadas-as-engenharias-de-processos-feq-0480-editada/": "FEQ-0480",
+    "/cursos-longa-duracao/aula-aberta-feq-0480/": "FEQ-0480",
+    "/cursos-longa-duracao/workshop-feq-0480/": "FEQ-0480",
+    "/cursos-longa-duracao/workshop-ia-2024/": "FEQ-0480",
+    "/cursos-longa-duracao/inscricao-feq0480-posworkshop/": "FEQ-0480",
+    "/cursos-longa-duracao/formulario-feq-0480-etapa2-workshop/": "FEQ-0480",
+    "/concertando360/": "FEQ-0360",
+    "/cursos-longa-duracao/cursos-longa-duracao-gestao-de-processos-industriais-confiabilidade-e-seguranca-de-processos/": "FEQ-0360",
+    "/cursos-longa-duracao/gestao-de-processos-industriais-confiabilidade-e-seguranca-de-processos-feq-0360/": "FEQ-0360",
+    "/cursos-longa-duracao/webinar-gestao-de-processos-industriais-confiabilidade-e-seguranca-de-processos-feq-0360/": "FEQ-0360",
+    "/webinar-seguranca-de-processos/": "FEQ-0360",
+    "/cursos-longa-duracao/formulario-feq-0360/": "FEQ-0360",
+    "/cursos-longa-duracao/formulario-feq-0360-etapa2-2/": "FEQ-0360",
+    "/cursos-longa-duracao/formulario-feq-0360-etapa2webinar/": "FEQ-0360",
+    "/concertando499/": "FEQ-0499",
+    "/cursos-curta-duracao/eficiencia-energetica-de-processos-de-manufatura-e-sistemas-de-utilidades-industriais-feq-0499/": "FEQ-0499",
+    "/cursos-curta-duracao/feq-0499/": "FEQ-0499",
+    "/cursos-longa-duracao/formulario-feq-0499/": "FEQ-0499",
+    "/cursos-longa-duracao/formulario-feq-0499-etapa2/": "FEQ-0499",
+    "/cursos-curta-duracao/feq-0580-dominando-a-tomada-de-decisao-otimizacao-e-simulacao-de-processos-industriais-com-python/": "FEQ-0580",
+    "/cursos-longa-duracao/formulario-feq-0580-etapa2/": "FEQ-0580",
+    "/cursos-longa-duracao/formulariofeq-580-etapa2-2/": "FEQ-0580",
+    "/cursos-curta-duracao/aqr-feq-0331/": "FEQ-0331",
+    "/cursos-longa-duracao/formulario-feq-0331/": "FEQ-0331",
+    "/cursos-longa-duracao/formulario-feq-0331-2/": "FEQ-0331",
+    "/cursos-longa-duracao/formulario-feq-0331-etapa2/": "FEQ-0331",
+    "/cursos-longa-duracao/feq-0333-carbon-capture-utilization-and-storage/": "FEQ-0333",
+    "/cursos-longa-duracao/formulario-feq-0333etapa2/": "FEQ-0333",
+    "/cursos-longa-duracao/feq-0299-introducao-a-ciencia-dos-materiais/": "FEQ-0299",
+    "/cursos-longa-duracao/formulario-feq-0299-etapa2/": "FEQ-0299",
+    "/cursos-longa-duracao/feq-0670-simulacao-molecular-principios-e-pratica/": "FEQ-0670",
+    "/cursos-longa-duracao/formulario-feq-0670-etapa2/": "FEQ-0670",
+}
+REDIRECT_GRUPO = "Atena: paginas antigas -> LP"   # grupo nosso; os 301 manuais (grupo 1) não são tocados
+
+
+def _regras(s, base):
+    """Todas as regras do plugin Redirection (paginado, page começa em 0). None = falha."""
+    regras, pag = [], 0
+    while True:
+        r = _wp(s, base, "GET", f"redirect?per_page=200&page={pag}", ns="redirection/v1")
+        if r is None:
+            return None
+        regras += r.get("items") or []
+        if not r.get("items") or len(regras) >= int(r.get("total") or 0):
+            return regras
+        pag += 1
+
+
+def publicar_redirecionamentos(cursos, sessao=None):
+    """Garante uma regra do Redirection por página de REDIRECIONAR, apontando para a LP
+    atual (ponte.slug_lp). Idempotente: regra igual não é regravada.
+
+    302, não 301: as LPs são noindex. Um 301 faria o Google trocar a URL indexada por
+    uma que ele não indexa e o curso sairia da busca; com 302 a página antiga continua no
+    resultado e quem clica cai na LP. E 302 não fica preso no cache do navegador se o
+    destino mudar. flag_query=pass leva utm/gclid/fbclid até a LP (atribuição).
+    Fonte que já tem regra MANUAL ativa é pulada e reportada — não brigo com ela.
+    Confere no ar (GET sem seguir redirect): página servida de cache não conta como ok."""
+    turma = {m["curso"]: m["turma"] for m in cursos}
+    alvo = {src: f"/{_slug(c, turma[c])}/" for src, c in REDIRECIONAR.items() if c in turma}
+    base = (os.environ.get("WP_URL") or "").rstrip("/")
+    user, senha = os.environ.get("WP_USER"), os.environ.get("WP_APP_PASSWORD")
+    if not (base and user and senha):
+        return {"status": "dry_run", "regras": alvo}
+    s = sessao
+    if s is None:
+        import requests
+        s = requests.Session()
+        s.auth = (user, senha)
+    ns = "redirection/v1"
+    grupos = _wp(s, base, "GET", "group?per_page=200", ns=ns)
+    if grupos is None:
+        return {"status": "falhou", "motivo": "não consegui ler os grupos do Redirection"}
+    gid = next((g["id"] for g in grupos.get("items") or [] if g["name"] == REDIRECT_GRUPO), None)
+    if gid is None:
+        criado = _wp(s, base, "POST", "group", ns=ns, json={"name": REDIRECT_GRUPO, "moduleId": 1})
+        gid = next((g["id"] for g in (criado or {}).get("items") or []
+                    if g["name"] == REDIRECT_GRUPO), None)
+        if gid is None:
+            return {"status": "falhou", "motivo": "não consegui criar o grupo do Redirection"}
+    regras = _regras(s, base)
+    if regras is None:
+        return {"status": "falhou", "motivo": "não consegui listar as regras do Redirection"}
+    meus = {r["url"]: r for r in regras if r.get("group_id") == gid}
+    manuais = {r["url"] for r in regras if r.get("group_id") != gid and r.get("enabled")}
+    gravadas, iguais, conflitos, falhas = [], [], [], []
+    for src, dst in alvo.items():
+        if src in manuais:
+            conflitos.append(src)
+            continue
+        atual = meus.get(src)
+        if (atual and atual.get("enabled") and atual.get("action_code") == 302
+                and (atual.get("action_data") or {}).get("url") == dst):
+            iguais.append(src)
+            continue
+        corpo = {"url": src, "match_type": "url", "action_type": "url", "action_code": 302,
+                 "action_data": {"url": dst}, "group_id": gid, "enabled": True,
+                 "title": f"Atena: {dst.strip('/')}",
+                 "match_data": {"source": {"flag_query": "pass", "flag_case": False,
+                                           "flag_trailing": True, "flag_regex": False}}}
+        r = _wp(s, base, "POST", f"redirect/{atual['id']}" if atual else "redirect", ns=ns, json=corpo)
+        (gravadas if r is not None else falhas).append(src)
+    nao_redireciona = []
+    for src, dst in alvo.items():
+        if src in conflitos:
+            continue
+        try:
+            r = s.get(base + src, allow_redirects=False, timeout=30)
+            ok = r.status_code in (301, 302, 307) and \
+                urllib.parse.urlparse(r.headers.get("Location", "")).path == dst
+        except Exception:
+            ok = False
+        if not ok:
+            nao_redireciona.append(src)
+    return {"status": "publicado" if not (falhas or nao_redireciona) else "falhou",
+            "grupo": gid, "gravadas": len(gravadas), "iguais": len(iguais),
+            "conflitos_com_regra_manual": conflitos, "falhas": falhas,
+            "nao_redireciona_no_ar": nao_redireciona}
+
+
 def _paginapublicada(sessao, link):
     if not link:
         return ""
@@ -369,6 +504,8 @@ def main(argv):
                     help="publica TAMBÉM o bloco de cursos da home (só a grade de cards)")
     ap.add_argument("--so-home", action="store_true", help="publica só o bloco da home")
     ap.add_argument("--so-contato", action="store_true", help="publica só a página /contatos/")
+    ap.add_argument("--so-redirecionar", action="store_true",
+                    help="só sincroniza os redirecionamentos páginas antigas -> LP")
     args = ap.parse_args(argv)
 
     from atena.growth.db import Growth
@@ -384,11 +521,14 @@ def main(argv):
         g.conn.commit()
     if args.so_contato:
         return [publicar_contato()]
+    if args.so_redirecionar:
+        return [publicar_redirecionamentos(cursos)]
     if args.so_home:
         return [publicar_home_cursos(g, ont, backup_dir=args.saida)]
     paginas = renderizar(g, ont, cursos, args.saida)
     resultados = publicar(paginas)
     resultados.append(publicar_obrigado())
+    resultados.append(publicar_redirecionamentos(cursos))
     if args.home:
         resultados.append(publicar_home_cursos(g, ont, backup_dir=args.saida))
     return resultados
