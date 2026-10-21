@@ -460,15 +460,17 @@ def publicar_redirecionamentos(cursos, sessao=None):
             conflitos.append(src)
             continue
         atual = meus.get(src)
+        # flag_case=True no Redirection quer dizer IGNORAR maiúsculas (o default do site)
+        match = {"source": {"flag_query": "pass", "flag_case": True,
+                            "flag_trailing": True, "flag_regex": False}}
         if (atual and atual.get("enabled") and atual.get("action_code") == 302
-                and (atual.get("action_data") or {}).get("url") == dst):
+                and (atual.get("action_data") or {}).get("url") == dst
+                and atual.get("match_data") == match):
             iguais.append(src)
             continue
         corpo = {"url": src, "match_type": "url", "action_type": "url", "action_code": 302,
                  "action_data": {"url": dst}, "group_id": gid, "enabled": True,
-                 "title": f"Atena: {dst.strip('/')}",
-                 "match_data": {"source": {"flag_query": "pass", "flag_case": False,
-                                           "flag_trailing": True, "flag_regex": False}}}
+                 "title": f"Atena: {dst.strip('/')}", "match_data": match}
         r = _wp(s, base, "POST", f"redirect/{atual['id']}" if atual else "redirect", ns=ns, json=corpo)
         (gravadas if r is not None else falhas).append(src)
     nao_redireciona = []
