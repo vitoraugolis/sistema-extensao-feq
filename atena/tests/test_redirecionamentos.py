@@ -42,7 +42,7 @@ class FakeRedirection:
         rota = url.split("/wp-json/redirection/v1/")[1]
         if rota.startswith("group"):
             if metodo == "POST":
-                self.grupos.append({"id": 9, "name": kw["json"]["name"]})
+                self.grupos.append({"id": 9, "name": kw["json"]["name"].replace(">", "&gt;")})
             return Resp(corpo={"items": self.grupos, "total": len(self.grupos)})
         if metodo == "GET":
             pag = int(rota.split("page=")[-1])

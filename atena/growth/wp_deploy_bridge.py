@@ -20,6 +20,7 @@ import sys
 import json
 import pathlib
 import argparse
+import html as _html
 import urllib.parse
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2]))
@@ -439,11 +440,13 @@ def publicar_redirecionamentos(cursos, sessao=None):
     grupos = _wp(s, base, "GET", "group?per_page=200", ns=ns)
     if grupos is None:
         return {"status": "falhou", "motivo": "não consegui ler os grupos do Redirection"}
-    gid = next((g["id"] for g in grupos.get("items") or [] if g["name"] == REDIRECT_GRUPO), None)
+    # o plugin devolve o nome escapado ("->" volta "-&gt;")
+    gid = next((g["id"] for g in grupos.get("items") or []
+                if _html.unescape(g["name"]) == REDIRECT_GRUPO), None)
     if gid is None:
         criado = _wp(s, base, "POST", "group", ns=ns, json={"name": REDIRECT_GRUPO, "moduleId": 1})
         gid = next((g["id"] for g in (criado or {}).get("items") or []
-                    if g["name"] == REDIRECT_GRUPO), None)
+                    if _html.unescape(g["name"]) == REDIRECT_GRUPO), None)
         if gid is None:
             return {"status": "falhou", "motivo": "não consegui criar o grupo do Redirection"}
     regras = _regras(s, base)
