@@ -326,6 +326,12 @@ Inscrito (o lead pediu a vaga e entregou os dados), mas quem reporta conversão 
 e tira o card da fila continua sendo o gesto humano na Verificação, depois de lançar
 a inscrição na Extecamp de verdade (§8).
 
+**Nome digitado vence o do perfil** (27/10/2026): se o telefone já tem card (em geral
+criado pelo WhatsApp, com o nome do perfil — "mari 🎀"), a etapa 1 sobrescreve o `nome`
+com o que a pessoa digitou e registra na auditoria. Os demais campos seguem a regra da
+ingestão (só completa o que falta). A ficha da etapa 2 não tem campo de nome: antes
+disso, o nome real de quem veio do WhatsApp se perdia.
+
 **Sem repasse à Extecamp**: a LP não manda mais o lead ao formulário oficial — ele
 preencheria a mesma ficha duas vezes. Por isso o `select` de pagamento lista as
 opções **já com o preço da campanha** (parceladas e à vista) e o aviso "o formulário

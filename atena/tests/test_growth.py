@@ -202,6 +202,11 @@ check(not ponte.processar({"telefone": "19988880011", "curso": "FEQ-9999"},
                           est4, g4, ads, ing4)["ok"], "curso desconhecido é recusado")
 r2 = ponte.processar({**dados, "event_id": "<script>"}, est4, g4, ads, ing4)
 check(r2["ok"] and r2["event_id"] != "<script>", "event_id sujo é substituído, não confiado")
+est4.upsert_lead("wa-5519977770001", nome="mari 🎀", telefone="5519977770001", curso="FEQ-0480")
+r3 = ponte.processar({"nome": "Mariana Souza", "telefone": "19977770001", "curso": "FEQ-0480"},
+                     est4, g4, ads, ing4)
+check(r3["card_id"] == "wa-5519977770001" and est4.get_lead(r3["card_id"])["nome"] == "Mariana Souza",
+      "lead já existente (WhatsApp) passa a usar o nome digitado na LP, não o do perfil")
 
 # --- conversões offline: telefone casa lead -> Matriculado + Purchase com valor --
 r = processar_matricula(g4, ads, est4, "+55 (19) 98888-0010", valor=3900, agora=AGORA)

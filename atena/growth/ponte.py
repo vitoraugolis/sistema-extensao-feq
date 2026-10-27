@@ -1651,7 +1651,14 @@ def processar(dados, est, g, ads, ing, ont=None):
                     "consentimento": "true", "fonte": "ponte"})
     if not r.get("ok"):
         return {"ok": False, "motivo": r.get("motivo", "ingestão falhou")}
-    contexto = {k: dados.get(k) for k in ("fbp", "fbc", "ip", "ua", "url") if dados.get(k)}
+    # Lead que já existia (quase sempre veio antes pelo WhatsApp) entra com o nome do
+    # PERFIL ("mari 🎀"). A ingestão não sobrescreve nada de lead existente, então o
+    # nome que a pessoa digitou na LP se perdia — e é ele que vai para a Extecamp.
+    if est and nome and r.get("acao") == "atualizado" and \
+            (est.get_lead(r["card_id"]) or {}).get("nome") != nome:
+        est.set_lead(r["card_id"], nome=nome)
+        est.log_acao("ponte", f"nome atualizado pelo formulário da LP: {nome}", r["card_id"])
+    contexto ={k: dados.get(k) for k in ("fbp", "fbc", "ip", "ua", "url") if dados.get(k)}
     # Curso SEM turma aberta: o lead entrou na LISTA DE ESPERA, não num checkout.
     # Registrar checkout aqui seria errado em cadeia — jogaria o lead na aba
     # Verificação pedindo pro operador conferir na Extecamp uma inscrição que não
