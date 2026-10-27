@@ -1691,9 +1691,11 @@ function inCopiar(btn, valor){
 }
 
 async function inTranscrita(id){
-  if(!confirm('Confirmar que a ficha foi lançada na Extecamp?\n\nIsto reporta a conversão à Meta e registra o lead como inscrito.')) return;
+  if(!confirm('Confirmar que a ficha foi lançada na Extecamp?\n\nIsto reporta a conversão à Meta, registra o lead como inscrito e envia a ele pelo WhatsApp o aviso de inscrição efetuada.')) return;
   const r = await api('/api/inscricoes/'+id+'/transcrita',{method:'POST'});
   if(r.erro){ alert(r.erro); return; }
+  const av = r.aviso_lead || {};
+  if(!av.ok) alert('Ficha marcada como transcrita, mas o aviso ao lead NÃO foi enviado:\n'+(av.motivo||av.erro||'falha no envio'));
   IN_ABERTA = null;
   carregar();
 }

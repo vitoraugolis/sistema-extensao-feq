@@ -364,6 +364,17 @@ na LP no momento do modal — é isso que liga a conversão à campanha original
 maximiza o Event Match Quality. Enviar em até 7 dias (janela de atribuição);
 `GROWTH_TEST_EVENT_CODE` para homologar no Test Events antes de valer.
 
+### 8a. Aviso ao lead quando a ficha é transcrita (27/10/2026)
+
+`POST /api/inscricoes/<id>/transcrita` (botão "Marcar como transcrita na Extecamp")
+envia ao lead o template **`feq_inscricao_efetuada`** (UTILITY): inscrição efetuada,
+instruções de matrícula no e-mail informado na LP, "responda aqui se não recebeu".
+Variáveis: primeiro nome, curso (nome + código) e e-mail do card. Não envia — e a
+resposta `aviso_lead` diz por quê, mostrado num alerta na Central — quando: a ficha já
+estava transcrita (reclique), o lead não tem e-mail, pediu opt-out, ou o template ainda
+não está APPROVED na Meta. A transcrição em si nunca falha por causa do aviso.
+Submissão à Meta: `python3 -m atena.ops.criar_template_inscricao`.
+
 ## 8b. Verificação humana do desfecho (fecha o loop da LP)
 
 O lead da ponte declara intenção (modal) e é redirecionado à Extecamp — mas a

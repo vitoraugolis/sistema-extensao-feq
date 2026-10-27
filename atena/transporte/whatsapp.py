@@ -95,7 +95,25 @@ TEMPLATES_ROL = [
     {"nome": "feq_inscricao_garantida", "idioma": "pt_BR", "titulo": "Inscrição garantida",
      "descricao": "Inscrição garantida; o link para prosseguir sai quando a Extecamp abrir o curso.",
      "params": [{"k": "nome", "rotulo": "Nome"}, {"k": "curso", "rotulo": "Curso"}]},
+    {"nome": "feq_inscricao_efetuada", "idioma": "pt_BR", "titulo": "Inscrição efetuada",
+     "descricao": "Sai sozinho quando a ficha é marcada como transcrita na Extecamp.",
+     "params": [{"k": "nome", "rotulo": "Nome"}, {"k": "curso", "rotulo": "Curso"},
+                {"k": "email", "rotulo": "E-mail"}]},
 ]
+
+# Confirmação de inscrição, disparada pelo gesto "ficha transcrita" na Central. A Extecamp
+# manda as instruções de matrícula por e-mail; isto avisa o lead de onde olhar e abre a
+# janela de 24h para quem não recebeu responder aqui mesmo. UTILITY: é atualização de
+# algo que a pessoa pediu. Submetido à Meta por atena/ops/criar_template_inscricao.py.
+CORPO_INSCRICAO_EFETUADA = (
+    "Olá, {{1}}! 🎓\n\n"
+    "Sua inscrição no curso *{{2}}* foi efetuada com sucesso.\n\n"
+    "📧 As informações para o prosseguimento da sua matrícula foram enviadas para o "
+    "e-mail *{{3}}*. Caso não encontre a mensagem na caixa de entrada, verifique também "
+    "as pastas de spam e lixo eletrônico.\n\n"
+    "Se não tiver recebido o e-mail, basta responder a esta mensagem que nossa equipe "
+    "ajudará você.\n\n"
+    "Atenciosamente,\nExtensão Unicamp")
 
 
 # Templates de RECUPERAÇÃO dedicados a uma campanha. O preço vai literal no corpo
@@ -143,6 +161,7 @@ PARAMS_TEMPLATE = {
     "feq_promo_0331": ("nome", "prazo"),
     "feq_link_corrigido": ("nome", "curso", "url_inscricao", "prazo"),
     "feq_inscricao_garantida": ("nome", "curso"),
+    "feq_inscricao_efetuada": ("nome", "curso", "email"),
 }
 
 
@@ -157,6 +176,7 @@ def montar_params(nome_template, lead, ont):
         "prazo": "/".join(reversed((c.get("inscricoes_fim") or "").split("-"))),
         # SEMPRE da ontologia: é justamente a montagem manual do link que causou o erro
         "url_inscricao": c.get("url_inscricao") or "",
+        "email": (lead.get("email") or "").strip(),
     }
     vals = [fonte.get(k, "") for k in PARAMS_TEMPLATE.get(nome_template, ("nome", "curso"))]
     return None if any(not v.strip() for v in vals) else vals

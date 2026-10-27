@@ -88,6 +88,31 @@ def test_transcrever_confirma_conversao_uma_vez():
     assert tipos.count("inscricao_confirmada") == 1, tipos
 
 
+def test_transcrever_avisa_o_lead_uma_vez():
+    """Ao marcar como transcrita, o lead recebe o template com nome, curso e e-mail
+    informado; reclique não reenvia; sem e-mail não envia (a Meta recusa variável vazia)."""
+    enviados = []
+    orig = (A.WA.enviar_template, A.WA.templates_status)
+    A.WA.enviar_template = lambda tel, nome, **kw: enviados.append((nome, kw["params"])) or {"ok": True}
+    A.WA.templates_status = lambda *a, **k: {"feq_inscricao_efetuada": "APPROVED"}
+    try:
+        cid = _com_ficha("meta-19900000015")
+        A.EST.set_lead(cid, nome="Fulana de Tal", email="fulana@x.com")
+        c = _cliente()
+        r = c.post(f"/api/inscricoes/{cid}/transcrita").get_json()
+        assert r["aviso_lead"]["ok"], r
+        assert enviados[0][0] == "feq_inscricao_efetuada"
+        assert enviados[0][1][0] == "Fulana" and enviados[0][1][2] == "fulana@x.com", enviados
+        assert not c.post(f"/api/inscricoes/{cid}/transcrita").get_json()["aviso_lead"]["ok"]
+        assert len(enviados) == 1
+        sem = _com_ficha("meta-19900000016")
+        r = c.post(f"/api/inscricoes/{sem}/transcrita").get_json()
+        assert r["ok"] and not r["aviso_lead"]["ok"] and "e-mail" in r["aviso_lead"]["motivo"]
+        assert len(enviados) == 1
+    finally:
+        A.WA.enviar_template, A.WA.templates_status = orig
+
+
 def test_ficha_transcrita_sai_da_fila():
     cid = _com_ficha("meta-19900000014")
     c = _cliente()

@@ -684,10 +684,42 @@ def inscricao_transcrita(card_id):
     if not lead or not ficha:
         return jsonify({"erro": "ficha ou lead inexistente"}), 404
     usuario = session.get("usuario", "operador")
+    ja_transcrita = ficha.get("status") == "transcrita"
     GRW.set_inscricao_status(ficha["id"], "transcrita")
     capi = _mover_fase(lead, card_id, "Inscrito")
     EST.log_acao(usuario, f"ficha transcrita na Extecamp ({ficha['curso']})", card_id)
-    return jsonify({"ok": True, "status": "transcrita", "conversao_offline": capi})
+    # reclique não reenvia a confirmação ao lead
+    aviso = {"ok": False, "motivo": "ficha já estava transcrita"} if ja_transcrita \
+        else _avisar_inscricao_efetuada(EST.get_lead(card_id))
+    return jsonify({"ok": True, "status": "transcrita", "conversao_offline": capi,
+                    "aviso_lead": aviso})
+
+
+TPL_INSCRICAO_EFETUADA = "feq_inscricao_efetuada"
+
+
+def _avisar_inscricao_efetuada(lead):
+    """Template de inscrição efetuada (nome, curso, e-mail informado na LP). Sem e-mail,
+    com opt-out ou template ainda não aprovado na Meta: NÃO envia e diz por quê — o
+    operador vê na resposta e a transcrição em si nunca falha por causa do aviso."""
+    from atena.transporte.whatsapp import montar_params
+    cid = lead["card_id"]
+    if lead.get("optout"):
+        return {"ok": False, "motivo": "lead pediu para não receber mensagens"}
+    st = WA.templates_status()
+    if st is not None and st.get(TPL_INSCRICAO_EFETUADA) != "APPROVED":
+        return {"ok": False, "motivo": f"template {TPL_INSCRICAO_EFETUADA} ainda não aprovado na Meta"}
+    primeiro = ((lead.get("nome") or "").split() or [""])[0]
+    params = montar_params(TPL_INSCRICAO_EFETUADA, {**lead, "nome": primeiro}, ONTO.ont)
+    if params is None:
+        return {"ok": False, "motivo": "lead sem e-mail cadastrado — avise por outro canal"}
+    r = WA.enviar_template(lead["telefone"], TPL_INSCRICAO_EFETUADA, params=params)
+    if r.get("ok"):
+        EST.add_conversa(cid, "agente", f"[template {TPL_INSCRICAO_EFETUADA}] e-mail {params[2]}",
+                         wamid=r.get("wamid"), status="enviado", autor="template",
+                         destino=lead["telefone"])
+    EST.log_acao("sistema", f"aviso de inscrição efetuada: {'enviado' if r.get('ok') else 'falhou'}", cid)
+    return r
 
 
 # ------------------------------------------------------ Central de Notificações
