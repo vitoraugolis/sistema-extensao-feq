@@ -97,7 +97,7 @@ def test_transcrever_avisa_o_lead_uma_vez():
     A.WA.templates_status = lambda *a, **k: {"feq_inscricao_efetuada": "APPROVED"}
     try:
         cid = _com_ficha("meta-19900000015")
-        A.EST.set_lead(cid, nome="Fulana de Tal", email="fulana@x.com")
+        A.EST.set_lead(cid, nome="FULANA DE TAL", email="fulana@x.com")
         c = _cliente()
         r = c.post(f"/api/inscricoes/{cid}/transcrita").get_json()
         assert r["aviso_lead"]["ok"], r

@@ -12,12 +12,11 @@ import pathlib
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2]))
 
-import atena  # noqa: F401  fuso BRT
-from atena.transporte.whatsapp import WhatsApp, CORPO_INSCRICAO_EFETUADA
+import atena.api.app as A  # carrega o .env com o parser do app (`source .env` trunca valores)
+from atena.transporte.whatsapp import CORPO_INSCRICAO_EFETUADA
 
 if __name__ == "__main__":
-    wa = WhatsApp(None, None)
-    r = wa.criar_template("feq_inscricao_efetuada", "UTILITY", CORPO_INSCRICAO_EFETUADA,
+    r = A.WA.criar_template("feq_inscricao_efetuada", "UTILITY", CORPO_INSCRICAO_EFETUADA,
                           exemplos=["Mariana",
                                     "Engenharia de Processos Químicos (FEQ-1000)",
                                     "mariana@email.com"])

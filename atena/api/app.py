@@ -709,7 +709,8 @@ def _avisar_inscricao_efetuada(lead):
     st = WA.templates_status()
     if st is not None and st.get(TPL_INSCRICAO_EFETUADA) != "APPROVED":
         return {"ok": False, "motivo": f"template {TPL_INSCRICAO_EFETUADA} ainda não aprovado na Meta"}
-    primeiro = ((lead.get("nome") or "").split() or [""])[0]
+    # nome vindo da Extecamp/ficha costuma estar em CAIXA ALTA: "Olá, MAYARA!" soa grito
+    primeiro = ((lead.get("nome") or "").split() or [""])[0].capitalize()
     params = montar_params(TPL_INSCRICAO_EFETUADA, {**lead, "nome": primeiro}, ONTO.ont)
     if params is None:
         return {"ok": False, "motivo": "lead sem e-mail cadastrado — avise por outro canal"}
