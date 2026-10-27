@@ -58,7 +58,22 @@ def test_ficha_chega_agrupada_e_completa():
     assert campos["cpf"] == FICHA["cpf"]
     titulos = [g["titulo"] for g in item["grupos"]]
     assert titulos == sorted(titulos, key=lambda t: [
-        "Dados pessoais", "Endereço", "Formação e atuação", "Pagamento", "Outros"].index(t)), titulos
+        "Contato", "Dados pessoais", "Endereço", "Formação e atuação", "Pagamento", "Outros"].index(t)), titulos
+
+
+def test_contato_da_etapa1_vem_copiavel_na_ficha():
+    """Nome/e-mail/telefone são os 1os campos da Extecamp, mas moram no card (etapa 1),
+    não na ficha. Entram como grupo próprio, com o telefone já em DDD + celular."""
+    cid = _com_ficha("meta-19900000017")
+    A.EST.set_lead(cid, email="fulana@x.com")
+    d = _cliente().get("/api/inscricoes").get_json()
+    item = next(i for i in d["inscricoes"] if i["card_id"] == cid)
+    contato = item["grupos"][0]
+    assert contato["titulo"] == "Contato"
+    assert {it["campo"]: it["valor"] for it in contato["itens"]} == {
+        "nome": "Fulana", "email": "fulana@x.com", "ddd": "19", "celular": "900000001"}
+    conv = _cliente().get(f"/api/conversas/{cid}").get_json()
+    assert conv["inscricao"]["grupos"][0]["titulo"] == "Contato"
 
 
 def test_campo_novo_no_formulario_nao_some_da_tela():

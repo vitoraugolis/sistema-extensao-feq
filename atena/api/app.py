@@ -341,7 +341,7 @@ def _ficha_do_card(card_id):
         return None
     return {"id": i["id"], "curso": i["curso"], "turma": i["turma"],
             "status": i["status"], "criado": i["criado"],
-            "grupos": _ficha_para_humano(i["dados_json"])}
+            "grupos": _ficha_para_humano(i["dados_json"], EST.get_lead(card_id))}
 
 
 @app.route("/api/leads/<card_id>/notas", methods=["POST"])
@@ -635,13 +635,26 @@ _GRUPOS_FICHA = (
 )
 
 
-def _ficha_para_humano(dados_json):
+def _contato_ficha(lead):
+    """Nome/e-mail/telefone vêm da etapa 1 (card), não da ficha — mas são os primeiros
+    campos do formulário da Extecamp, então entram como grupo copiável. Telefone já
+    separado em DDD + celular, como a Extecamp pede."""
+    tel = _so_digitos((lead or {}).get("telefone") or "")
+    m = re.fullmatch(r"55(\d{2})(\d{8,9})", tel)
+    itens = [("nome", "Nome", (lead or {}).get("nome")), ("email", "E-mail", (lead or {}).get("email"))]
+    itens += [("ddd", "DDD", m.group(1)), ("celular", "Celular", m.group(2))] if m \
+        else [("telefone", "Telefone", tel)]
+    itens = [{"campo": c, "rotulo": r, "valor": v} for c, r, v in itens if v]
+    return [{"titulo": "Contato", "itens": itens}] if itens else []
+
+
+def _ficha_para_humano(dados_json, lead=None):
     """A ficha em grupos rotulados, pronta para leitura/transcrição."""
     try:
         d = json.loads(dados_json or "{}")
     except ValueError:
         d = {}
-    grupos = []
+    grupos = _contato_ficha(lead) if lead else []
     for titulo, campos in _GRUPOS_FICHA:
         itens = [{"campo": c, "rotulo": _ROTULO_FICHA.get(c, c), "valor": d[c]}
                  for c in campos if d.get(c)]
@@ -668,7 +681,7 @@ def inscricoes_lista():
             "turma": i["turma"], "status": i["status"], "criado": i["criado"],
             "nome": lead.get("nome"), "telefone": lead.get("telefone"),
             "email": lead.get("email"), "fase": lead.get("fase"),
-            "grupos": _ficha_para_humano(i["dados_json"]),
+            "grupos": _ficha_para_humano(i["dados_json"], lead),
         })
     pendentes = sum(1 for i in out if i["status"] == "recebida")
     return jsonify({"inscricoes": out, "pendentes": pendentes})
