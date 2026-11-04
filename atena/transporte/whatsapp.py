@@ -99,6 +99,10 @@ TEMPLATES_ROL = [
      "descricao": "Sai sozinho quando a ficha é marcada como transcrita na Extecamp.",
      "params": [{"k": "nome", "rotulo": "Nome"}, {"k": "curso", "rotulo": "Curso"},
                 {"k": "email", "rotulo": "E-mail"}]},
+    {"nome": "feq_continuidade_inscricao", "idioma": "pt_BR", "titulo": "Continuidade da inscrição",
+     "descricao": "Link individual da Extecamp para seguir com a inscrição (taxa).",
+     "params": [{"k": "nome", "rotulo": "Nome"}, {"k": "curso", "rotulo": "Curso"},
+                {"k": "link", "rotulo": "Link individual"}]},
 ]
 
 # Confirmação de inscrição, disparada pelo gesto "ficha transcrita" na Central. A Extecamp
@@ -113,6 +117,18 @@ CORPO_INSCRICAO_EFETUADA = (
     "as pastas de spam e lixo eletrônico.\n\n"
     "Se não tiver recebido o e-mail, basta responder a esta mensagem que nossa equipe "
     "ajudará você.\n\n"
+    "Atenciosamente,\nExtensão Unicamp")
+
+# Link INDIVIDUAL da Extecamp (ok-inscricao_taxa.php?id1=…) para o inscrito seguir com a
+# inscrição. Não vem da ontologia: cada aluno tem o seu, colado pelo operador.
+# Submetido/enviado por atena/ops/continuidade_inscricao.py.
+CORPO_CONTINUIDADE_INSCRICAO = (
+    "Olá, {{1}}! 🎓\n\n"
+    "Sua inscrição no curso *{{2}}* foi registrada. Para dar continuidade, acesse o seu "
+    "link individual abaixo e siga as instruções da página:\n\n"
+    "🔗 {{3}}\n\n"
+    "O link é pessoal, não o compartilhe. Se tiver qualquer dificuldade, é só responder "
+    "a esta mensagem que nossa equipe ajudará você.\n\n"
     "Atenciosamente,\nExtensão Unicamp")
 
 
@@ -162,6 +178,7 @@ PARAMS_TEMPLATE = {
     "feq_link_corrigido": ("nome", "curso", "url_inscricao", "prazo"),
     "feq_inscricao_garantida": ("nome", "curso"),
     "feq_inscricao_efetuada": ("nome", "curso", "email"),
+    "feq_continuidade_inscricao": ("nome", "curso", "link"),
 }
 
 
@@ -177,6 +194,7 @@ def montar_params(nome_template, lead, ont):
         # SEMPRE da ontologia: é justamente a montagem manual do link que causou o erro
         "url_inscricao": c.get("url_inscricao") or "",
         "email": (lead.get("email") or "").strip(),
+        "link": (lead.get("link") or "").strip(),     # individual, passado pelo operador
     }
     vals = [fonte.get(k, "") for k in PARAMS_TEMPLATE.get(nome_template, ("nome", "curso"))]
     return None if any(not v.strip() for v in vals) else vals
