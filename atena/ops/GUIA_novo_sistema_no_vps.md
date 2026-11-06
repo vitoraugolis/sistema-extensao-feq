@@ -20,8 +20,10 @@ separada: não cabe aqui.
 
 ## 2. O que você precisa nos entregar ANTES do acesso
 
-1. **Sua chave SSH pública** (`~/.ssh/id_ed25519.pub`). Criamos um usuário Linux só seu;
-   a chave do dono da máquina não é compartilhada.
+1. **Acesso**: você recebe a chave `.pem` da empresa e entra como `ubuntu`
+   (`ssh -i chave.pem ubuntu@144.33.22.236`). Esse usuário tem **sudo e é o mesmo que roda a
+   Atena**: as regras da seção 3 não são opcionais. Guarde a chave com `chmod 600` e não a
+   copie para outras máquinas nem para repositórios.
 2. **Domínio ou subdomínio** do sistema, com DNS (registro A) apontando para `144.33.22.236`.
 3. **Porta interna** que o app vai escutar, em `127.0.0.1` (não `0.0.0.0`). Livres: qualquer uma
    menos 8095, 2019, 53, 111.
@@ -30,8 +32,8 @@ separada: não cabe aqui.
 
 ## 3. Regras da casa
 
-- Tudo seu fica em **`/home/<seu-usuario>/`**. Não toque em `/home/ubuntu/atena-feq/`
-  (o deploy da Atena faz rsync ali e apagaria o que for seu).
+- Tudo seu fica em **`/home/ubuntu/<seu-app>/`** (pasta própria). Não toque em `/home/ubuntu/atena-feq/`
+  (o deploy da Atena faz rsync ali e apagaria o que for seu), nem em `~/.ssh/authorized_keys`.
 - Não rode `apt upgrade`, não troque a versão do Python do sistema e não altere `atena.service`
   nem os blocos existentes do Caddyfile. Use um venv (`python3 -m venv .venv`) ou o runtime
   da sua linguagem dentro da sua home.
@@ -42,7 +44,7 @@ separada: não cabe aqui.
 
 ## 4. Modelo de unit do systemd (obrigatório usar o limite de memória)
 
-`/etc/systemd/system/<seu-servico>.service`; quem tem sudo instala para você:
+`/etc/systemd/system/<seu-servico>.service`:
 
 ```ini
 [Unit]
@@ -50,10 +52,10 @@ Description=<Nome do sistema>
 After=network.target
 
 [Service]
-User=<seu-usuario>
-WorkingDirectory=/home/<seu-usuario>/<app>
-EnvironmentFile=/home/<seu-usuario>/<app>/.env
-ExecStart=/home/<seu-usuario>/<app>/.venv/bin/python app.py
+User=ubuntu
+WorkingDirectory=/home/ubuntu/<seu-app>
+EnvironmentFile=/home/ubuntu/<seu-app>/.env
+ExecStart=/home/ubuntu/<seu-app>/.venv/bin/python app.py
 Restart=always
 RestartSec=5
 # Limites: se o seu app vazar memória, ELE é morto e reiniciado, não a Atena.
@@ -68,7 +70,7 @@ WantedBy=multi-user.target
 
 ## 5. HTTPS (Caddy)
 
-Acrescentamos um bloco ao `/etc/caddy/Caddyfile`; o certificado sai automaticamente:
+Acrescente um bloco (sem alterar os existentes) e rode `sudo systemctl reload caddy` ao `/etc/caddy/Caddyfile`; o certificado sai automaticamente:
 
 ```
 seu.dominio.com.br {
