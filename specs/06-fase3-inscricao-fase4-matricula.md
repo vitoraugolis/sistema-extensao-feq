@@ -13,6 +13,9 @@ Levar o Prospect a concluir o formulário de inscrição da Extecamp.
 - **F4** Registrar `Forma de Pagamento` quando coletada.
 - **F5** Anexar comprovantes ao card via `api-cards-attach-file` (≤10 MB).
 
+> **Atualização 06/11/2026:** a inscrição em si passou a ser feita pelo robô da
+> spec 21 (`specs/21-inscricao-automatica-extecamp.md`) a partir da ficha da etapa 2.
+
 ### Como detectar "Inscrito"
 A Extecamp é externa; sem integração direta na v1. Opções (decisão em aberto):
 (a) confirmação declarada pelo lead + validação humana; (b) o próprio lead envia comprovante

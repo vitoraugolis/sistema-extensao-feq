@@ -1639,9 +1639,13 @@ async function inCarregar(){
           <button class="btn btn-g" onclick="inAlternar('${i.card_id}')">
             <i class="ti ti-${aberta?'chevron-up':'chevron-down'}"></i> ${aberta?'ocultar':'ver ficha'}</button>
           <button class="btn btn-g" onclick="abrirConversa('${i.card_id}')"><i class="ti ti-messages"></i> conversa</button>
-          ${feita?'':`<button class="btn btn-p" onclick="inTranscrita('${i.card_id}')"><i class="ti ti-check"></i> Transcrita</button>`}
+          ${feita?'':`<button class="btn btn-g" onclick="inRobo('${i.card_id}',false)" title="Lê a Extecamp e confere a ficha, sem enviar nada"><i class="ti ti-eye-check"></i> simular</button>
+          <button class="btn btn-p" onclick="inRobo('${i.card_id}',true)" title="O robô preenche e envia a inscrição na Extecamp e manda o link ao lead"><i class="ti ti-robot"></i> Inscrever na Extecamp</button>
+          <button class="btn btn-g" onclick="inTranscrita('${i.card_id}')"><i class="ti ti-check"></i> Transcrita</button>`}
         </span>
       </div>
+      ${i.robo_obs ? `<div class="muted" style="margin-top:6px;font-size:12px;"><i class="ti ti-robot"></i> ${escapeHtml(i.robo_obs)}</div>` : ''}
+      ${i.link_extecamp ? `<div style="margin-top:4px;font-size:12px;"><a href="${escapeHtml(i.link_extecamp)}" target="_blank" rel="noopener">link de continuidade do lead</a></div>` : ''}
       ${aberta ? inFicha(i) : ''}
     </div>`;
   }).join('');
@@ -1688,6 +1692,25 @@ function inCopiar(btn, valor){
     const antes = btn.textContent; btn.textContent = 'copiado';
     setTimeout(()=>{ btn.textContent = antes; }, 900);
   });
+}
+
+// Robô de inscrição (spec 21). Simular só LÊ a Extecamp (busca o documento, carrega a
+// ficha) e diz o que falta; Inscrever envia de verdade e manda o link ao lead.
+async function inRobo(id, valer){
+  if(valer && !confirm('O robô vai INSCREVER este lead na Extecamp agora (não dá para desfazer) e mandar a ele, pelo WhatsApp, o link para validar a inscrição.\n\nContinuar?')) return;
+  const r = await api('/api/inscricoes/'+id+'/extecamp',{method:'POST',
+    headers:{'Content-Type':'application/json'}, body:JSON.stringify({valer})});
+  const pend = (r.pendencias||[]).map(p=>'• '+p).join('\n');
+  if(!valer){
+    alert(r.ok ? `Simulação OK (${r.caminho==='ex-aluno'?'ex-aluno: cadastro encontrado':'primeiro cadastro'}). A ficha está completa para enviar.`
+               : 'O robô não conseguiria inscrever:\n'+pend);
+    return;
+  }
+  if(r.ok){
+    const av = r.aviso_lead||{};
+    alert('Inscrito na Extecamp ✓\n\n'+(av.ok?'Link enviado ao lead pelo WhatsApp.':'Link NÃO enviado ao lead: '+(av.motivo||'falha')+'\nO link está na ficha para envio manual.'));
+  } else alert('Inscrição não concluída:\n'+pend);
+  carregar();
 }
 
 async function inTranscrita(id){

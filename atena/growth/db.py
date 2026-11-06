@@ -101,6 +101,11 @@ class Growth:
             self.conn.execute("ALTER TABLE eventos_funil ADD COLUMN valor REAL")  # spec 16
         except sqlite3.OperationalError:
             pass  # coluna já existe
+        for col in ("link_extecamp", "robo_obs"):   # spec 21: robô de inscrição
+            try:
+                self.conn.execute(f"ALTER TABLE inscricoes ADD COLUMN {col} TEXT")
+            except sqlite3.OperationalError:
+                pass
         try:   # início da turma CORRENTE: inscritos() conta só o que veio depois
             self.conn.execute("ALTER TABLE cursos_metas ADD COLUMN turma_desde TEXT")
         except sqlite3.OperationalError:
@@ -290,6 +295,14 @@ class Growth:
         with self._lock:
             rows = self.conn.execute(q, p).fetchall()
         return [dict(r) for r in rows]
+
+    def set_inscricao_robo(self, insc_id, obs, link=None):
+        """Resultado do robô de inscrição (spec 21): o link individual ok-inscricao
+        quando deu certo, e sempre a observação (caminho ou pendências)."""
+        with self._lock:
+            self.conn.execute("UPDATE inscricoes SET robo_obs=?, link_extecamp=COALESCE(?,link_extecamp),"
+                              " atualizado=? WHERE id=?", (obs, link, _agora(), insc_id))
+            self.conn.commit()
 
     def set_inscricao_status(self, insc_id, status):
         with self._lock:

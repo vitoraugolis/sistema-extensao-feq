@@ -71,6 +71,7 @@ specs/                          # ESPECIFICAÇÕES (fonte da verdade)
   15-growth-engine.md           # RevOps: pacing, Meta Ads/CAPI, recuperação de checkout
   19-funil-professores.md       # módulo RESTRITO (master concede acesso): prospecção de docentes
   16-funil-conversoes-hub.md    # bridge page (dedup Pixel×CAPI), matrículas offline, ferramentas p/ agentes
+  21-inscricao-automatica-extecamp.md  # robô que lança a ficha da LP na Extecamp e manda o link ao lead
   17-fluxo-consolidado-lp.md    # FLUXO DEFINITIVO: LP órfã no WP FEQ, telemetria de sessão, 5 toques, conversão offline via Central
 atena/                          # SISTEMA v2 (monólito modular) — ver atena/README.md
   ontologia/  core/  agentes/  revisor/  transporte/  api/  web/  growth/  tests/
@@ -105,6 +106,7 @@ PORT=8080                       # 8090 cérebro v1 · 8095 Central v2
 # Growth Engine (spec 15) — sem estes tokens, tudo roda em dry-run:
 META_ADS_TOKEN=... META_AD_ACCOUNT_ID=act_... META_PIXEL_ID=... META_CAPI_TOKEN=...
 GROWTH_CPL_MAX=60 GROWTH_SHIFT_PCT=20 GROWTH_AUTO_APPLY=0 GROWTH_TEST_EVENT_CODE=...
+INSCRICAO_AUTO=0                # 1 = robô inscreve na Extecamp assim que a ficha chega (spec 21)
 ```
 
 ## 6. Como rodar e testar
@@ -220,6 +222,12 @@ Reescrita **v2** (monólito modular `atena/`, ancoragem ontológica) implementad
   (Aprovações e Dúvidas absorvidas, ação na própria linha; `pacing_atrasado` fora); templates
   com cabeçalho de mídia e botões de link/ligar/cupom criados na Central, e campanhas que
   preenchem cada variável/botão por lead.
+
+- ✅ **Robô de inscrição na Extecamp** (06/11/2026, `specs/21`, `atena/coleta/inscricao.py`):
+  ficha da etapa 2 → formulário público (busca ex-aluno por variantes do documento, senão
+  primeiro cadastro) → link `ok-inscricao*` ao lead (template `feq_continuidade_inscricao`).
+  Botões simular/Inscrever na aba Inscrições; `INSCRICAO_AUTO=1` liga o automático.
+  Dry-run conferido no formulário real; **primeiro envio real ainda pendente**.
 
 ## 10. Riscos e pendências abertas
 

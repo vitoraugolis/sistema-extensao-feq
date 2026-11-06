@@ -454,20 +454,33 @@ def _secao_curriculo(c):
 # nascimento) e como paga.
 _E2_PESSOAIS_EXTRA = """          <div><label class="lbl" for="doc_tipo">Tipo de documento</label>
             <select id="doc_tipo" name="doc_tipo" class="inp"><option value="">Selecione…</option>
-              <option>RG</option><option>CNH</option><option>Passaporte</option><option>RNE</option></select></div>
+              <option>RG</option><option value="CIN">CIN – Carteira de Identidade Nacional</option>
+              <option>RNE</option><option>RNM</option><option>Passaporte</option></select></div>
           <div><label class="lbl" for="doc_numero">Número do documento</label>
-            <input id="doc_numero" name="doc_numero" class="inp"></div>
+            <input id="doc_numero" name="doc_numero" class="inp" placeholder="com o hífen, se tiver"></div>
           <div><label class="lbl" for="doc_emissor">Estado emissor</label>
             <input id="doc_emissor" name="doc_emissor" maxlength="2" placeholder="SP" class="inp"></div>
           <div><label class="lbl" for="sexo">Sexo</label>
             <select id="sexo" name="sexo" class="inp"><option value="">Selecione…</option>
-              <option>Feminino</option><option>Masculino</option><option>Prefiro não informar</option></select></div>
+              <option>Feminino</option><option>Masculino</option></select></div>
+          <div><label class="lbl" for="genero">Gênero</label>
+            <select id="genero" name="genero" class="inp"><option value="">Selecione…</option>
+              <option>Mulher cisgênero</option><option>Homem cisgênero</option><option>Mulher trans</option>
+              <option>Homem trans/transmasculino</option><option>Travesti</option>
+              <option>Pessoa não binária/agênero</option><option>Prefere não responder</option></select></div>
           <div><label class="lbl" for="estado_civil">Estado civil</label>
             <select id="estado_civil" name="estado_civil" class="inp"><option value="">Selecione…</option>
               <option>Solteiro(a)</option><option>Casado(a)</option><option>Divorciado(a)</option>
-              <option>Viúvo(a)</option><option>União estável</option></select></div>
+              <option>Separado(a) judicialmente</option><option>Viúvo(a)</option><option>União estável</option></select></div>
+          <div><label class="lbl" for="estado_nascimento">Estado onde nasceu</label>
+            <input id="estado_nascimento" name="estado_nascimento" maxlength="2" placeholder="SP" class="inp"></div>
           <div><label class="lbl" for="cidade_nascimento">Cidade onde nasceu</label>
             <input id="cidade_nascimento" name="cidade_nascimento" class="inp"></div>
+          <div><label class="lbl" for="deficiencia">Possui alguma deficiência?</label>
+            <select id="deficiencia" name="deficiencia" class="inp"><option value="Não">Não</option>
+              <option>Cegueira</option><option>Baixa Visão</option><option>Surdez</option>
+              <option>Surdocegueira</option><option value="Deficiencia Fisica">Deficiência física</option>
+              <option>Outra</option></select></div>
 """
 
 _E2_ENDERECO = """      <fieldset>

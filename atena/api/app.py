@@ -16,6 +16,7 @@ import json
 import hmac
 import time
 import secrets
+import threading
 import datetime
 import pathlib
 import tempfile
@@ -84,6 +85,7 @@ from atena.growth.meta_ads import MetaAds
 from atena.growth import ponte
 from atena.coleta import extecamp as coleta_extecamp
 from atena.coleta import sincronizacao as coleta_sinc
+from atena.coleta import inscricao as coleta_inscricao
 from atena.growth import funil as growth_funil
 from atena.growth import pdf_guia
 
@@ -613,6 +615,7 @@ def lead_verificar(card_id):
 _ROTULO_FICHA = {
     "cpf": "CPF", "nascimento": "Nascimento", "doc_tipo": "Documento",
     "doc_numero": "Nº do documento", "doc_emissor": "Emissor", "sexo": "Sexo",
+    "genero": "Gênero", "estado_nascimento": "UF natal", "deficiencia": "Deficiência",
     "estado_civil": "Estado civil", "cidade_nascimento": "Cidade natal",
     "cep": "CEP", "rua": "Rua", "numero": "Número", "complemento": "Complemento",
     "bairro": "Bairro", "cidade": "Cidade", "estado": "UF",
@@ -626,7 +629,8 @@ _ROTULO_FICHA = {
 # Um dict solto obrigaria o agente a caçar campo por campo na tela.
 _GRUPOS_FICHA = (
     ("Dados pessoais", ("cpf", "nascimento", "doc_tipo", "doc_numero", "doc_emissor",
-                        "sexo", "estado_civil", "cidade_nascimento")),
+                        "sexo", "genero", "estado_civil", "estado_nascimento",
+                        "cidade_nascimento", "deficiencia")),
     ("Endereço", ("cep", "rua", "numero", "complemento", "bairro", "cidade", "estado")),
     ("Formação e atuação", ("escolaridade", "instituicao", "curso_concluido",
                             "ano_conclusao", "situacao", "empresa", "cargo",
@@ -682,6 +686,7 @@ def inscricoes_lista():
             "nome": lead.get("nome"), "telefone": lead.get("telefone"),
             "email": lead.get("email"), "fase": lead.get("fase"),
             "grupos": _ficha_para_humano(i["dados_json"], lead),
+            "link_extecamp": i.get("link_extecamp"), "robo_obs": i.get("robo_obs"),
         })
     pendentes = sum(1 for i in out if i["status"] == "recebida")
     return jsonify({"inscricoes": out, "pendentes": pendentes})
@@ -734,6 +739,91 @@ def _avisar_inscricao_efetuada(lead):
                          destino=lead["telefone"])
     EST.log_acao("sistema", f"aviso de inscrição efetuada: {'enviado' if r.get('ok') else 'falhou'}", cid)
     return r
+
+
+# ------------------------------------------- Robô de inscrição na Extecamp (spec 21)
+TPL_CONTINUIDADE = "feq_continuidade_inscricao"
+_ROBO_EM_CURSO = set()
+_ROBO_LOCK = threading.Lock()
+
+
+def _avisar_continuidade(lead, link):
+    """Manda ao lead o SEU link ok-inscricao: é por ele que a inscrição se valida
+    (termo + taxa). Mesmo fail-soft do aviso de inscrição efetuada."""
+    from atena.transporte.whatsapp import montar_params
+    cid = lead["card_id"]
+    if lead.get("optout"):
+        return {"ok": False, "motivo": "lead pediu para não receber mensagens"}
+    st = WA.templates_status()
+    if st is not None and st.get(TPL_CONTINUIDADE) != "APPROVED":
+        return {"ok": False, "motivo": f"template {TPL_CONTINUIDADE} ainda não aprovado na Meta"}
+    primeiro = ((lead.get("nome") or "").split() or [""])[0].capitalize()
+    params = montar_params(TPL_CONTINUIDADE, {**lead, "nome": primeiro, "link": link}, ONTO.ont)
+    if params is None:
+        return {"ok": False, "motivo": "parâmetro vazio no template"}
+    r = WA.enviar_template(lead["telefone"], TPL_CONTINUIDADE, params=params)
+    if r.get("ok"):
+        EST.add_conversa(cid, "agente", f"[template {TPL_CONTINUIDADE}] link de continuidade da inscrição",
+                         wamid=r.get("wamid"), status="enviado", autor="template",
+                         destino=lead["telefone"])
+    EST.log_acao("sistema", f"link de continuidade da inscrição: {'enviado' if r.get('ok') else 'falhou'}", cid)
+    return r
+
+
+def _inscrever_extecamp(card_id, valer):
+    """Roda o robô para a ficha mais recente do lead. Com `valer`, sucesso = mesmo
+    efeito do gesto "Transcrita" (fase Inscrito + CAPI offline), mas o aviso ao lead
+    leva o link individual. Nunca roda duas vezes a mesma ficha em paralelo, nem
+    repete uma ficha já transcrita ou que foi ENVIADA sem link (pode ter criado a
+    inscrição lá: o humano confere no ADM Cursos antes)."""
+    lead, ficha = EST.get_lead(card_id), GRW.get_inscricao(card_id)
+    if not lead or not ficha:
+        return {"ok": False, "pendencias": ["ficha ou lead inexistente"]}
+    if ficha.get("status") == "transcrita":
+        return {"ok": False, "pendencias": ["ficha já transcrita"]}
+    if valer and (ficha.get("robo_obs") or "").startswith("ENVIADO"):
+        return {"ok": False, "pendencias": ["envio anterior sem confirmação — confira no ADM Cursos"]}
+    url = next((m["url"] for m in GRW.cursos() if m["curso"] == ficha["curso"]), None)
+    if not url:
+        return {"ok": False, "pendencias": [f"curso {ficha['curso']} sem link de inscrição"]}
+    with _ROBO_LOCK:
+        if card_id in _ROBO_EM_CURSO:
+            return {"ok": False, "pendencias": ["robô já está inscrevendo este lead"]}
+        _ROBO_EM_CURSO.add(card_id)
+    try:
+        try:
+            r = coleta_inscricao.inscrever(json.loads(ficha["dados_json"] or "{}"), lead, url, valer=valer)
+        except Exception as e:     # rede/HTML: vira pendência, nunca 500 nem thread morta calada
+            r = {"ok": False, "enviado": False, "pendencias": [f"falha técnica: {type(e).__name__}"]}
+        if not valer:
+            return r
+        if r.get("ok"):
+            GRW.set_inscricao_robo(ficha["id"], f"robô: inscrito ({r['caminho']})", link=r["link"])
+            GRW.set_inscricao_status(ficha["id"], "transcrita")
+            r["conversao_offline"] = _mover_fase(lead, card_id, "Inscrito")
+            r["aviso_lead"] = _avisar_continuidade(EST.get_lead(card_id), r["link"])
+            EST.log_acao("robô", f"inscrição feita na Extecamp ({ficha['curso']}, {r['caminho']})", card_id)
+        else:
+            obs = ("ENVIADO sem link de confirmação: " if r.get("enviado") else "robô parou: ") \
+                + "; ".join(r.get("pendencias") or ["?"])
+            GRW.set_inscricao_robo(ficha["id"], obs)
+            EST.add_alerta("inscricao", f"Robô não concluiu a inscrição de {lead.get('nome') or card_id} "
+                                        f"({ficha['curso']}) — {obs}")
+            EST.log_acao("robô", f"inscrição na Extecamp não concluída ({ficha['curso']})", card_id)
+        return r
+    finally:
+        with _ROBO_LOCK:
+            _ROBO_EM_CURSO.discard(card_id)
+
+
+@app.route("/api/inscricoes/<card_id>/extecamp", methods=["POST"])
+def inscricao_robo(card_id):
+    """Central: {"valer": false} = simulação (lê a Extecamp, não envia);
+    {"valer": true} = inscreve de verdade e manda o link ao lead."""
+    valer = bool((request.get_json(silent=True) or {}).get("valer"))
+    if valer:
+        EST.log_acao(session.get("usuario", "operador"), "pediu inscrição automática na Extecamp", card_id)
+    return jsonify(_inscrever_extecamp(card_id, valer))
 
 
 # ------------------------------------------------------ Central de Notificações
@@ -2298,6 +2388,10 @@ def webhook_inscricao():
     dados = {**(request.get_json(silent=True) or {}),
              "ip": request.remote_addr, "ua": request.headers.get("User-Agent", "")}
     r = ponte.processar_etapa2(dados, EST, GRW, ADS, ING, ont=_ont())
+    # spec 21: o lead acabou de pedir a inscrição ("Concluir inscrição"); com
+    # INSCRICAO_AUTO=1 o robô a faz na hora. Sem a flag, fica o botão na Central.
+    if r.get("ok") and os.environ.get("INSCRICAO_AUTO") == "1":
+        threading.Thread(target=_inscrever_extecamp, args=(r["card_id"], True), daemon=True).start()
     return jsonify(r), (200 if r.get("ok") else 400), _CORS_LP
 
 
