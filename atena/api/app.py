@@ -2649,6 +2649,11 @@ def _operacoes():
                 EST.set_config("op_fb_alerta", str(_t.time()))
                 EST.add_alerta("degradacao",
                                f"{len(recentes)} respostas caíram no fallback determinístico em 15 min — verificar journalctl")
+            # recursos do VPS (máquina compartilhada com outros sistemas): disco/RAM/swap/CPU
+            if _t.time() - float(EST.get_config("op_recursos") or 0) > 600:
+                EST.set_config("op_recursos", str(_t.time()))
+                from atena.ops import recursos as _rec
+                _rec.checar(EST)
             # utcnow() aqui era o bug: o comentário sempre disse "BRT" mas a leitura
             # era UTC — os 5 jobs por hora (backup/LGPD/canário/curador/pacing) rodavam
             # 3h mais cedo que o documentado (ex.: "06h BRT" na prática era 03h BRT).

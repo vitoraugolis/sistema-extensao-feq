@@ -229,6 +229,10 @@ Reescrita **v2** (monólito modular `atena/`, ancoragem ontológica) implementad
   Botões simular/Inscrever na aba Inscrições; `INSCRICAO_AUTO=1` liga o automático.
   Dry-run conferido no formulário real; **primeiro envio real ainda pendente**.
 
+- ✅ **VPS compartilhável** (06/11/2026): `atena/ops/recursos.py` vigia disco/RAM/swap/CPU a
+  cada 10 min no tick de operações e alerta (Central + WhatsApp, 1 por tipo a cada 6h).
+  Regras para hospedar outro sistema na mesma VM: `atena/ops/GUIA_novo_sistema_no_vps.md`.
+
 ## 10. Riscos e pendências abertas
 
 - **Service account do BigQuery (`agente-guara-bq@guara-db`) enxerga o projeto `guara-db`
