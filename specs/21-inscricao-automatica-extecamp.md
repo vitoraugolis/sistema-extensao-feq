@@ -2,7 +2,7 @@
 
 **Status:** implementado em 06/11/2026 (`atena/coleta/inscricao.py`, 24 checks em
 `atena/tests/test_inscricao_extecamp.py`). Dry-run conferido contra o formulário real
-(FEQ-0480/009). **Envio real ainda não feito**: ver § Ativação.
+(FEQ-0480/009). **Primeira tentativa real recusada** (ver § Fluxo); ver § Ativação.
 
 ## Objetivo
 A ficha que o lead entrega na etapa 2 da LP (spec 17) é lançada pelo robô no
@@ -24,9 +24,16 @@ WhatsApp para ele validar a inscrição (termo + taxa). Substitui a transcriçã
 5. `POST inscricao.php?id=1&…` com `cadastrar=cadastrar` → redireciona para
    `ok-inscricao*.php?id1=…` (sucesso). Sem esse link = falha.
 
-A tela de data de nascimento do ex-aluno **não foi vista por dentro** (exige documento
-cadastrado). O robô casa os campos por nome (dia/mes/ano ou nasc/data); tela desconhecida
-vira pendência. Primeira inscrição real de ex-aluno: conferir e ajustar `_data_nascimento`.
+Tela de data de nascimento do ex-aluno (vista em 06/11/2026): form `procura_aluno.php?id=2`
+com selects `dia_t`/`mes_t`/`ano_t` (valores **sem zero à esquerda**: `5`, não `05`). Data
+certa → página com `<script>location.href='inscricao.php?id1=…'</script>` (redirect em JS,
+não HTTP), que o robô segue para chegar à ficha pré-preenchida. Tela desconhecida = pendência.
+
+**Primeira tentativa real (06/11/2026, FEQ-1150/001, Enzo):** primeiro cadastro, 47 campos,
+e a Extecamp devolveu a ficha com "ATENÇÃO: Favor verificar os campos em destaque". Mesmo
+assim **gravou o cadastro de pessoa** (o documento passou a ser achado como ex-aluno), sem
+gênero nem deficiência. Nada indica qual campo foi destacado. Desde então a página de erro
+fica em `atena/data/extecamp_falhas/<card_id>.html` (tem PII; só no VPS) para o próximo caso.
 
 ## Mapeamento ficha → Extecamp (`valores_desejados`)
 | Extecamp | Fonte | Regra |

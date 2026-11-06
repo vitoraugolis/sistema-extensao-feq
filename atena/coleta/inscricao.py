@@ -385,10 +385,24 @@ def _link_ok(resp):
     return None
 
 
+def _opcao_num(campo, x):
+    """Valor da opção numérica igual a x ("05" casa com value="5"); sem opções, x."""
+    return next((v for v, _ in campo.get("opcoes") or [] if v.isdigit() and int(v) == int(x)), x)
+
+
+_JS_LOCATION = re.compile(r"""location\.href\s*=\s*['"]([^'"]+)['"]""")
+
+
+def _seguir_js(http, html):
+    """A Extecamp troca de tela com <script>location.href='…'</script> (não HTTP 302)."""
+    m = _JS_LOCATION.search(html)
+    return _texto(http.get(urljoin(BASE, m.group(1).replace("&amp;", "&")))) if m else html
+
+
 def _data_nascimento(html, dma):
-    """Ex-aluno: a Extecamp pede a data de nascimento antes de abrir a ficha. Não
-    vimos essa tela por dentro (exige um documento cadastrado), então o casamento é
-    por nome de campo; tela desconhecida -> None (pendência, nunca chute)."""
+    """Ex-aluno: a Extecamp pede a data de nascimento antes de abrir a ficha
+    (form `procura_aluno.php?id=2`, selects dia_t/mes_t/ano_t com valores sem zero à
+    esquerda, vista em 06/11/2026). Tela desconhecida -> None (pendência, nunca chute)."""
     for f in formularios(html):
         c = f["campos"]
         dia = next((k for k in c if re.search(r"dia", k, re.I)), None)
@@ -396,7 +410,7 @@ def _data_nascimento(html, dma):
         ano = next((k for k in c if re.search(r"ano", k, re.I)), None)
         payload = {k: x["valor"] for k, x in c.items()}
         if dia and mes and ano:
-            payload.update({dia: dma[0], mes: dma[1], ano: dma[2]})
+            payload.update({k: _opcao_num(c[k], x) for k, x in ((dia, dma[0]), (mes, dma[1]), (ano, dma[2]))})
             return f["action"], payload
         unico = next((k for k in c if re.search(r"nasc|data", k, re.I)), None)
         if unico:
@@ -452,6 +466,8 @@ def inscrever(ficha, lead, url_curso, valer=False, sessao=None):
         acao, dados = passo
         ficha_html = _texto(http.post(urljoin(BASE, acao), dados))
         if not _form_com(ficha_html, "pf_nome"):
+            ficha_html = _seguir_js(http, ficha_html)
+        if not _form_com(ficha_html, "pf_nome"):
             out["pendencias"].append("ex-aluno: data de nascimento não aceita pela Extecamp")
             out["caminho"] = "ex-aluno"
             return out
@@ -487,6 +503,7 @@ def inscrever(ficha, lead, url_curso, valer=False, sessao=None):
         m = re.search(r"ATEN[ÇC][ÃA]O[^.]{0,160}", txt)
         out["pendencias"].append("Extecamp não devolveu o link de continuidade"
                                  + (f": {m.group(0).strip()}" if m else ""))
+        out["resposta_html"] = _texto(resp)   # quem chama guarda: mostra os campos em destaque
         return out
     out.update(ok=True, link=link)
     return out

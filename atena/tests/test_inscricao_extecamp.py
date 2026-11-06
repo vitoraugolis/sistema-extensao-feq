@@ -36,9 +36,11 @@ BUSCA = """<form name="form1" method="post" action="procura_aluno.php?id=1">
 <form name="form2" method="post" action="inscricao.php?id1=&id2=%81g"><button type="submit">Fazer primeiro cadastro</button></form>"""
 NAO_ACHOU = BUSCA + "<p>Atenção: Documento não localizado ou incorreto.</p>"
 NASC = """<form method="post" action="procura_aluno.php?id=2"><input type="hidden" name="rg" value="X">
-<select name="DIA"><option value=""></option><option value="17">17</option></select>
-<select name="MES"><option value=""></option><option value="05">05</option></select>
-<select name="ANO"><option value=""></option><option value="1990">1990</option></select></form>"""
+<select name="dia_t"><option value="1">01</option><option value="17">17</option></select>
+<select name="mes_t"><option value="1">01</option><option value="5">05 </option></select>
+<select name="ano_t"><option value="2026">2026</option><option value="1990">1990</option></select></form>"""
+# como a Extecamp real (06/11/2026): data certa -> página com redirect em JS para a ficha
+NASC_OK = """<script>location.href='inscricao.php?id1=%F1&id2=%81g&id4=%F4&id5='</script>""" + BUSCA
 
 
 def ficha_html(pref=None):
@@ -112,6 +114,8 @@ class FakeExtecamp:
             return R(ENTRADA, url=url)
         if "seleciona_cidade.php" in url:
             return R(CIDADES_SP if url.endswith("=SP") else "<select name='pf_cid'></select>")
+        if "inscricao.php?id1=%F1" in url:
+            return R(ficha_html(self.pref))
         if "viacep" in url:
             return R("", j={"logradouro": "Avenida Albert Einstein", "bairro": "Cidade Universitária",
                             "localidade": "Campinas", "uf": "SP"})
@@ -124,7 +128,7 @@ class FakeExtecamp:
             self.buscas.append(data["rg"])
             return R(NASC if data["rg"] in self.docs else NAO_ACHOU)
         if url.endswith("procura_aluno.php?id=2"):
-            return R(ficha_html(self.pref) if (data["DIA"], data["MES"], data["ANO"]) == ("17", "05", "1990")
+            return R(NASC_OK if (data["dia_t"], data["mes_t"], data["ano_t"]) == ("17", "5", "1990")
                      else NASC)
         if "inscricao.php?id1=" in url:
             return R(ficha_html())

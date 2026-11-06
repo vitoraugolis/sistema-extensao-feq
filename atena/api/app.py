@@ -795,6 +795,11 @@ def _inscrever_extecamp(card_id, valer):
             r = coleta_inscricao.inscrever(json.loads(ficha["dados_json"] or "{}"), lead, url, valer=valer)
         except Exception as e:     # rede/HTML: vira pendência, nunca 500 nem thread morta calada
             r = {"ok": False, "enviado": False, "pendencias": [f"falha técnica: {type(e).__name__}"]}
+        html_falha = r.pop("resposta_html", None)
+        if html_falha:   # tem PII: fica no VPS, junto do SQLite (atena/data), nunca em log
+            dest = pathlib.Path(EST.path).parent / "extecamp_falhas" / f"{card_id}.html"
+            dest.parent.mkdir(exist_ok=True)
+            dest.write_text(html_falha)
         if not valer:
             return r
         if r.get("ok"):
