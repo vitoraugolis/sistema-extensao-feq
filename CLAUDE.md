@@ -227,7 +227,8 @@ Reescrita **v2** (monólito modular `atena/`, ancoragem ontológica) implementad
   ficha da etapa 2 → formulário público (busca ex-aluno por variantes do documento, senão
   primeiro cadastro) → link `ok-inscricao*` ao lead (template `feq_continuidade_inscricao`).
   Botões simular/Inscrever na aba Inscrições; `INSCRICAO_AUTO=1` liga o automático.
-  Dry-run conferido no formulário real; **primeiro envio real ainda pendente**.
+  Primeira inscrição real em 06/11/2026 (FEQ-1150, primeiro cadastro): a Extecamp respondeu
+  "campos em destaque" e inscreveu mesmo assim — o robô confirma pela página `ok-inscricao_taxa`.
 
 - ✅ **VPS compartilhável** (06/11/2026): `atena/ops/recursos.py` vigia disco/RAM/swap/CPU a
   cada 10 min no tick de operações e alerta (Central + WhatsApp, 1 por tipo a cada 6h).

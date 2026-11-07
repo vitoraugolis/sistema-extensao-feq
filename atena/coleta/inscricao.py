@@ -393,12 +393,6 @@ def _opcao_num(campo, x):
 _JS_LOCATION = re.compile(r"""location\.href\s*=\s*['"]([^'"]+)['"]""")
 
 
-def _seguir_js(http, html):
-    """A Extecamp troca de tela com <script>location.href='…'</script> (não HTTP 302)."""
-    m = _JS_LOCATION.search(html)
-    return _texto(http.get(urljoin(BASE, m.group(1).replace("&amp;", "&")))) if m else html
-
-
 def _data_nascimento(html, dma):
     """Ex-aluno: a Extecamp pede a data de nascimento antes de abrir a ficha
     (form `procura_aluno.php?id=2`, selects dia_t/mes_t/ano_t com valores sem zero à
@@ -419,61 +413,86 @@ def _data_nascimento(html, dma):
     return None
 
 
-def inscrever(ficha, lead, url_curso, valer=False, sessao=None):
-    """Executa a inscrição. Retorno:
-    {ok, caminho: 'ex-aluno'|'novo', link?, pendencias: [...], enviado: bool,
-     documento_testado: n}. `ok` só é True com o link ok-inscricao em mãos (valer)
-    ou, no dry-run, com a ficha completa e pronta para enviar."""
-    http = _Http(sessao)
-    out = {"ok": False, "caminho": None, "link": None, "pendencias": [], "enviado": False}
-    desejado = valores_desejados(ficha, lead)
+_CONCLUIDA = re.compile(r"inscri[çc][ãa]o foi conclu[íi]da", re.I)
 
-    # 1-2. página do curso -> escolha "já fiz / nunca fiz"
+
+def _ja_inscrito(http, query):
+    """Página de confirmação do aluno nesta turma (só leitura). Os ids do redirect em JS
+    para a ficha do ex-aluno abrem `ok-inscricao_taxa.php`; se ela diz "inscrição foi
+    concluída", a pessoa já está inscrita e este é o link de continuidade."""
+    if not query:
+        return None
+    url = urljoin(BASE, "ok-inscricao_taxa.php?" + query)
+    return url if _CONCLUIDA.search(_texto(http.get(url))) else None
+
+
+def _localizar(http, url_curso, ficha):
+    """Passos 1-3: entrada do curso e busca do cadastro pelas variantes do documento.
+    Retorno: {erro} | {ex_aluno, ficha_html (None = primeiro cadastro), novo, query, n}."""
     r = http.get(url_curso)
     f0 = _form_com(_texto(r), "sigla")
     if not f0:
-        out["pendencias"].append("página do curso sem o formulário de entrada (link fechado?)")
-        return out
+        return {"erro": "página do curso sem o formulário de entrada (link fechado?)"}
     pag = _texto(http.post(urljoin(url_curso, f0["action"]), {k: c["valor"] for k, c in f0["campos"].items()}))
     busca = _form_com(pag, "rg")
     novo = next((f for f in formularios(pag) if "inscricao.php" in f["action"]), None)
     if not busca or not novo:
-        out["pendencias"].append("tela de busca de cadastro mudou (faltam os forms rg/primeiro cadastro)")
-        return out
-
-    # 3a. ex-aluno? testa as variantes do documento
-    ficha_html, ex_aluno = None, False
+        return {"erro": "tela de busca de cadastro mudou (faltam os forms rg/primeiro cadastro)"}
     variantes = variantes_documento((ficha or {}).get("doc_numero"), (ficha or {}).get("doc_emissor"),
                                     (ficha or {}).get("cpf"))
-    out["documento_testado"] = len(variantes)
+    out = {"ex_aluno": False, "ficha_html": None, "novo": novo, "query": None, "n": len(variantes)}
     for doc in variantes:
         base = {k: c["valor"] for k, c in busca["campos"].items()}
         resp = _texto(http.post(urljoin(BASE, busca["action"]), {**base, "rg": doc}))
         if _NAO_ACHOU.search(resp):
             continue
-        ex_aluno = True
+        out["ex_aluno"] = True
         if _form_com(resp, "pf_nome"):          # foi direto para a ficha
-            ficha_html = resp
-            break
+            out["ficha_html"] = resp
+            return out
         dma = _nascimento((ficha or {}).get("nascimento"))
         passo = _data_nascimento(resp, dma) if dma else None
         if not passo:
             campos = sorted({k for f in formularios(resp) for k in f["campos"]})
-            out["pendencias"].append("ex-aluno: tela de data de nascimento não reconhecida "
-                                     f"(campos: {', '.join(campos) or 'nenhum'})")
-            out["caminho"] = "ex-aluno"
-            return out
+            return {**out, "erro": "ex-aluno: tela de data de nascimento não reconhecida "
+                                   f"(campos: {', '.join(campos) or 'nenhum'})"}
         acao, dados = passo
-        ficha_html = _texto(http.post(urljoin(BASE, acao), dados))
-        if not _form_com(ficha_html, "pf_nome"):
-            ficha_html = _seguir_js(http, ficha_html)
-        if not _form_com(ficha_html, "pf_nome"):
-            out["pendencias"].append("ex-aluno: data de nascimento não aceita pela Extecamp")
-            out["caminho"] = "ex-aluno"
-            return out
-        break
+        html = _texto(http.post(urljoin(BASE, acao), dados))
+        m = _JS_LOCATION.search(html)
+        if m and not _form_com(html, "pf_nome"):
+            out["query"] = m.group(1).replace("&amp;", "&").split("?", 1)[-1]
+            html = _texto(http.get(urljoin(BASE, m.group(1).replace("&amp;", "&"))))
+        if not _form_com(html, "pf_nome"):
+            return {**out, "erro": "ex-aluno: data de nascimento não aceita pela Extecamp"}
+        out["ficha_html"] = html
+        return out
+    return out
+
+
+def inscrever(ficha, lead, url_curso, valer=False, sessao=None):
+    """Executa a inscrição. Retorno:
+    {ok, caminho: 'ex-aluno'|'novo', link?, pendencias: [...], enviado: bool,
+     documento_testado: n, ja_inscrito?}. `ok` só é True com o link ok-inscricao em mãos
+    (valer, ou pessoa já inscrita nesta turma) ou, no dry-run, com a ficha pronta para enviar."""
+    http = _Http(sessao)
+    out = {"ok": False, "caminho": None, "link": None, "pendencias": [], "enviado": False}
+    desejado = valores_desejados(ficha, lead)
+
+    loc = _localizar(http, url_curso, ficha)
+    out["documento_testado"] = loc.get("n")
+    ex_aluno = loc.get("ex_aluno", False)
+    if ex_aluno:
+        out["caminho"] = "ex-aluno"
+    if loc.get("erro"):
+        out["pendencias"].append(loc["erro"])
+        return out
+    link = _ja_inscrito(http, loc["query"])
+    if link:                                    # nunca inscrever duas vezes
+        out.update(ok=True, link=link, ja_inscrito=True)
+        return out
+    ficha_html = loc["ficha_html"]
     if ficha_html is None:                      # 3b. primeiro cadastro
-        ficha_html = _texto(http.post(urljoin(BASE, novo["action"]), {}))
+        ficha_html = _texto(http.post(urljoin(BASE, loc["novo"]["action"]), {}))
     out["caminho"] = "ex-aluno" if ex_aluno else "novo"
     form = _form_com(ficha_html, "pf_nome")
     if not form:
@@ -498,6 +517,11 @@ def inscrever(ficha, lead, url_curso, valer=False, sessao=None):
     link = _link_ok(resp)
     if not link and resp.status_code in (301, 302, 303) and resp.headers.get("Location"):
         link = _link_ok(http.get(urljoin(BASE, resp.headers["Location"])))
+    if not link:
+        # 06/11/2026: a Extecamp devolveu "ATENÇÃO: campos em destaque" e mesmo assim
+        # inscreveu. A palavra final é a página de confirmação, buscada de novo.
+        loc2 = _localizar(http, url_curso, ficha)
+        link = None if loc2.get("erro") else _ja_inscrito(http, loc2.get("query"))
     if not link:
         txt = re.sub(r"<[^>]+>", " ", _texto(resp))
         m = re.search(r"ATEN[ÇC][ÃA]O[^.]{0,160}", txt)

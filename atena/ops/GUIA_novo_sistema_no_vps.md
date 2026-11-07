@@ -1,6 +1,5 @@
-# Guia — subir um novo sistema no VPS da FEQ (Oracle)
+# Guia — subir um novo sistema no VPS 1 (Oracle)
 
-Para o desenvolvedor que vai hospedar outro sistema ao lado da Atena.
 **Leia tudo antes de começar: a máquina é pequena e a Atena está em produção.**
 
 ## 1. A máquina

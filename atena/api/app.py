@@ -774,15 +774,15 @@ def _inscrever_extecamp(card_id, valer):
     """Roda o robô para a ficha mais recente do lead. Com `valer`, sucesso = mesmo
     efeito do gesto "Transcrita" (fase Inscrito + CAPI offline), mas o aviso ao lead
     leva o link individual. Nunca roda duas vezes a mesma ficha em paralelo, nem
-    repete uma ficha já transcrita ou que foi ENVIADA sem link (pode ter criado a
-    inscrição lá: o humano confere no ADM Cursos antes)."""
+    repete uma ficha já transcrita. Ficha ENVIADA sem link roda só em modo conferência
+    (valer=False): se a página de confirmação mostra a inscrição, conclui com o link;
+    senão segue bloqueada até o humano conferir no ADM Cursos."""
     lead, ficha = EST.get_lead(card_id), GRW.get_inscricao(card_id)
     if not lead or not ficha:
         return {"ok": False, "pendencias": ["ficha ou lead inexistente"]}
     if ficha.get("status") == "transcrita":
         return {"ok": False, "pendencias": ["ficha já transcrita"]}
-    if valer and (ficha.get("robo_obs") or "").startswith("ENVIADO"):
-        return {"ok": False, "pendencias": ["envio anterior sem confirmação — confira no ADM Cursos"]}
+    so_conferir = valer and (ficha.get("robo_obs") or "").startswith("ENVIADO")
     url = next((m["url"] for m in GRW.cursos() if m["curso"] == ficha["curso"]), None)
     if not url:
         return {"ok": False, "pendencias": [f"curso {ficha['curso']} sem link de inscrição"]}
@@ -792,7 +792,8 @@ def _inscrever_extecamp(card_id, valer):
         _ROBO_EM_CURSO.add(card_id)
     try:
         try:
-            r = coleta_inscricao.inscrever(json.loads(ficha["dados_json"] or "{}"), lead, url, valer=valer)
+            r = coleta_inscricao.inscrever(json.loads(ficha["dados_json"] or "{}"), lead, url,
+                                           valer=valer and not so_conferir)
         except Exception as e:     # rede/HTML: vira pendência, nunca 500 nem thread morta calada
             r = {"ok": False, "enviado": False, "pendencias": [f"falha técnica: {type(e).__name__}"]}
         html_falha = r.pop("resposta_html", None)
@@ -800,6 +801,9 @@ def _inscrever_extecamp(card_id, valer):
             dest = pathlib.Path(EST.path).parent / "extecamp_falhas" / f"{card_id}.html"
             dest.parent.mkdir(exist_ok=True)
             dest.write_text(html_falha)
+        if so_conferir and not r.get("ja_inscrito"):
+            return {"ok": False, "pendencias": ["envio anterior sem confirmação e a Extecamp não mostra "
+                                                "a inscrição — confira no ADM Cursos"]}
         if not valer:
             return r
         if r.get("ok"):

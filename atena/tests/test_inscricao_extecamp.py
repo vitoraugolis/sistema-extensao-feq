@@ -107,13 +107,15 @@ class FakeExtecamp:
 
     def __init__(self, docs=(), final="ok", pref=None):
         self.docs, self.final, self.pref = set(docs), final, pref
-        self.buscas, self.envio = [], None
+        self.buscas, self.envio, self.inscrito = [], None, False
 
     def get(self, url, **kw):
         if url == URL:
             return R(ENTRADA, url=url)
         if "seleciona_cidade.php" in url:
             return R(CIDADES_SP if url.endswith("=SP") else "<select name='pf_cid'></select>")
+        if "ok-inscricao_taxa.php?id1=%F1" in url:
+            return R("<p>Pré inscrição foi concluída! MARIA</p>" if self.inscrito else "<p>?</p>")
         if "inscricao.php?id1=%F1" in url:
             return R(ficha_html(self.pref))
         if "viacep" in url:
@@ -135,7 +137,12 @@ class FakeExtecamp:
         if "inscricao.php?id=1" in url:
             self.envio = data
             if self.final == "ok":
+                self.inscrito = True
                 return R("", status=302, headers={"Location": LINK})
+            if self.final == "atencao_mas_inscreveu":   # caso real de 06/11/2026
+                self.inscrito = True
+                self.docs.add(self.buscas[0])
+
             return R("<p>ATENÇÃO: Favor verificar os campos em destaque.</p>" + ficha_html())
         raise AssertionError(f"POST inesperado {url}")
 
@@ -208,5 +215,16 @@ r = I.inscrever({**FICHA, "nascimento": "1991-01-01"}, LEAD, URL, valer=True,
                 sessao=FakeExtecamp(docs={"MG-12.345.678"}))
 check(not r["ok"] and r["caminho"] == "ex-aluno" and "não aceita" in r["pendencias"][0],
       "ex-aluno com nascimento errado não cai para primeiro cadastro (evita duplicar)")
+
+print("confirmação pela página do aluno")
+fx = FakeExtecamp(final="atencao_mas_inscreveu")
+r = I.inscrever(FICHA, LEAD, URL, valer=True, sessao=fx)
+check(r["ok"] and r["link"].startswith(I.BASE + "ok-inscricao_taxa.php?id1=%F1"),
+      "ATENÇÃO na resposta mas inscrição feita: acha o link na página de confirmação")
+fx = FakeExtecamp(docs={"MG-12345678"})
+fx.inscrito = True
+r = I.inscrever(FICHA, LEAD, URL, valer=True, sessao=fx)
+check(r["ok"] and r.get("ja_inscrito") and fx.envio is None and "ok-inscricao_taxa" in r["link"],
+      "ex-aluno já inscrito na turma: devolve o link e NÃO envia de novo")
 
 print(f"\n{ok} checks OK — inscrição Extecamp")

@@ -1,8 +1,8 @@
 # 21 — Inscrição automática na Extecamp (robô)
 
-**Status:** implementado em 06/11/2026 (`atena/coleta/inscricao.py`, 24 checks em
+**Status:** implementado em 06/11/2026 (`atena/coleta/inscricao.py`, 26 checks em
 `atena/tests/test_inscricao_extecamp.py`). Dry-run conferido contra o formulário real
-(FEQ-0480/009). **Primeira tentativa real recusada** (ver § Fluxo); ver § Ativação.
+(FEQ-0480/009). **Primeira inscrição real feita** (06/11/2026, ver § Fluxo); ver § Ativação.
 
 ## Objetivo
 A ficha que o lead entrega na etapa 2 da LP (spec 17) é lançada pelo robô no
@@ -30,10 +30,14 @@ certa → página com `<script>location.href='inscricao.php?id1=…'</script>` (
 não HTTP), que o robô segue para chegar à ficha pré-preenchida. Tela desconhecida = pendência.
 
 **Primeira tentativa real (06/11/2026, FEQ-1150/001, Enzo):** primeiro cadastro, 47 campos,
-e a Extecamp devolveu a ficha com "ATENÇÃO: Favor verificar os campos em destaque". Mesmo
-assim **gravou o cadastro de pessoa** (o documento passou a ser achado como ex-aluno), sem
-gênero nem deficiência. Nada indica qual campo foi destacado. Desde então a página de erro
-fica em `atena/data/extecamp_falhas/<card_id>.html` (tem PII; só no VPS) para o próximo caso.
+e a Extecamp devolveu a ficha com "ATENÇÃO: Favor verificar os campos em destaque" — mas
+**a inscrição foi feita** (conferido no ADM Cursos em 07/11). A resposta do POST não é
+confiável; a palavra final é a **página de confirmação** `ok-inscricao_taxa.php?<ids>`, com
+os ids do redirect em JS da tela de nascimento. Ela mostra "Pré inscrição foi concluída!"
+quando a pessoa está inscrita na turma (`_ja_inscrito`, só leitura). O robô a consulta:
+- **antes** de enviar, sempre que acha o cadastro (ex-aluno já inscrito → devolve o link, não envia);
+- **depois** de um envio sem link, refazendo a busca (primeiro cadastro inscrito → link).
+Falha que sobra guarda a página em `atena/data/extecamp_falhas/<card_id>.html` (PII; só no VPS).
 
 ## Mapeamento ficha → Extecamp (`valores_desejados`)
 | Extecamp | Fonte | Regra |
@@ -64,8 +68,9 @@ completa o vazio, exceto as escolhas do curso (pagamento, misto, como soube, con
 - **Fail-closed**: qualquer obrigatório sem dado, opção não reconhecida, cidade fora da
   lista, tela desconhecida → `pendencias` (só nomes de campo, sem PII) e nada é enviado.
 - Ex-aluno com nascimento recusado **não** cai para primeiro cadastro (duplicaria o aluno).
-- Envio sem o link de volta → `robo_obs` começa com `ENVIADO` e o robô se recusa a repetir:
-  a inscrição pode ter sido criada; humano confere no ADM Cursos e marca Transcrita.
+- Envio sem o link de volta e sem confirmação → `robo_obs` começa com `ENVIADO`. Rodar de
+  novo só **confere** (nunca reenvia): se a página de confirmação mostra a inscrição, conclui
+  com o link; senão o humano confere no ADM Cursos e marca Transcrita.
 - Lock por card: duas execuções simultâneas do mesmo lead são recusadas.
 - Ficha básica (spec 17, só CPF/nascimento/pagamento) não tem os obrigatórios → sempre
   pendência; esses cursos seguem na transcrição manual.
