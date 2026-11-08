@@ -285,9 +285,10 @@
     ev.preventDefault();
     var erro = document.getElementById("erro-e2");
     var faltando = [];
-    ["cpf", "nascimento", "forma_pagamento"].forEach(function (id) {
-      var el = document.getElementById(id);
-      if (el && !String(el.value).trim()) faltando.push(id);
+    // Todo [required] do formulário: a ficha completa exige o que o robô precisa para
+    // inscrever na Extecamp (spec 21); a básica, só CPF/nascimento/pagamento.
+    formE2.querySelectorAll("[required]").forEach(function (el) {
+      if (!String(el.value).trim()) faltando.push(el.id);
     });
     if (faltando.length) {
       erro.textContent = "Preencha os campos obrigatórios antes de concluir.";

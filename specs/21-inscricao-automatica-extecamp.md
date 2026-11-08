@@ -74,6 +74,13 @@ completa o vazio, exceto as escolhas do curso (pagamento, misto, como soube, con
 - Lock por card: duas execuções simultâneas do mesmo lead são recusadas.
 - Ficha básica (spec 17, só CPF/nascimento/pagamento) não tem os obrigatórios → sempre
   pendência; esses cursos seguem na transcrição manual.
+- Desde 08/11/2026 a ficha **completa** da LP exige no navegador (`required`) tudo que o
+  robô precisa: documento (tipo, número, UF emissora), sexo, gênero, estado civil, UF e
+  cidade de nascimento, CEP, rua, número, bairro, cidade e UF. Só o complemento é opcional.
+  O servidor (`OBRIGATORIOS_ETAPA2`) continua aceitando só CPF/nascimento/pagamento, de
+  propósito: uma LP antiga em cache que mande ficha incompleta não pode perder o lead
+  (o JS segue para o obrigado mesmo com erro). Ficha incompleta assim cai em pendência no
+  robô, e o lead recebe o link oficial de inscrição.
 
 ## Integração
 - `POST /api/inscricoes/<card_id>/extecamp` `{"valer": false|true}`. Central, aba

@@ -18,6 +18,7 @@ Toda checagem fixa `hoje`: o estado depende do calendário e, sem fixar, o arqui
 passaria hoje e falharia sozinho em 01/09 sem nenhum bug — erro já cometido duas
 vezes neste projeto (test_promocao.py e test_growth.py).
 """
+import re
 import sys
 import pathlib
 import datetime
@@ -120,6 +121,20 @@ faltando = [x for x in SO_COMPLETA if f'name="{x}"' in lp]
 check(not faltando, f"ficha básica não pede campo que a Extecamp não recebe (sobrou: {faltando})")
 for campo in SO_BASICA + SO_COMPLETA:
     check(f'name="{campo}"' in lp_dep, f"ficha completa segue intacta: {campo}")
+
+# Robô da Extecamp (spec 21) não inscreve sem estes: a ficha completa os exige no
+# navegador (caso Débora, 08/11/2026: ficha sem endereço, inscrição impossível).
+ROBO = ("doc_tipo", "doc_numero", "doc_emissor", "sexo", "genero", "estado_civil",
+        "estado_nascimento", "cidade_nascimento", "cep", "rua", "numero", "bairro",
+        "cidade", "estado")
+def exige(html, x):
+    return bool(re.search(rf'name="{x}"[^>]*\srequired', html))
+sem_req = [x for x in ROBO + SO_BASICA if not exige(lp_dep, x)]
+check(not sem_req, f"ficha completa exige tudo que o robô precisa (faltou: {sem_req})")
+check(not exige(lp_dep, "complemento"), "complemento segue opcional")
+check(all(exige(lp, x) for x in SO_BASICA)
+      and not any(exige(lp, x) for x in ROBO),
+      "ficha básica só exige CPF, nascimento e pagamento")
 
 check("{{E2_" not in lp and "{{E2_" not in lp_dep, "nenhum token de ficha vazou para o HTML")
 check("Leva menos de 1 minuto" in lp and "Leva cerca de 3 minutos" in lp_dep,
