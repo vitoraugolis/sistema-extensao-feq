@@ -103,6 +103,11 @@ TEMPLATES_ROL = [
      "descricao": "Link individual da Extecamp para seguir com a inscrição (taxa).",
      "params": [{"k": "nome", "rotulo": "Nome"}, {"k": "curso", "rotulo": "Curso"},
                 {"k": "link", "rotulo": "Link individual"}]},
+    {"nome": "feq_ficha_incompleta", "idioma": "pt_BR", "titulo": "Ficha incompleta",
+     "descricao": "Ficha da LP sem os dados que o robô exige: o lead conclui a inscrição "
+                  "no link oficial da Extecamp (spec 21).",
+     "params": [{"k": "nome", "rotulo": "Nome"}, {"k": "curso", "rotulo": "Curso"},
+                {"k": "link", "rotulo": "Link de inscrição da Extecamp"}]},
 ]
 
 # Confirmação de inscrição, disparada pelo gesto "ficha transcrita" na Central. A Extecamp
@@ -179,6 +184,9 @@ PARAMS_TEMPLATE = {
     "feq_inscricao_garantida": ("nome", "curso"),
     "feq_inscricao_efetuada": ("nome", "curso", "email"),
     "feq_continuidade_inscricao": ("nome", "curso", "link"),
+    # link = cursos_metas.url (Extecamp), nunca url_inscricao: com urlInscricaoLead
+    # ele aponta para a própria LP, que é justamente onde a ficha ficou incompleta.
+    "feq_ficha_incompleta": ("nome", "curso", "link"),
 }
 
 
