@@ -265,9 +265,9 @@ Reescrita **v2** (monólito modular `atena/`, ancoragem ontológica) implementad
   revisão; os valores anteriores estão em `config lp_hash_backup_31ago`.
 - ✅ As 12 LPs no ar já usam `feq.vitoraugolis.com.br` nos webhooks (conferido em
   13/10/2026 decodificando o bloco base64 de cada página). Nada depende mais de `sslip.io`.
-- `META_ADS_TOKEN` expirou em 10/10/2026: as chamadas ao Meta Ads (`atena/growth/meta_ads.py`)
-  falham até gerar um token novo (os de WhatsApp e Página são de system user e
-  não expiram).
+- ✅ `META_ADS_TOKEN` trocado em 08/11/2026 por token de System User (não expira). De 10/10 a
+  08/11 o CAPI falhou: as 4 inscrições confirmadas dentro da janela de 7 dias da Meta foram
+  reenviadas (`funil.reenviar_falhas`, hora original); 5 mais antigas ficaram de fora.
 - O `.env` de produção tem valor com espaços (`WP_APP_PASSWORD`): `. ./.env` no shell o
   trunca. O app lê o arquivo com parser próprio; scripts avulsos devem fazer o mesmo.
 - As versões dos pacotes Python em produção foram fixadas iguais às do Lightsail
