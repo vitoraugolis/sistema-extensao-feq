@@ -71,6 +71,46 @@ def registrar(g, ads, est, card_id, tipo, curso=None, agora=None, event_id=None,
     return {"ok": True, "capi": capi_id}
 
 
+# A Meta recusa event_time com mais de 7 dias; 6 dá folga ao relógio e ao tempo de envio.
+JANELA_REENVIO_DIAS = 6
+
+
+def reenviar_falhas(g, ads, est, agora=None, tipos=("inscricao_confirmada", "matricula_confirmada")):
+    """Reenvia ao CAPI as conversões OFFLINE cuja chamada falhou (capi vazio), com a
+    hora ORIGINAL do evento e o mesmo event_id de `registrar` — reenviar duas vezes não
+    duplica na Meta. Só conversões offline: início de inscrição/lista de espera também
+    saíram pelo Pixel do navegador, e reenviar sem o event_id dele contaria em dobro.
+    Fora da janela da Meta não há o que fazer: fica em `expirados`."""
+    agora = agora or datetime.datetime.now()
+    limite = agora - datetime.timedelta(days=JANELA_REENVIO_DIAS)
+    out = {"enviados": [], "falharam": [], "expirados": []}
+    for tipo in tipos:
+        for e in g.eventos(tipo=tipo):
+            if e["capi"]:
+                continue
+            ts = datetime.datetime.fromisoformat(e["ts"])
+            if ts < limite:
+                out["expirados"].append(e["card_id"])
+                continue
+            lead = est.get_lead(e["card_id"]) or {}
+            if not (lead.get("telefone") or lead.get("email")):
+                out["falharam"].append(e["card_id"])
+                continue
+            eid = f"{tipo}-{e['card_id']}"
+            custom = {"content_ids": [e["curso"]], "content_name": e["curso"]}
+            if EVENTO_CAPI[tipo] == "Purchase":
+                custom.update(currency="BRL", value=e["valor"] or 0)
+            r = ads.capi(EVENTO_CAPI[tipo], lead.get("telefone"), eid, custom,
+                         email=lead.get("email"), event_time=ts.timestamp())
+            if r.get("ok") and r.get("status") != "dry_run":
+                g.set_evento_capi(e["id"], eid)
+                est.log_acao("growth", f"evento {tipo} ({e['curso']}) reenviado: capi={eid}", e["card_id"])
+                out["enviados"].append(e["card_id"])
+            else:
+                out["falharam"].append(e["card_id"])
+    return out
+
+
 def status_funil(g, est, card_id):
     """Status derivado do lead no funil (spec 16 §5): lead | initiated_checkout | enrolled.
     Derivado de fase+eventos — não é coluna (estado duplicado seria drift na certa)."""

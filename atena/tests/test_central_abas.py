@@ -76,6 +76,17 @@ def test_contato_da_etapa1_vem_copiavel_na_ficha():
     assert conv["inscricao"]["grupos"][0]["titulo"] == "Contato"
 
 
+def test_conversao_usa_o_curso_da_ficha_nao_o_do_card():
+    """Enzo (07/11/2026): card de interesse FEQ-1000, inscrito em FEQ-1150. A Meta
+    precisa receber o curso em que a pessoa se inscreveu."""
+    cid = "meta-19900000021"
+    A.EST.upsert_lead(cid, nome="Enzo", telefone="+5519900000021", curso="FEQ-1000")
+    A.GRW.add_inscricao(cid, "FEQ-1150", "001", json.dumps(FICHA, ensure_ascii=False))
+    _cliente().post(f"/api/inscricoes/{cid}/transcrita")
+    ev = [e for e in A.GRW.eventos(card_id=cid) if e["tipo"] == "inscricao_confirmada"]
+    assert [e["curso"] for e in ev] == ["FEQ-1150"], ev
+
+
 def test_campo_novo_no_formulario_nao_some_da_tela():
     """Campo sem rótulo cai em 'Outros' em vez de sumir — some seria pior que feio:
     o agente transcreveria uma ficha incompleta sem saber."""

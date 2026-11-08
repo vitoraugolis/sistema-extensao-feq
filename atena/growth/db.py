@@ -198,6 +198,11 @@ class Growth:
                 (card_id, curso, tipo, ts or _agora(), capi, valor))
             self.conn.commit()
 
+    def set_evento_capi(self, evento_id, capi):
+        with self._lock:
+            self.conn.execute("UPDATE eventos_funil SET capi=? WHERE id=?", (capi, evento_id))
+            self.conn.commit()
+
     def eventos(self, card_id=None, tipo=None):
         q, args = "SELECT * FROM eventos_funil WHERE 1=1", []
         if card_id:

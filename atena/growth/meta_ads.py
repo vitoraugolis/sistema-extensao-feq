@@ -145,12 +145,12 @@ class MetaAds:
 
     # --------------------------------------------------------------- CAPI
     def capi(self, evento, telefone, event_id, custom=None, *, email=None,
-             action_source=None, contexto=None):
+             action_source=None, contexto=None, event_time=None):
         """Evento server-side ao pixel. PII só sai como SHA-256 (_user_data).
         event_id vindo do NAVEGADOR (ponte) garante a desduplicação Pixel×CAPI —
         nesse caso action_source=website e contexto traz fbp/fbc/ip/ua/url."""
         c = contexto or {}
-        ev = {"event_name": evento, "event_time": int(time.time()),
+        ev = {"event_name": evento, "event_time": int(event_time or time.time()),
               "event_id": event_id,
               "action_source": action_source or "system_generated",
               "user_data": _user_data(telefone, email, c),

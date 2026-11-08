@@ -920,4 +920,29 @@ for _t in _threads_g:
     _t.join()
 check(not _erros_g, f"Growth sob concorrência sem erro de SQLite (achado: {_erros_g[0] if _erros_g else None})")
 
+# ---- reenvio retroativo do CAPI (token vencido de 10/10 a 08/11/2026)
+class _AdsRetro:
+    def __init__(self):
+        self.envios = []
+    def capi(self, evento, tel, eid, custom=None, **kw):
+        self.envios.append((evento, eid, kw.get("event_time")))
+        return {"ok": True}
+gr, er, ar = Growth(":memory:"), Estado(":memory:"), _AdsRetro()
+AGORA_R = datetime.datetime(2026, 11, 8, 20, 0)
+for cid in ("r1", "r2", "r3", "r4"):
+    er.upsert_lead(cid, nome="X", telefone="+5519977770001", curso="FEQ-1000")
+gr.add_evento("r1", "FEQ-1000", "inscricao_confirmada", ts="2026-11-07T10:55:56")        # falhou, recente
+gr.add_evento("r2", "FEQ-1000", "inscricao_confirmada", ts="2026-10-27T09:00:00")        # falhou, velho
+gr.add_evento("r3", "FEQ-1000", "inscricao_confirmada", ts="2026-11-06T09:00:00",
+              capi="inscricao_confirmada-r3")                                            # já foi
+gr.add_evento("r4", "FEQ-1000", "inicio_inscricao", ts="2026-11-07T09:00:00")            # Pixel já contou
+rr = funil.reenviar_falhas(gr, ar, er, agora=AGORA_R)
+check(rr == {"enviados": ["r1"], "falharam": [], "expirados": ["r2"]},
+      f"reenvio só da conversão offline falhada e dentro da janela ({rr})")
+check(ar.envios == [("CompleteRegistration", "inscricao_confirmada-r1",
+                     datetime.datetime(2026, 11, 7, 10, 55, 56).timestamp())],
+      "reenvio usa o event_id de registrar e a hora ORIGINAL do evento")
+check(funil.reenviar_falhas(gr, ar, er, agora=AGORA_R)["enviados"] == [],
+      "reenvio é idempotente: o evento enviado ganha capi e não sai de novo")
+
 print(f"\n{ok} checks OK — growth")

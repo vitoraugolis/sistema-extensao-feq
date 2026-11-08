@@ -459,9 +459,11 @@ def kanban_criar():
     return jsonify({"ok": True, "card_id": card_id, "criado": True})
 
 
-def _mover_fase(lead, card_id, fase):
+def _mover_fase(lead, card_id, fase, curso=None):
     """Núcleo do move de fase (kanban E aba Verificação): estado + espelho FARO +
-    conversão offline idempotente (spec 17 §8). Retorna o event_id CAPI ou None."""
+    conversão offline idempotente (spec 17 §8). Retorna o event_id CAPI ou None.
+    `curso`: o da FICHA inscrita, quando há uma — o card guarda o curso de interesse,
+    que pode ser outro (Enzo, 07/11/2026: card FEQ-1000, inscrito em FEQ-1150)."""
     EST.set_lead(card_id, fase=fase)
     if lead.get("faro_id") and ORQ.faro.ativo:
         try:
@@ -472,12 +474,13 @@ def _mover_fase(lead, card_id, fase):
     tipo = {"Inscrito": "inscricao_confirmada", "Matriculado": "matricula_confirmada"}.get(fase)
     if not tipo or any(e["tipo"] == tipo for e in GRW.eventos(card_id=card_id)):
         return None
+    curso = curso or lead.get("curso") or ""
     try:
-        c = ONTO.ont.curso(lead.get("curso") or "")
+        c = ONTO.ont.curso(curso)
     except Exception:
         c = None
     valor = growth_funil.valor_curso(c) if tipo == "matricula_confirmada" else None
-    return growth_funil.registrar(GRW, ADS, EST, card_id, tipo, valor=valor).get("capi")
+    return growth_funil.registrar(GRW, ADS, EST, card_id, tipo, curso=curso, valor=valor).get("capi")
 
 
 @app.route("/api/leads/<card_id>/mover", methods=["POST"])
@@ -704,7 +707,7 @@ def inscricao_transcrita(card_id):
     usuario = session.get("usuario", "operador")
     ja_transcrita = ficha.get("status") == "transcrita"
     GRW.set_inscricao_status(ficha["id"], "transcrita")
-    capi = _mover_fase(lead, card_id, "Inscrito")
+    capi = _mover_fase(lead, card_id, "Inscrito", curso=ficha["curso"])
     EST.log_acao(usuario, f"ficha transcrita na Extecamp ({ficha['curso']})", card_id)
     # reclique não reenvia a confirmação ao lead
     aviso = {"ok": False, "motivo": "ficha já estava transcrita"} if ja_transcrita \
@@ -809,7 +812,7 @@ def _inscrever_extecamp(card_id, valer):
         if r.get("ok"):
             GRW.set_inscricao_robo(ficha["id"], f"robô: inscrito ({r['caminho']})", link=r["link"])
             GRW.set_inscricao_status(ficha["id"], "transcrita")
-            r["conversao_offline"] = _mover_fase(lead, card_id, "Inscrito")
+            r["conversao_offline"] = _mover_fase(lead, card_id, "Inscrito", curso=ficha["curso"])
             r["aviso_lead"] = _avisar_continuidade(EST.get_lead(card_id), r["link"])
             EST.log_acao("robô", f"inscrição feita na Extecamp ({ficha['curso']}, {r['caminho']})", card_id)
         else:
