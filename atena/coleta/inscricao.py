@@ -161,7 +161,9 @@ def variantes_documento(numero, emissor="", cpf=""):
         out += [f"MG{b}" for b in base] + [f"MG-{b}" for b in base] + [f"MG {b}" for b in base]
     c = _dig(cpf)
     if len(c) == 11:
-        out += [c, f"{c[:3]}.{c[3:6]}.{c[6:9]}-{c[9:]}"]
+        # 999999999-99: é assim que a Extecamp guarda o CPF que o robô manda como CIN
+        # (tira os pontos, mantém o hífen) — Julio, 10/11/2026, inscrito e não achado.
+        out += [f"{c[:9]}-{c[9:]}", c, f"{c[:3]}.{c[3:6]}.{c[6:9]}-{c[9:]}"]
     return [v for v in dict.fromkeys(o.strip() for o in out) if len(_dig(v)) >= 5]
 
 

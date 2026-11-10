@@ -159,6 +159,8 @@ v = I.variantes_documento("MG-12.345.678", "MG", "12345678909")
 check({"MG-12.345.678", "12345678", "1234567-8", "MG12345678", "MG-12345678"} <= set(v),
       "MG: com/sem prefixo MG e com/sem hífen do dígito")
 check("123.456.789-09" in v and "12345678909" in v, "CPF entra (CIN usa o número do CPF)")
+check("123456789-09" in I.variantes_documento("123.456.789-09", "SC", "123.456.789-09"),
+      "CIN: busca o CPF como a Extecamp o guarda (sem pontos, com hífen antes do DV)")
 check(I.variantes_documento("12.345.678-X")[:1] == ["12.345.678-X"] and "12345678-X" in I.variantes_documento("12.345.678-X"),
       "SP com dígito X: como digitado primeiro, depois só com hífen")
 
