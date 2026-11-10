@@ -90,7 +90,8 @@ sudo mkdir -p /etc/caddy
 # enquanto o DNS do domínio não propagou). Caddy emite/renova os dois
 # certificados via ACME sozinho; se o domínio ainda não resolver pra cá, só a
 # tentativa dele falha e tenta de novo depois — o site em sslip.io não é afetado.
-printf '%s.sslip.io {\n  reverse_proxy localhost:8095\n}\n\nfeq.vitoraugolis.com.br {\n  reverse_proxy localhost:8095\n}\n' "$IP_PUB" | sudo tee /etc/caddy/Caddyfile >/dev/null
+# Outros apps da VM (ex.: guara) ficam em /etc/caddy/*.caddy: o import os preserva a cada deploy.
+printf '%s.sslip.io {\n  reverse_proxy localhost:8095\n}\n\nfeq.vitoraugolis.com.br {\n  reverse_proxy localhost:8095\n}\n\nimport /etc/caddy/*.caddy\n' "$IP_PUB" | sudo tee /etc/caddy/Caddyfile >/dev/null
 # systemd: app
 sudo tee /etc/systemd/system/atena.service >/dev/null <<EOF
 [Unit]
