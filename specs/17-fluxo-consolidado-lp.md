@@ -364,6 +364,15 @@ na LP no momento do modal — é isso que liga a conversão à campanha original
 maximiza o Event Match Quality. Enviar em até 7 dias (janela de atribuição);
 `GROWTH_TEST_EVENT_CODE` para homologar no Test Events antes de valer.
 
+**Por marco, não por nome de fase** (11/11/2026): a conversão sai para todo marco que a
+fase *alcançou* (`estado.alcancou`) e ainda não foi reportado — card que vai direto a
+"Taxa aceita"/"Taxa paga" também gera `inscricao_confirmada`. A **coleta Extecamp**
+(spec 20) dispara o mesmo reporte para os cards que ela faz avançar (não para os que
+ela cria: esses não vieram das nossas campanhas). Ficha transcrita, robô e verificação
+**nunca regridem** a fase: quem a coleta já viu além de Inscrito fica onde está.
+Caso Débora (08/11/2026): inscreveu-se sozinha, a coleta a pôs em "Taxa aceita" e a
+conversão nunca saiu.
+
 ### 8a. Aviso ao lead quando a ficha é transcrita (27/10/2026)
 
 `POST /api/inscricoes/<id>/transcrita` (botão "Marcar como transcrita na Extecamp")
@@ -371,7 +380,7 @@ envia ao lead o template **`feq_inscricao_efetuada`** (UTILITY): inscrição efe
 instruções de matrícula no e-mail informado na LP, "responda aqui se não recebeu".
 Variáveis: primeiro nome, curso (nome + código) e e-mail do card. Não envia — e a
 resposta `aviso_lead` diz por quê, mostrado num alerta na Central — quando: a ficha já
-estava transcrita (reclique), o lead não tem e-mail, pediu opt-out, ou o template ainda
+estava transcrita (reclique), o lead já aparece inscrito pela coleta (inscreveu-se sozinho), o lead não tem e-mail, pediu opt-out, ou o template ainda
 não está APPROVED na Meta. A transcrição em si nunca falha por causa do aviso.
 Submissão à Meta: `python3 -m atena.ops.criar_template_inscricao`.
 

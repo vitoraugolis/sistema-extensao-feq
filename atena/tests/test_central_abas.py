@@ -257,3 +257,36 @@ if __name__ == "__main__":
             print(f"ERRO  {fn.__name__}  {type(e).__name__}: {e}")
     print(f"\n{len(casos) - falhas}/{len(casos)} passaram.")
     sys.exit(1 if falhas else 0)
+
+
+def test_transcrever_quem_ja_avancou_nao_regride_nem_avisa():
+    """Débora (08/11/2026): inscreveu-se sozinha e a coleta a pôs em "Taxa aceita".
+    Tirar a ficha da fila não pode devolvê-la a "Inscrito" nem mandar o template de
+    inscrição efetuada — mas a conversão que nunca saiu tem de sair."""
+    enviados = []
+    orig = A.WA.enviar_template
+    A.WA.enviar_template = lambda *a, **k: enviados.append(a) or {"ok": True}
+    try:
+        cid = _com_ficha("meta-19900000031")
+        A.EST.set_lead(cid, fase="Taxa aceita", email="d@x.com")
+        r = _cliente().post(f"/api/inscricoes/{cid}/transcrita").get_json()
+        assert A.EST.get_lead(cid)["fase"] == "Taxa aceita"
+        assert not r["aviso_lead"]["ok"] and not enviados, r
+        tipos = [e["tipo"] for e in A.GRW.eventos(card_id=cid)]
+        assert tipos.count("inscricao_confirmada") == 1, tipos
+    finally:
+        A.WA.enviar_template = orig
+
+
+def test_conversao_por_marco_alcancado():
+    """Pular "Inscrito" (coleta ou kanban direto em "Taxa paga") também é inscrição;
+    chegar a "Matriculado" reporta as duas, uma vez cada."""
+    cid = "meta-19900000032"
+    A.EST.upsert_lead(cid, nome="X", telefone="+5519900000032", curso="FEQ-0480", fase="Prospect")
+    lead = A.EST.get_lead(cid)
+    A._reportar_conversoes(lead, cid, "Taxa paga")
+    A._reportar_conversoes(lead, cid, "Matriculado")
+    A._reportar_conversoes(lead, cid, "Matriculado")
+    A._reportar_conversoes(lead, cid, "Cancelado")
+    tipos = sorted(e["tipo"] for e in A.GRW.eventos(card_id=cid))
+    assert tipos == ["inscricao_confirmada", "matricula_confirmada"], tipos

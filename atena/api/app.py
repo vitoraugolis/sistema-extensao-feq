@@ -470,17 +470,38 @@ def _mover_fase(lead, card_id, fase, curso=None):
             ORQ.faro.mover(lead["faro_id"], fase)
         except Exception as e:
             print(f"[faro] mover falhou: {e}", flush=True)
-    # Conversão offline (spec 17 §8): o gesto do operador É o reporte à Meta.
-    tipo = {"Inscrito": "inscricao_confirmada", "Matriculado": "matricula_confirmada"}.get(fase)
-    if not tipo or any(e["tipo"] == tipo for e in GRW.eventos(card_id=card_id)):
-        return None
+    return _reportar_conversoes(lead, card_id, fase, curso)
+
+
+def _reportar_conversoes(lead, card_id, fase, curso=None):
+    """Conversão offline (spec 17 §8): reporta à Meta cada marco que `fase` ALCANÇOU
+    e ainda não foi reportado. Por marco, não por nome de fase: quem a coleta leva
+    direto de Prospect a "Taxa aceita" também se inscreveu (Débora, 08/11/2026 —
+    antes só "Inscrito" exato disparava, e a conversão dela nunca saiu)."""
+    from atena.core.estado import alcancou
+    ja = {e["tipo"] for e in GRW.eventos(card_id=card_id)}
     curso = curso or lead.get("curso") or ""
-    try:
-        c = ONTO.ont.curso(curso)
-    except Exception:
-        c = None
-    valor = growth_funil.valor_curso(c) if tipo == "matricula_confirmada" else None
-    return growth_funil.registrar(GRW, ADS, EST, card_id, tipo, curso=curso, valor=valor).get("capi")
+    capi = None
+    for marco, tipo in (("Inscrito", "inscricao_confirmada"), ("Matriculado", "matricula_confirmada")):
+        if not alcancou(fase, marco) or tipo in ja:
+            continue
+        valor = None
+        if tipo == "matricula_confirmada":
+            try:
+                valor = growth_funil.valor_curso(ONTO.ont.curso(curso))
+            except Exception:
+                valor = growth_funil.valor_curso(None)
+        capi = growth_funil.registrar(GRW, ADS, EST, card_id, tipo, curso=curso, valor=valor).get("capi")
+    return capi
+
+
+def _confirmar_inscricao(lead, card_id, curso=None):
+    """Inscrição confirmada por nós (ficha transcrita, robô, verificação): o card vai
+    para "Inscrito" — mas quem a coleta já viu MAIS adiante (taxa aceita, paga...)
+    fica onde está. Voltar a fase apagaria o degrau que a Extecamp mostrou."""
+    from atena.core.estado import alcancou
+    fase = lead.get("fase") if alcancou(lead.get("fase"), "Inscrito") else "Inscrito"
+    return _mover_fase(lead, card_id, fase, curso=curso)
 
 
 @app.route("/api/leads/<card_id>/mover", methods=["POST"])
@@ -601,9 +622,9 @@ def lead_verificar(card_id):
         return jsonify({"erro": "faltou 'inscrito' (true/false)"}), 400
     usuario = session.get("usuario", "operador")
     if b["inscrito"]:
-        capi = _mover_fase(lead, card_id, "Inscrito")
+        capi = _confirmar_inscricao(lead, card_id)
         EST.log_acao(usuario, "verificação Extecamp: inscrito ✓", card_id)
-        return jsonify({"ok": True, "fase": "Inscrito", "conversao_offline": capi})
+        return jsonify({"ok": True, "fase": EST.get_lead(card_id)["fase"], "conversao_offline": capi})
     GRW.add_evento(card_id, lead.get("curso") or "", "verificacao_negativa")
     r = growth_funil.ativar_um(GRW, EST, ONTO.ont, WA, card_id)
     EST.log_acao(usuario, "verificação Extecamp: NÃO inscrito -> ativação imediata "
@@ -705,12 +726,16 @@ def inscricao_transcrita(card_id):
     if not lead or not ficha:
         return jsonify({"erro": "ficha ou lead inexistente"}), 404
     usuario = session.get("usuario", "operador")
+    from atena.core.estado import alcancou
     ja_transcrita = ficha.get("status") == "transcrita"
+    # a coleta já viu a pessoa inscrita: ela se inscreveu sozinha e já sabe disso
+    ja_inscrito = alcancou(lead.get("fase"), "Inscrito")
     GRW.set_inscricao_status(ficha["id"], "transcrita")
-    capi = _mover_fase(lead, card_id, "Inscrito", curso=ficha["curso"])
+    capi = _confirmar_inscricao(lead, card_id, curso=ficha["curso"])
     EST.log_acao(usuario, f"ficha transcrita na Extecamp ({ficha['curso']})", card_id)
     # reclique não reenvia a confirmação ao lead
     aviso = {"ok": False, "motivo": "ficha já estava transcrita"} if ja_transcrita \
+        else {"ok": False, "motivo": "lead já aparece inscrito na Extecamp"} if ja_inscrito \
         else _avisar_inscricao_efetuada(EST.get_lead(card_id))
     return jsonify({"ok": True, "status": "transcrita", "conversao_offline": capi,
                     "aviso_lead": aviso})
@@ -812,7 +837,7 @@ def _inscrever_extecamp(card_id, valer):
         if r.get("ok"):
             GRW.set_inscricao_robo(ficha["id"], f"robô: inscrito ({r['caminho']})", link=r["link"])
             GRW.set_inscricao_status(ficha["id"], "transcrita")
-            r["conversao_offline"] = _mover_fase(lead, card_id, "Inscrito", curso=ficha["curso"])
+            r["conversao_offline"] = _confirmar_inscricao(lead, card_id, curso=ficha["curso"])
             r["aviso_lead"] = _avisar_continuidade(EST.get_lead(card_id), r["link"])
             EST.log_acao("robô", f"inscrição feita na Extecamp ({ficha['curso']}, {r['caminho']})", card_id)
         else:
@@ -2289,6 +2314,11 @@ def coleta_pagina():
             contatos = json.loads(EST.get_config(chave) or "{}")
             r = coleta_sinc.sincronizar(EST, dados, contatos=contatos)
             resposta["resumo"] = r
+            # quem a coleta fez avançar é conversão como as do operador.
+            # ponytail: só cards que já existiam; `criados` não veio de campanha nossa.
+            for m in (r.get("movidos") or []):
+                _reportar_conversoes(EST.get_lead(m["card_id"]) or {}, m["card_id"],
+                                     m["para"], curso=dados.get("curso"))
             # a listagem pagina de 20 em 20: enfileira as páginas 2..N
             if dados.get("paginas", 1) > 1 and "pagina_form" not in url:
                 for n in range(2, dados["paginas"] + 1):
