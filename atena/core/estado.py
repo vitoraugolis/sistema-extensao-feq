@@ -73,6 +73,11 @@ CREATE TABLE IF NOT EXISTS campanhas(
   id INTEGER PRIMARY KEY AUTOINCREMENT, nome TEXT, template_nome TEXT, template_idioma TEXT,
   filtro_json TEXT, status TEXT DEFAULT 'rascunho', total_alvo INTEGER DEFAULT 0,
   criado TEXT, criado_por TEXT, cancelar INTEGER DEFAULT 0);
+-- Funil e Conversas consultam histórico/decisão POR LEAD (700+ leads a cada refresh).
+-- Sem estes índices cada consulta varria a tabela inteira: /api/kanban levava 18 s
+-- e as requisições do polling se empilhavam, travando todas as abas (11/11/2026).
+CREATE INDEX IF NOT EXISTS ix_conversas_card ON conversas(card_id, id);
+CREATE INDEX IF NOT EXISTS ix_decisoes_card ON decisoes(card_id, status);
 """
 
 # Fases do funil comercial de professores (ordem = ordem das colunas no quadro).
