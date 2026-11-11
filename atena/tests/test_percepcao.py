@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Percepção de mídia: áudio -> transcrição (Whisper), imagem -> descrição (Claude).
+Percepção de mídia: áudio -> transcrição (Whisper), imagem -> descrição (GPT).
 
 O requisito que mais importa aqui NÃO é transcrever bem — é nunca quebrar a conversa
 quando a transcrição falha. Lead que manda áudio já era mal atendido com o rótulo cego;
@@ -40,9 +40,8 @@ sem_chave = dict(os.environ)
 os.environ.pop("OPENAI_API_KEY", None)
 check(percepcao.transcrever_audio(falso, "audio/ogg") is None,
       "sem OPENAI_API_KEY devolve None (não estoura exceção)")
-os.environ.pop("ANTHROPIC_API_KEY", None)
 check(percepcao.descrever_imagem(falso, "image/jpeg") is None,
-      "sem ANTHROPIC_API_KEY devolve None (não estoura exceção)")
+      "visão sem OPENAI_API_KEY devolve None (não estoura exceção)")
 os.environ.update(sem_chave)
 
 check(percepcao.transcrever_audio("/caminho/que/nao/existe", "audio/ogg") is None,

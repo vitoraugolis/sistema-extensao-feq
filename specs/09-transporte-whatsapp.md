@@ -123,11 +123,11 @@ mal atendido**. Agora:
 | entrada | processador | resultado |
 |---|---|---|
 | áudio (`audio/ogg` de voz do WhatsApp, mp3, m4a, wav, webm) | **OpenAI Whisper** (`whisper-1`) | transcrição do que o lead falou |
-| imagem (`jpeg/png/gif/webp`) e figurinha | **Claude (visão)** | descrição objetiva + transcrição do texto visível |
+| imagem (`jpeg/png/gif/webp`) e figurinha | **GPT (visão)** (`OPENAI_VISION_MODEL`, default `gpt-4o-mini`) | descrição objetiva + transcrição do texto visível |
 
-Imagem fica no Claude porque é o provedor que **já** processa todo o conteúdo das
-conversas — não faz sentido abrir um segundo processador de dados pessoais só para isso.
-Áudio vai ao Whisper porque o Claude não transcreve áudio.
+Imagem vai à OpenAI desde 11/11/2026 (antes Claude; o crédito da Anthropic esgotou e
+toda imagem saía sem descrição). A OpenAI já é a processadora dos áudios, então a troca
+não abre um novo processador de dados pessoais.
 
 Detalhes que a implementação precisou resolver:
 - **Extensão do arquivo**: as mídias são gravadas como `data/media/<media_id>`, sem

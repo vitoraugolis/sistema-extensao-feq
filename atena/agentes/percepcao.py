@@ -7,11 +7,10 @@ Muita gente manda áudio em vez de digitar. Até aqui o cérebro recebia apenas 
 — na prática, quem prefere áudio era mal atendido.
 
   áudio  -> OpenAI Whisper  (transcrição do que o lead falou)
-  imagem -> Claude (visão)  (descrição objetiva + transcrição do texto visível)
+  imagem -> GPT (visão, OPENAI_VISION_MODEL, default gpt-4o-mini)
 
-Imagem fica no Claude porque é o provedor que já processa TODO o conteúdo das conversas
-— não faz sentido abrir um segundo processador de dados pessoais só para isso. Áudio vai
-ao Whisper porque o Claude não transcreve áudio.
+Imagem foi para a OpenAI em 11/11/2026 (crédito da Anthropic esgotado): ela já é
+processadora dos áudios, então não abre um terceiro processador de dados pessoais.
 
 DEGRADA EM SILÊNCIO, sempre: sem chave, formato não suportado, arquivo grande demais,
 timeout ou erro da API -> devolve None e o orquestrador volta ao rótulo antigo. Perceber
@@ -40,7 +39,7 @@ _EXT_AUDIO = {
     "audio/mp4": "m4a", "audio/x-m4a": "m4a", "audio/aac": "m4a",
     "audio/wav": "wav", "audio/x-wav": "wav", "audio/webm": "webm",
 }
-# tipos que a API de visão do Claude aceita
+# tipos que a API de visão aceita
 _MIME_IMAGEM = {"image/jpeg", "image/png", "image/gif", "image/webp"}
 
 _LIMITE_AUDIO_MB = 24     # limite do Whisper é 25 MB (o do WhatsApp já é 16)
@@ -105,9 +104,10 @@ def transcrever_audio(caminho, mime):
 
 
 def descrever_imagem(caminho, mime):
-    """Imagem -> descrição objetiva + texto visível, via Claude. None em qualquer falha."""
-    from atena.agentes.cerebro import _claude, chave_do
-    chave = chave_do("claude")
+    """Imagem -> descrição objetiva + texto visível, via GPT (OpenAI, mesma chave do
+    Whisper). None em qualquer falha. Era Claude até 11/11/2026 (crédito esgotado)."""
+    import requests
+    chave = os.environ.get("OPENAI_API_KEY")
     m = (mime or "").split(";")[0].strip().lower()
     if not (chave and m in _MIME_IMAGEM):
         return None
@@ -115,15 +115,22 @@ def descrever_imagem(caminho, mime):
     if not dados:
         return None
     try:
-        # _claude repassa `messages` direto no corpo, então o conteúdo em blocos
-        # (imagem + texto) do formato de visão passa sem precisar de cliente novo.
-        saida = _claude(
-            chave, os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-4-6"),
-            "Você descreve imagens para um atendente humano, com precisão e sem especular.",
-            [{"role": "user", "content": [
-                {"type": "image", "source": {"type": "base64", "media_type": m,
-                                             "data": base64.b64encode(dados).decode()}},
-                {"type": "text", "text": _PROMPT_IMAGEM}]}])
+        # não usa cerebro._openai: ele força response_format=json, e aqui a saída é prosa
+        r = requests.post(
+            "https://api.openai.com/v1/chat/completions", timeout=60,
+            headers={"Authorization": f"Bearer {chave}"},
+            json={"model": os.environ.get("OPENAI_VISION_MODEL", "gpt-4o-mini"),
+                  "max_completion_tokens": 800,
+                  "messages": [
+                      {"role": "system", "content": "Você descreve imagens para um atendente "
+                                                    "humano, com precisão e sem especular."},
+                      {"role": "user", "content": [
+                          {"type": "image_url", "image_url": {
+                              "url": f"data:{m};base64,{base64.b64encode(dados).decode()}"}},
+                          {"type": "text", "text": _PROMPT_IMAGEM}]}]})
+        if r.status_code != 200:
+            raise RuntimeError(f"OpenAI {r.status_code}: {r.text[:140]}")
+        saida = r.json()["choices"][0]["message"]["content"]
         return (saida or "").strip()[:_MAX_CARACTERES] or None
     except Exception as e:
         print(f"[percepcao] visão falhou: {type(e).__name__}: {e}", flush=True)
