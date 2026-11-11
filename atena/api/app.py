@@ -295,16 +295,21 @@ def conversas():
         if not hist and not prop:
             continue   # nunca houve contato nem proposta -> não é uma "conversa" ainda
         ult = hist[-1] if hist else None
+        # relógio da conversa = última MENSAGEM (como o WhatsApp), não `atualizado`
+        # do lead — coleta, mudança de fase e notas mexem nele e embaralhavam a lista
+        quando = (ult or {}).get("ts") or (prop or {}).get("ts") or l["atualizado"]
         out.append({"id": l["card_id"], "lead": l["nome"], "iniciais": _iniciais(l["nome"]),
+                    "_quando": quando,
                     "telefone": l.get("telefone") or "",   # fallback de exibição sem nome
                     "curso": l["curso"], "cursos": EST.cursos_interesse(l),  # filtro por curso (aba Conversas)
-                    "estado": l["estado_conversa"], "ha": _ha(l["atualizado"]),
+                    "estado": l["estado_conversa"], "ha": _ha(quando),
                     "optout": bool(l.get("optout")), "modo": l.get("modo") or "auto",
                     "preview": _preview(ult)[:80],
                     "preview_de_lead": bool(ult and ult["papel"] == "lead"),
                     "aguardando": bool(ult and ult["papel"] == "lead"),   # último turno foi do lead
                     "nao_lidas": nao_lidas.get(l["card_id"], 0),
                     "pendente": bool(prop)})
+    out.sort(key=lambda c: c.pop("_quando") or "", reverse=True)
     return jsonify(out)
 
 

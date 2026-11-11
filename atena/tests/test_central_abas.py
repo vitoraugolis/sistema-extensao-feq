@@ -290,3 +290,18 @@ def test_conversao_por_marco_alcancado():
     A._reportar_conversoes(lead, cid, "Cancelado")
     tipos = sorted(e["tipo"] for e in A.GRW.eventos(card_id=cid))
     assert tipos == ["inscricao_confirmada", "matricula_confirmada"], tipos
+
+
+def test_lista_de_conversas_segue_a_ultima_mensagem():
+    """Como no WhatsApp: no topo, a conversa com a mensagem mais recente — mexer no
+    lead (fase, coleta, notas) não pode reordenar a lista."""
+    a, b = "meta-19900000041", "meta-19900000042"
+    for cid in (a, b):
+        A.EST.upsert_lead(cid, nome=cid, telefone="+55" + cid[-11:], curso="FEQ-0480")
+    A.EST.add_conversa(a, "lead", "oi")
+    A.EST.add_conversa(b, "lead", "oi")
+    A.EST.conn.execute("UPDATE conversas SET ts='2026-11-01T10:00:00' WHERE card_id=?", (a,))
+    A.EST.conn.execute("UPDATE conversas SET ts='2026-11-02T10:00:00' WHERE card_id=?", (b,))
+    A.EST.set_lead(a, notas="mexido depois")        # `atualizado` de A fica mais novo
+    ids = [c["id"] for c in _cliente().get("/api/conversas").get_json() if c["id"] in (a, b)]
+    assert ids == [b, a], ids
