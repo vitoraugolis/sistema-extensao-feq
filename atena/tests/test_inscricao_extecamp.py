@@ -115,7 +115,10 @@ class FakeExtecamp:
         if "seleciona_cidade.php" in url:
             return R(CIDADES_SP if url.endswith("=SP") else "<select name='pf_cid'></select>")
         if "ok-inscricao_taxa.php?id1=%F1" in url:
-            return R("<p>Pré inscrição foi concluída! MARIA</p>" if self.inscrito else "<p>?</p>")
+            # a Extecamp devolve o MESMO modelo sem inscrição, só com data/nº em branco
+            return R("<p>Pré inscrição foi concluída! MARIA, sua pré inscrição foi realizada em: "
+                     + ("<b>10-11-2026 15:50</b>. Você é o 20° inscrito(a).</p>" if self.inscrito
+                        else ". Você é o ° inscrito(a).</p>"))
         if "inscricao.php?id1=%F1" in url:
             return R(ficha_html(self.pref))
         if "viacep" in url:
@@ -163,6 +166,16 @@ check("123456789-09" in I.variantes_documento("123.456.789-09", "SC", "123.456.7
       "CIN: busca o CPF como a Extecamp o guarda (sem pontos, com hífen antes do DV)")
 check(I.variantes_documento("12.345.678-X")[:1] == ["12.345.678-X"] and "12345678-X" in I.variantes_documento("12.345.678-X"),
       "SP com dígito X: como digitado primeiro, depois só com hífen")
+
+print("página de confirmação")
+class _Pag:
+    def __init__(self, html): self.html = html
+    def get(self, url, **kw): return R(self.html)
+_vazia = "Pré inscrição foi concluída! , sua pré inscrição foi realizada em: . Você é o ° inscrito(a)."
+_cheia = "Pré inscrição foi concluída! X, sua pré inscrição foi realizada em: 10-11-2026 15:50 . Você é o 20° inscrito(a)."
+check(I._ja_inscrito(_Pag(_vazia), "id1=x") is None,
+      "'concluída' com data/nº em branco NÃO é inscrição (Handerson, 11/11/2026)")
+check(I._ja_inscrito(_Pag(_cheia), "id1=x"), "'concluída' com data e nº é inscrição")
 
 print("primeiro cadastro (dry-run)")
 fx = FakeExtecamp()

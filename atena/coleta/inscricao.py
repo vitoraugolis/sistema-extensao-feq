@@ -416,6 +416,10 @@ def _data_nascimento(html, dma):
 
 
 _CONCLUIDA = re.compile(r"inscri[çc][ãa]o foi conclu[íi]da", re.I)
+# A página diz "concluída" MESMO SEM inscrição — só com a data e o nº em branco
+# ("realizada em: . Você é o ° inscrito"). Handerson, 11/11/2026: o robô viu o
+# "concluída" vazio, achou que ele já estava inscrito e não enviou a ficha.
+_REALIZADA_EM = re.compile(r"realizada\s+em:?\s*(?:<[^>]*>\s*)*\d{2}[-/]\d{2}[-/]\d{4}", re.I)
 
 
 def _ja_inscrito(http, query):
@@ -425,7 +429,8 @@ def _ja_inscrito(http, query):
     if not query:
         return None
     url = urljoin(BASE, "ok-inscricao_taxa.php?" + query)
-    return url if _CONCLUIDA.search(_texto(http.get(url))) else None
+    pag = _texto(http.get(url))
+    return url if _CONCLUIDA.search(pag) and _REALIZADA_EM.search(pag) else None
 
 
 def _localizar(http, url_curso, ficha):

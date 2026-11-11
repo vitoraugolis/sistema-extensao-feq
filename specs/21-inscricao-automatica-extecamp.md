@@ -34,7 +34,10 @@ e a Extecamp devolveu a ficha com "ATENÇÃO: Favor verificar os campos em desta
 **a inscrição foi feita** (conferido no ADM Cursos em 07/11). A resposta do POST não é
 confiável; a palavra final é a **página de confirmação** `ok-inscricao_taxa.php?<ids>`, com
 os ids do redirect em JS da tela de nascimento. Ela mostra "Pré inscrição foi concluída!"
-quando a pessoa está inscrita na turma (`_ja_inscrito`, só leitura). O robô a consulta:
+quando a pessoa está inscrita na turma (`_ja_inscrito`, só leitura) — **mas só vale com a
+data e o nº de inscrito preenchidos**: sem inscrição a Extecamp devolve o mesmo modelo
+"concluída" com "realizada em: . Você é o ° inscrito" em branco (Handerson, 11/11/2026:
+o robô tomou isso por inscrição e não enviou a ficha). O robô a consulta:
 - **antes** de enviar, sempre que acha o cadastro (ex-aluno já inscrito → devolve o link, não envia);
 - **depois** de um envio sem link, refazendo a busca (primeiro cadastro inscrito → link).
 Falha que sobra guarda a página em `atena/data/extecamp_falhas/<card_id>.html` (PII; só no VPS).
