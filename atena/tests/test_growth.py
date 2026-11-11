@@ -945,4 +945,15 @@ check(ar.envios == [("CompleteRegistration", "inscricao_confirmada-r1",
 check(funil.reenviar_falhas(gr, ar, er, agora=AGORA_R)["enviados"] == [],
       "reenvio é idempotente: o evento enviado ganha capi e não sai de novo")
 
+# ---- inscrição também vai como Lead (conjuntos da Meta otimizam para Lead, 11/11/2026)
+ar2 = _AdsRetro()
+er.upsert_lead("r5", nome="X", telefone="+5519977770005", curso="FEQ-1000")
+funil.registrar(gr, ar2, er, "r5", "inscricao_confirmada")
+check([e[:2] for e in ar2.envios] == [("CompleteRegistration", "inscricao_confirmada-r5"),
+                                       ("Lead", "Lead-inscricao_confirmada-r5")],
+      "inscrição confirmada envia CompleteRegistration E Lead, com event_ids distintos")
+ar3 = _AdsRetro()
+funil.registrar(gr, ar3, er, "r5", "matricula_confirmada", valor=3900)
+check([e[0] for e in ar3.envios] == ["Purchase"], "matrícula não ganha Lead extra")
+
 print(f"\n{ok} checks OK — growth")

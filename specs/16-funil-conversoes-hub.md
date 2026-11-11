@@ -114,7 +114,7 @@ mesma governança híbrida da spec 15. Tudo fica auditável em `acoes_orcamento`
 |---|---|---|
 | `inicio_inscricao` | InitiateCheckout | ponte (website) ou operador |
 | `boleto_gerado` | InitiateCheckout | operador |
-| `inscricao_confirmada` | CompleteRegistration | operador / motor |
+| `inscricao_confirmada` | CompleteRegistration + Lead | operador / motor |
 | `matricula_confirmada` | Purchase (valor real) | CLI de matrículas |
 
 - `optin_fonte` agora reflete a origem real (`meta_lead_ad` ou `ponte`).

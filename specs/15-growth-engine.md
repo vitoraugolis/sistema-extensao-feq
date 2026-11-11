@@ -118,7 +118,7 @@ Curso ↔ campanha: código `FEQ-XXXX` no nome da campanha/conjunto
 |---|---|---|
 | `inicio_inscricao` | InitiateCheckout | lead abriu a inscrição (ponte/Extecamp) |
 | `boleto_gerado` | InitiateCheckout | boleto emitido |
-| `inscricao_confirmada` | CompleteRegistration | inscrição efetivada |
+| `inscricao_confirmada` | CompleteRegistration **+ Lead** (event_id `Lead-<id>`; os conjuntos otimizam para Lead, 11/11/2026) | inscrição efetivada |
 | `matricula_confirmada` | Purchase (valor real, BRL) | matrícula offline (spec 16) |
 
 - `user_data.ph` = SHA-256 do telefone E.164 (digits-only, DDI 55). Sem e-mail no estado.

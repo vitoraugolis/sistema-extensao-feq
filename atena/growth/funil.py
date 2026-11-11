@@ -21,6 +21,10 @@ EVENTO_CAPI = {"inicio_inscricao": "InitiateCheckout",
                "lista_espera": "Lead",
                "inscricao_confirmada": "CompleteRegistration",
                "matricula_confirmada": "Purchase"}   # offline, com valor real (spec 16)
+# Eventos ADICIONAIS por tipo. Os conjuntos da Meta otimizam para Lead e a inscrição só
+# saía como CompleteRegistration: a Meta contava zero (11/11/2026). event_id próprio
+# ("Lead-<eid>"), senão a Meta desduplicaria contra o CompleteRegistration.
+EVENTOS_EXTRA = {"inscricao_confirmada": ("Lead",)}
 RECUPERAR_APOS_H = {"etapa1": 2,             # parou na etapa 1 da LP: 2h -> "posso ajudar?" (spec 17 §7)
                     "inicio_inscricao": 2,   # concluiu a etapa 2 e não converteu
                     "boleto_gerado": 24}     # boleto: prazo de compensação é maior
@@ -65,6 +69,10 @@ def registrar(g, ads, est, card_id, tipo, curso=None, agora=None, event_id=None,
                      action_source="website" if contexto else None, contexto=contexto)
         if r.get("ok"):
             capi_id = eid
+        for extra in EVENTOS_EXTRA.get(tipo, ()):
+            # ponytail: falha do extra não entra em reenviar_falhas; só o principal é reenviado
+            ads.capi(extra, tel, f"{extra}-{eid}", custom, email=email,
+                     action_source="website" if contexto else None, contexto=contexto)
     g.add_evento(card_id, curso, tipo, ts=ts, capi=capi_id, valor=valor)
     if est:
         est.log_acao("growth", f"evento {tipo} ({curso}) capi={capi_id or 'não'}", card_id)
